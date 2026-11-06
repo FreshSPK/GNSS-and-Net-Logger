@@ -294,6 +294,7 @@ class MainActivity : ComponentActivity() {
 
                 if (showHelpDialog) {
                     AboutAndHelpDialog(
+                        lang = currentLang,
                         onDismiss = { showHelpDialog = false }
                     )
                 }

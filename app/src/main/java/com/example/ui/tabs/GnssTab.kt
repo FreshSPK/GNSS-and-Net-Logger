@@ -3,13 +3,12 @@ package com.example.ui.tabs
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +36,7 @@ fun GnssTab(
     gnss: GnssState,
     lang: String
 ) {
+    val isCs = lang != "EN"
     var selectedFilter by remember { mutableStateOf("ALL") } // "ALL", "L5", "GPS", "GALILEO", "GLONASS", "BEIDOU"
     var activeSubTab by remember { mutableStateOf(GnssSubTab.SKYPLOT_RADAR) }
     var showDopInfoDialog by remember { mutableStateOf(false) }
@@ -66,7 +66,7 @@ fun GnssTab(
         ) {
             Column {
                 Text(
-                    text = "GNSS SATELITY A PÁSMA",
+                    text = if (isCs) "GNSS SATELITY A PÁSMA" else "GNSS SATELLITES & BANDS",
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = TextSecondaryDark,
                     fontWeight = FontWeight.Bold
@@ -80,7 +80,7 @@ fun GnssTab(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "/ ${gnss.satellitesInView} v dosahu",
+                        text = if (isCs) "/ ${gnss.satellitesInView} v dosahu" else "/ ${gnss.satellitesInView} in view",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimaryDark
                     )
@@ -123,12 +123,12 @@ fun GnssTab(
             FilterChip(
                 selected = selectedFilter == "ALL",
                 onClick = { selectedFilter = "ALL" },
-                label = { Text("Všechny (${gnss.satellitesInView})") }
+                label = { Text(if (isCs) "Všechny (${gnss.satellitesInView})" else "All (${gnss.satellitesInView})") }
             )
             FilterChip(
                 selected = selectedFilter == "L5",
                 onClick = { selectedFilter = "L5" },
-                label = { Text("Pouze L5/E5a (${gnss.l5Count})") }
+                label = { Text(if (isCs) "Pouze L5 / E5a (${gnss.l5Count})" else "L5 / E5a Only (${gnss.l5Count})") }
             )
             FilterChip(
                 selected = selectedFilter == "GPS",
@@ -171,17 +171,17 @@ fun GnssTab(
             Tab(
                 selected = activeSubTab == GnssSubTab.SKYPLOT_RADAR,
                 onClick = { activeSubTab = GnssSubTab.SKYPLOT_RADAR },
-                text = { Text("Skyplot Radar", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                text = { Text(if (isCs) "Skyplot Radar" else "Skyplot Radar", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             )
             Tab(
                 selected = activeSubTab == GnssSubTab.SIGNALY_CN0,
                 onClick = { activeSubTab = GnssSubTab.SIGNALY_CN0 },
-                text = { Text("Signály C/N0", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                text = { Text(if (isCs) "Signály C/N0" else "C/N0 Signals", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             )
             Tab(
                 selected = activeSubTab == GnssSubTab.PODROBNA_TABULKA,
                 onClick = { activeSubTab = GnssSubTab.PODROBNA_TABULKA },
-                text = { Text("Podrobná tabulka", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                text = { Text(if (isCs) "Podrobná tabulka" else "Detailed Table", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             )
         }
 
@@ -193,7 +193,6 @@ fun GnssTab(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Explanatory card matching image_ca27dc1f.png
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -201,7 +200,7 @@ fun GnssTab(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "VYSVĚTLIVKY • BÍLÁ ZÁŘE = VE FIXU • ZELENÝ KRUH = PÁSMO L5/E5a",
+                            text = if (isCs) "VYSVĚTLIVKY • BÍLÁ ZÁŘE = VE FIXU • ZELENÝ KRUH = PÁSMO L5/E5a" else "LEGEND • WHITE GLOW = IN FIX • GREEN CIRCLE = L5/E5a BAND",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                             fontWeight = FontWeight.Bold,
                             color = TextSecondaryDark
@@ -220,14 +219,13 @@ fun GnssTab(
                 }
             }
             GnssSubTab.SIGNALY_CN0 -> {
-                // Bar charts of C/N0 for each satellite
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkSlate800)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text(text = "Úrovně signálu C/N0 (dB-Hz)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(text = if (isCs) "Úrovně signálu C/N0 (dB-Hz)" else "Signal Levels C/N0 (dB-Hz)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
                         filteredSatellites.forEach { sat ->
                             Row(
@@ -265,7 +263,6 @@ fun GnssTab(
                 }
             }
             GnssSubTab.PODROBNA_TABULKA -> {
-                // Full detailed satellite list table
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -274,8 +271,8 @@ fun GnssTab(
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Text(text = "SVID", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), color = CyanTertiary, fontWeight = FontWeight.Bold)
-                            Text(text = "Konstelace", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1.5f), color = CyanTertiary, fontWeight = FontWeight.Bold)
-                            Text(text = "Pásmo", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1.2f), color = CyanTertiary, fontWeight = FontWeight.Bold)
+                            Text(text = if (isCs) "Konstelace" else "Constell.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1.5f), color = CyanTertiary, fontWeight = FontWeight.Bold)
+                            Text(text = if (isCs) "Pásmo" else "Band", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1.2f), color = CyanTertiary, fontWeight = FontWeight.Bold)
                             Text(text = "C/N0", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f), color = CyanTertiary, fontWeight = FontWeight.Bold)
                             Text(text = "El/Az", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1.2f), color = CyanTertiary, fontWeight = FontWeight.Bold)
                             Text(text = "Fix", style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(0.8f), color = CyanTertiary, fontWeight = FontWeight.Bold)
@@ -295,7 +292,7 @@ fun GnssTab(
                                 Text(text = String.format("%.0f", sat.cn0DbHz), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
                                 Text(text = "${sat.elevationDegrees.toInt()}°/${sat.azimuthDegrees.toInt()}°", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1.2f))
                                 Text(
-                                    text = if (sat.usedInFix) "ANO" else "NE",
+                                    text = if (sat.usedInFix) (if (isCs) "ANO" else "YES") else (if (isCs) "NE" else "NO"),
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.weight(0.8f),
                                     fontWeight = FontWeight.Bold,
@@ -323,12 +320,12 @@ fun GnssTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Faktory degradace přesnosti (DOP)",
+                        text = if (isCs) "Faktory degradace přesnosti (DOP)" else "Dilution of Precision (DOP)",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = { showDopInfoDialog = true }) {
-                        Icon(imageVector = Icons.Default.Info, contentDescription = "DOP Vysvětlení", tint = CyanTertiary)
+                        Icon(imageVector = Icons.Default.Info, contentDescription = "DOP Info", tint = CyanTertiary)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -336,18 +333,89 @@ fun GnssTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "HDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
                         Text(text = String.format("%.2f", gnss.hdop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = EmeraldSignal)
-                        Text(text = "Horizontální", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Horizontální" else "Horizontal", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "VDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
                         Text(text = String.format("%.2f", gnss.vdop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimaryDark)
-                        Text(text = "Vertikální", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Vertikální" else "Vertical", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "PDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
                         Text(text = String.format("%.2f", gnss.pdop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = CyanTertiary)
-                        Text(text = "Prostorový 3D", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Prostorový 3D" else "Spatial 3D", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // AGC JAMMING & INTERFERENCE MONITOR (RESTORED & PROMINENT)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (gnss.jammingAlert) RoseCritical.copy(alpha = 0.22f) else DarkSlate800
+            ),
+            border = if (gnss.jammingAlert) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(RoseCritical)) else null
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isCs) "DETEKCE RUŠENÍ & AGC MONITOR" else "AGC JAMMING & INTERFERENCE MONITOR",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (gnss.jammingAlert) RoseCritical else AmberWarning
+                        )
+                    }
+                    if (gnss.jammingAlert) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Jamming Alert",
+                            tint = RoseCritical
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (gnss.jammingAlert) {
+                        if (isCs) "VAROVÁNÍ: Detekován prudký propad AGC / potenciální RF rušení (Jamming)!" else "WARNING: Sudden AGC drop / potential RF jamming detected!"
+                    } else {
+                        if (isCs) "Úroveň AGC nominální • Čisté radiofrekvenční prostředí bez anomálií" else "AGC baseline nominal • Clean RF environment without gain anomalies"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (gnss.jammingAlert) RoseCritical else EmeraldSignal
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { (gnss.agcInterferenceScore / 100f).coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    color = if (gnss.jammingAlert) RoseCritical else CyanTertiary,
+                    trackColor = DarkSlate700
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (isCs) "Interferenční index: ${String.format("%.1f", gnss.agcInterferenceScore)}%" else "Interference index: ${String.format("%.1f", gnss.agcInterferenceScore)}%",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
+                    Text(
+                        text = if (isCs) "Zdroj: GnssMeasurements AGC Level" else "Source: GnssMeasurements AGC Level",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
                 }
             }
         }
@@ -374,21 +442,21 @@ fun GnssTab(
     if (showDopInfoDialog) {
         AlertDialog(
             onDismissRequest = { showDopInfoDialog = false },
-            title = { Text(text = "Vysvětlení hodnot DOP (Dilution of Precision)", fontWeight = FontWeight.Bold) },
+            title = { Text(text = if (isCs) "Vysvětlení hodnot DOP (Dilution of Precision)" else "Dilution of Precision (DOP) Explained", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     Text(
-                        text = "Faktory DOP vyjadřují geometrické uspořádání viditelných satelitů vůči přijímači:",
+                        text = if (isCs) "Faktory DOP vyjadřují geometrické uspořádání viditelných satelitů vůči přijímači:" else "DOP factors express the geometric distribution of satellites relative to the receiver:",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = "• < 1.0 (Ideální): Mimořádná přesnost, satelity rovnoměrně rozprostřeny.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = "• 1.0 - 2.0 (Výborné): Běžná kvalita pro otevřené prostranství.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = "• 2.0 - 5.0 (Dobré): Plně vyhovující pro navigaci a měření v terénu.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = "• > 5.0 (Slabé): Satelity jsou v jedné přímce nebo stíněny zástavbou.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• < 1.0 (Ideální): Mimořádná přesnost, satelity rovnoměrně rozprostřeny." else "• < 1.0 (Ideal): Highest possible accuracy, satellites evenly distributed.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 1.0 - 2.0 (Výborné): Běžná kvalita pro otevřené prostranství." else "• 1.0 - 2.0 (Excellent): Standard open sky accuracy.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 2.0 - 5.0 (Dobré): Plně vyhovující pro navigaci a měření v terénu." else "• 2.0 - 5.0 (Good): Sufficient for standard route and vehicle tracking.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• > 5.0 (Slabé): Satelity jsou v jedné přímce nebo stíněny zástavbou." else "• > 5.0 (Poor): Satellites in one line or heavily shielded by buildings.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "HDOP = horizontální poloha (zeměpisná šířka a délka)\nVDOP = vertikální poloha (nadmořská výška)\nPDOP = celkový 3D polohový rozptyl (sqrt(HDOP² + VDOP²))",
+                        text = if (isCs) "HDOP = horizontální poloha (zeměpisná šířka a délka)\nVDOP = vertikální poloha (nadmořská výška)\nPDOP = celkový 3D polohový rozptyl (sqrt(HDOP² + VDOP²))" else "HDOP = Horizontal position (Lat/Lon)\nVDOP = Vertical position (Altitude)\nPDOP = 3D Spatial position dispersion (sqrt(HDOP² + VDOP²))",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = CyanSecondary
                     )
@@ -396,7 +464,7 @@ fun GnssTab(
             },
             confirmButton = {
                 Button(onClick = { showDopInfoDialog = false }) {
-                    Text("Rozumím")
+                    Text(if (isCs) "Rozumím" else "OK")
                 }
             }
         )

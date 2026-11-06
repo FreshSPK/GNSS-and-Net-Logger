@@ -127,23 +127,24 @@ fun MapTab(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val isCs = lang != "EN"
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.95f))
             ) {
                 Row(modifier = Modifier.padding(4.dp)) {
                     ModeButton(
-                        label = "RSRP Signál",
+                        label = if (isCs) "RSRP Signál" else "RSRP Signal",
                         selected = activeMode == MapVisualizationMode.RSRP_SIGNAL,
                         onClick = { activeMode = MapVisualizationMode.RSRP_SIGNAL }
                     )
                     ModeButton(
-                        label = "Rychlost",
+                        label = if (isCs) "Rychlost" else "Speed",
                         selected = activeMode == MapVisualizationMode.SPEED,
                         onClick = { activeMode = MapVisualizationMode.SPEED }
                     )
                     ModeButton(
-                        label = "Satelity",
+                        label = if (isCs) "Satelity" else "Satellites",
                         selected = activeMode == MapVisualizationMode.SATELLITES,
                         onClick = { activeMode = MapVisualizationMode.SATELLITES }
                     )
@@ -181,6 +182,7 @@ fun MapTab(
         }
 
         // Floating Legend Box in Top-Left matching image_7a3c57d5.png
+        val isCs = lang != "EN"
         Card(
             modifier = Modifier
                 .padding(start = 12.dp, top = 64.dp)
@@ -191,36 +193,36 @@ fun MapTab(
             Column(modifier = Modifier.padding(12.dp)) {
                 when (activeMode) {
                     MapVisualizationMode.RSRP_SIGNAL -> {
-                        Text(text = "LEGENDA RSRP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
+                        Text(text = if (isCs) "LEGENDA RSRP" else "RSRP LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LegendRow(color = EmeraldSignal, text = "> -80 dBm (Výborný)")
-                        LegendRow(color = Color(0xFF84CC16), text = "-80 až -90 dBm")
-                        LegendRow(color = AmberWarning, text = "-90 až -105 dBm")
-                        LegendRow(color = RoseCritical, text = "< -105 dBm (Slabý)")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "> -80 dBm (Výborný)" else "> -80 dBm (Excellent)")
+                        LegendRow(color = Color(0xFF84CC16), text = if (isCs) "-80 až -90 dBm" else "-80 to -90 dBm")
+                        LegendRow(color = AmberWarning, text = if (isCs) "-90 až -105 dBm" else "-90 to -105 dBm")
+                        LegendRow(color = RoseCritical, text = if (isCs) "< -105 dBm (Slabý)" else "< -105 dBm (Poor)")
                     }
                     MapVisualizationMode.SPEED -> {
-                        Text(text = "LEGENDA RYCHLOST", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
+                        Text(text = if (isCs) "LEGENDA RYCHLOST" else "SPEED LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LegendRow(color = BlueSatellite, text = "< 10 km/h (Pěšky)")
-                        LegendRow(color = CyanTertiary, text = "10 až 50 km/h (Město)")
-                        LegendRow(color = EmeraldSignal, text = "50 až 90 km/h (Silnice)")
-                        LegendRow(color = RoseCritical, text = "> 90 km/h (Dálnice)")
+                        LegendRow(color = BlueSatellite, text = if (isCs) "< 10 km/h (Pěšky)" else "< 10 km/h (Walk)")
+                        LegendRow(color = CyanTertiary, text = if (isCs) "10 až 50 km/h (Město)" else "10 to 50 km/h (Urban)")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "50 až 90 km/h (Silnice)" else "50 to 90 km/h (Road)")
+                        LegendRow(color = RoseCritical, text = if (isCs) "> 90 km/h (Dálnice)" else "> 90 km/h (Highway)")
                     }
                     MapVisualizationMode.SATELLITES -> {
-                        Text(text = "LEGENDA SATELITY", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
+                        Text(text = if (isCs) "LEGENDA SATELITY" else "SATELLITES LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LegendRow(color = RoseCritical, text = "< 5 satelitů (Slabý fix)")
-                        LegendRow(color = AmberWarning, text = "5 až 10 (Základní fix)")
-                        LegendRow(color = EmeraldSignal, text = "11 až 25 (Výborný fix)")
-                        LegendRow(color = BlueSatellite, text = "> 25 satelitů (Top fix)")
+                        LegendRow(color = RoseCritical, text = if (isCs) "< 5 satelitů (Slabý fix)" else "< 5 sats (Poor fix)")
+                        LegendRow(color = AmberWarning, text = if (isCs) "5 až 10 (Základní fix)" else "5 to 10 (Basic fix)")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "11 až 25 (Výborný fix)" else "11 to 25 (Great fix)")
+                        LegendRow(color = BlueSatellite, text = if (isCs) "> 25 satelitů (Top fix)" else "> 25 sats (Optimal)")
                     }
                     MapVisualizationMode.PDOP -> {
-                        Text(text = "LEGENDA PDOP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
+                        Text(text = if (isCs) "LEGENDA PDOP" else "PDOP LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LegendRow(color = EmeraldSignal, text = "< 1.5 (Ideální)")
-                        LegendRow(color = CyanTertiary, text = "1.5 až 3.0 (Výborný)")
-                        LegendRow(color = AmberWarning, text = "3.0 až 5.0 (Vyhovující)")
-                        LegendRow(color = RoseCritical, text = "> 5.0 (Slabá geometrie)")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "< 1.5 (Ideální)" else "< 1.5 (Ideal)")
+                        LegendRow(color = CyanTertiary, text = if (isCs) "1.5 až 3.0 (Výborný)" else "1.5 to 3.0 (Good)")
+                        LegendRow(color = AmberWarning, text = if (isCs) "3.0 až 5.0 (Vyhovující)" else "3.0 to 5.0 (Moderate)")
+                        LegendRow(color = RoseCritical, text = if (isCs) "> 5.0 (Slabá geometrie)" else "> 5.0 (Poor geometry)")
                     }
                 }
             }
