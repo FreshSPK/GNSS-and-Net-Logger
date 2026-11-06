@@ -1,10 +1,15 @@
 package com.example.telemetry
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.BatteryManager
+import com.example.model.BatteryState
 import com.example.model.EnvironmentState
 import com.example.model.MotionSensorState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,15 +34,54 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
     private var hasGravity = false
     private var hasGeomagnetic = false
 
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context?, intent: Intent?) {
+            val i = intent ?: return
+            val tempRaw = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)
+            val tempC = if (tempRaw > 0) tempRaw / 10.0f else null
+            val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            val levelPct = if (level >= 0 && scale > 0) (level * 100 / scale) else null
+            val voltage = i.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0)
+            val status = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
+            val cur = _envState.value
+            _envState.value = cur.copy(
+                battery = BatteryState(
+                    temperatureC = tempC,
+                    levelPct = levelPct,
+                    voltageMv = if (voltage > 0) voltage else null,
+                    isCharging = isCharging
+                )
+            )
+        }
+    }
+
+    private var isBatteryRegistered = false
+
     fun start() {
         pressureSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
         accelSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
         gyroSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
         magSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
+
+        try {
+            if (!isBatteryRegistered) {
+                context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                isBatteryRegistered = true
+            }
+        } catch (e: Exception) {}
     }
 
     fun stop() {
         sensorManager?.unregisterListener(this)
+        try {
+            if (isBatteryRegistered) {
+                context.unregisterReceiver(batteryReceiver)
+                isBatteryRegistered = false
+            }
+        } catch (e: Exception) {}
     }
 
     fun setQnh(qnhHpa: Float) {
@@ -49,10 +93,18 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
     fun updateDemoPressure(pressureHpa: Float, qnhHpa: Float) {
         val alt = calculateBarometricAltitude(pressureHpa, qnhHpa)
         val curMotion = _envState.value.motion
+        val curBattery = _envState.value.battery
         _envState.value = _envState.value.copy(
             pressureHpa = pressureHpa,
             baseQnhHpa = qnhHpa,
-            relativeAltitudeM = alt
+            relativeAltitudeM = alt,
+            seaLevelPressureHpa = pressureHpa + 32.5f,
+            battery = curBattery.copy(
+                temperatureC = 30.2f,
+                levelPct = 85,
+                voltageMv = 4050,
+                isCharging = false
+            )
         )
     }
 

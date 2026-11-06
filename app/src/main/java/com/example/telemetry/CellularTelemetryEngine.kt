@@ -149,6 +149,7 @@ class CellularTelemetryEngine(
 
         // Parse Serving Cell
         var tech = "Unknown"
+        var plmn = "N/A"
         var tac = "N/A"
         var ci = "N/A"
         var enbOrGnb = "N/A"
@@ -156,6 +157,9 @@ class CellularTelemetryEngine(
         var pci = 0
         var arfcn = 0
         var band = "N/A"
+        var bandwidthKhz: Int? = null
+        var dlFreq: Double? = null
+        var ulFreq: Double? = null
         var rsrp: Int? = null
         var rsrq: Int? = null
         var rssi: Int? = null
@@ -173,11 +177,25 @@ class CellularTelemetryEngine(
                 is CellInfoLte -> {
                     tech = "4G LTE"
                     val id = cell.cellIdentity
+                    val mcc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) id.mccString else if (id.mcc != Int.MAX_VALUE) id.mcc.toString() else null
+                    val mnc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) id.mncString else if (id.mnc != Int.MAX_VALUE) id.mnc.toString() else null
+                    if (!mcc.isNullOrEmpty() && !mnc.isNullOrEmpty()) {
+                        plmn = "$mcc$mnc"
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && id.bandwidth != Int.MAX_VALUE && id.bandwidth > 0) {
+                        bandwidthKhz = id.bandwidth
+                    }
+
                     tac = if (id.tac != Int.MAX_VALUE && id.tac > 0) id.tac.toString() else "N/A"
                     ci = if (id.ci != Int.MAX_VALUE && id.ci > 0) id.ci.toString() else "N/A"
                     pci = if (id.pci != Int.MAX_VALUE) id.pci else 0
                     arfcn = if (id.earfcn != Int.MAX_VALUE) id.earfcn else 0
                     band = BandMapper.lteEarfcnToBand(arfcn)
+                    val freqs = BandMapper.lteEarfcnToFrequencies(arfcn)
+                    if (freqs.first > 0) {
+                        dlFreq = freqs.first
+                        ulFreq = freqs.second
+                    }
 
                     if (id.ci > 0 && id.ci != Int.MAX_VALUE) {
                         val decoded = BandMapper.decodeLteCellId(id.ci.toLong())
@@ -198,10 +216,20 @@ class CellularTelemetryEngine(
                         tech = "5G NR"
                         val id = cell.cellIdentity as? CellIdentityNr
                         if (id != null) {
+                            val mcc = id.mccString
+                            val mnc = id.mncString
+                            if (!mcc.isNullOrEmpty() && !mnc.isNullOrEmpty()) {
+                                plmn = "$mcc$mnc"
+                            }
                             tac = if (id.tac != Int.MAX_VALUE && id.tac > 0) id.tac.toString() else "N/A"
                             pci = if (id.pci != Int.MAX_VALUE) id.pci else 0
                             arfcn = if (id.nrarfcn != Int.MAX_VALUE) id.nrarfcn else 0
                             band = BandMapper.nrArfcnToBand(arfcn)
+                            val freqs = BandMapper.nrArfcnToFrequencies(arfcn)
+                            if (freqs.first > 0) {
+                                dlFreq = freqs.first
+                                ulFreq = freqs.second
+                            }
                             val nci = id.nci
                             if (nci > 0 && nci != Long.MAX_VALUE) {
                                 ci = nci.toString()
@@ -225,6 +253,11 @@ class CellularTelemetryEngine(
                     } else if (cell is CellInfoWcdma) {
                         tech = "3G UMTS"
                         val id = cell.cellIdentity
+                        val mcc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) id.mccString else if (id.mcc != Int.MAX_VALUE) id.mcc.toString() else null
+                        val mnc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) id.mncString else if (id.mnc != Int.MAX_VALUE) id.mnc.toString() else null
+                        if (!mcc.isNullOrEmpty() && !mnc.isNullOrEmpty()) {
+                            plmn = "$mcc$mnc"
+                        }
                         tac = if (id.lac != Int.MAX_VALUE) id.lac.toString() else "N/A"
                         ci = if (id.cid != Int.MAX_VALUE) id.cid.toString() else "N/A"
                         pci = if (id.psc != Int.MAX_VALUE) id.psc else 0
@@ -236,6 +269,11 @@ class CellularTelemetryEngine(
                     } else if (cell is CellInfoGsm) {
                         tech = "2G GSM"
                         val id = cell.cellIdentity
+                        val mcc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) id.mccString else if (id.mcc != Int.MAX_VALUE) id.mcc.toString() else null
+                        val mnc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) id.mncString else if (id.mnc != Int.MAX_VALUE) id.mnc.toString() else null
+                        if (!mcc.isNullOrEmpty() && !mnc.isNullOrEmpty()) {
+                            plmn = "$mcc$mnc"
+                        }
                         tac = if (id.lac != Int.MAX_VALUE) id.lac.toString() else "N/A"
                         ci = if (id.cid != Int.MAX_VALUE) id.cid.toString() else "N/A"
                         arfcn = if (id.arfcn != Int.MAX_VALUE) id.arfcn else 0
@@ -295,6 +333,17 @@ class CellularTelemetryEngine(
         val bestNeighbor = neighbors.maxByOrNull { it.rsrp }
         val distance = BandMapper.calculateLteDistanceMeters(ta)
 
+        val detectedAnomalies = BandMapper.detectCellularAnomalies(
+            networkGen = tech,
+            tac = tac,
+            enbOrGnbId = enbOrGnb,
+            sectorId = sector,
+            rsrp = rsrp,
+            sinr = sinr,
+            neighborsCount = neighbors.size,
+            isServing = servingCell != null
+        )
+
         return SimCellInfo(
             slotIndex = slotIndex,
             subscriptionId = subId,
@@ -302,6 +351,7 @@ class CellularTelemetryEngine(
             operatorAlpha = displayName,
             networkGen = tech,
             isServing = servingCell != null,
+            plmn = plmn,
             tac = tac,
             ci = ci,
             enbOrGnbId = enbOrGnb,
@@ -309,6 +359,9 @@ class CellularTelemetryEngine(
             pci = pci,
             earfcnOrArfcn = arfcn,
             band = band,
+            channelBandwidthKhz = bandwidthKhz,
+            dlFreqMhz = dlFreq,
+            ulFreqMhz = ulFreq,
             rsrp = rsrp,
             rsrq = rsrq,
             rssi = rssi,
@@ -321,7 +374,8 @@ class CellularTelemetryEngine(
             csiSinr = csiSinr,
             timingAdvance = ta,
             estimatedDistanceM = distance,
-            neighbors = neighbors.sortedByDescending { it.rsrp }
+            neighbors = neighbors.sortedByDescending { it.rsrp },
+            anomalies = detectedAnomalies
         )
     }
 }

@@ -80,9 +80,18 @@ data class TelemetryRecord(
     val bestNeighborRsrp: Int?,
     val neighborServingDeltaDb: Int?,
 
-    // Environmental / Network
+    // Environmental / Network / Hardware
     val pressureHpa: Float?,
     val baroRelativeAltM: Float?,
+    val seaLevelPressureHpa: Float? = null,
     val pingRttMs: Long?,
-    val pingPacketLoss: Boolean
+    val pingPacketLoss: Boolean,
+
+    // Advanced Telemetry (v1.1)
+    val sim1Plmn: String = "N/A",
+    val sim2Plmn: String = "N/A",
+    val batteryTempC: Float? = null,
+    val batteryLevelPct: Int? = null,
+    val nmeaSentence: String? = null,
+    val rawDopplerHz: Float? = null
 )

@@ -420,6 +420,76 @@ fun GnssTab(
             }
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // RAW GNSS MEASUREMENTS & NMEA STREAM (Release v1.1 enhancement)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSlate800)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = if (isCs) "SUROVÁ MĚŘENÍ GNSS & NMEA TOK" else "RAW GNSS MEASUREMENTS & NMEA STREAM",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = CyanTertiary
+                )
+                Text(
+                    text = if (isCs) "Fáze nosné (ADR), Dopplerův posuv a NMEA věty" else "Carrier Phase (ADR), Doppler shift and NMEA stream",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondaryDark
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = if (isCs) "Dopplerův posuv" else "Doppler Shift", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(
+                            text = gnss.rawDopplerHz?.let { "${String.format("%.1f", it)} Hz" } ?: "N/A",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = EmeraldSignal
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = if (isCs) "ADR fázový stav" else "ADR Phase Fixes", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(
+                            text = "${gnss.adrValidCount} satelitů",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = CyanTertiary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = if (isCs) "Poslední NMEA věta:" else "Latest NMEA sentence:",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                    color = TextSecondaryDark
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DarkSlate900, RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = gnss.latestNmeaSentence ?: (if (isCs) "Čekání na NMEA větu (\$GNGGA / \$GNRMC)..." else "Waiting for NMEA sentence (\$GNGGA / \$GNRMC)..."),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = if (gnss.latestNmeaSentence != null) EmeraldSignal else TextSecondaryDark
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
 
         // Small VUT Logo at the bottom

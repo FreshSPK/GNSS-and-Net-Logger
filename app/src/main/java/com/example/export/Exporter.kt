@@ -19,7 +19,7 @@ object Exporter {
         sb.append("# Author: Ing. Jan Kufa, Ph.D. (VUT FEKT UREL)\n")
         sb.append("# Session: ${session.title} (ID: ${session.id})\n")
         sb.append("# Start: ${isoFormat.format(Date(session.startTimeMs))}\n")
-        sb.append("TimestampIso,TimestampMs,Latitude,Longitude,AltMsl_m,AltWgs84_m,Speed_kmh,Speed_ms,Bearing_deg,HAcc_m,VAcc_m,SatsInView,SatsUsed,PDOP,HDOP,VDOP,DualFreqPct,AgcScore,Constellations,Sim1Operator,Sim1Tech,Sim1TAC,Sim1CellId,Sim1eNodeB_gNodeB,Sim1Sector,Sim1PCI,Sim1ARFCN,Sim1Band,Sim1RSRP_dBm,Sim1RSRQ_dB,Sim1RSSI_dBm,Sim1SINR_dB,Sim1SS_RSRP,Sim1SS_SINR,Sim1TA,Sim1EstDist_m,Sim2Operator,Sim2Tech,Sim2Band,Sim2RSRP_dBm,Sim2SINR_dB,BestNeighborRSRP,NeighborDelta_dB,Pressure_hPa,BaroAlt_m,Ping_ms\n")
+        sb.append("TimestampIso,TimestampMs,Latitude,Longitude,AltMsl_m,AltWgs84_m,Speed_kmh,Speed_ms,Bearing_deg,HAcc_m,VAcc_m,SatsInView,SatsUsed,PDOP,HDOP,VDOP,DualFreqPct,AgcScore,Constellations,RawDoppler_Hz,Sim1Operator,Sim1PLMN,Sim1Tech,Sim1TAC,Sim1CellId,Sim1eNodeB_gNodeB,Sim1Sector,Sim1PCI,Sim1ARFCN,Sim1Band,Sim1RSRP_dBm,Sim1RSRQ_dB,Sim1RSSI_dBm,Sim1SINR_dB,Sim1SS_RSRP,Sim1SS_SINR,Sim1TA,Sim1EstDist_m,Sim2Operator,Sim2PLMN,Sim2Tech,Sim2Band,Sim2RSRP_dBm,Sim2SINR_dB,BestNeighborRSRP,NeighborDelta_dB,Pressure_hPa,SeaLevelPressure_hPa,BaroAlt_m,BatteryTemp_C,BatteryLevel_pct,Ping_ms,NmeaSentence\n")
 
         for (r in records) {
             sb.append("${isoFormat.format(Date(r.timestampMs))},")
@@ -41,7 +41,9 @@ object Exporter {
             sb.append("${r.dualFrequencyRatioPct},")
             sb.append("${r.agcInterferenceScore},")
             sb.append("\"${r.constellationBreakdown}\",")
+            sb.append("${r.rawDopplerHz ?: ""},")
             sb.append("\"${r.sim1Operator}\",")
+            sb.append("\"${r.sim1Plmn}\",")
             sb.append("\"${r.sim1NetworkGen}\",")
             sb.append("\"${r.sim1TacLac}\",")
             sb.append("\"${r.sim1CellId}\",")
@@ -59,6 +61,7 @@ object Exporter {
             sb.append("${r.sim1TimingAdvance ?: ""},")
             sb.append("${r.sim1EstimatedDistanceM ?: ""},")
             sb.append("\"${r.sim2Operator}\",")
+            sb.append("\"${r.sim2Plmn}\",")
             sb.append("\"${r.sim2NetworkGen}\",")
             sb.append("\"${r.sim2Band}\",")
             sb.append("${r.sim2Rsrp ?: ""},")
@@ -66,8 +69,12 @@ object Exporter {
             sb.append("${r.bestNeighborRsrp ?: ""},")
             sb.append("${r.neighborServingDeltaDb ?: ""},")
             sb.append("${r.pressureHpa ?: ""},")
+            sb.append("${r.seaLevelPressureHpa ?: ""},")
             sb.append("${r.baroRelativeAltM ?: ""},")
-            sb.append("${r.pingRttMs ?: ""}\n")
+            sb.append("${r.batteryTempC ?: ""},")
+            sb.append("${r.batteryLevelPct ?: ""},")
+            sb.append("${r.pingRttMs ?: ""},")
+            sb.append("\"${escapeCsv(r.nmeaSentence ?: "")}\"\n")
         }
         return sb.toString()
     }
@@ -157,5 +164,9 @@ object Exporter {
 
     private fun escapeJson(input: String): String {
         return input.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "")
+    }
+
+    private fun escapeCsv(input: String): String {
+        return input.replace("\"", "\"\"").replace("\n", " ").replace("\r", "")
     }
 }

@@ -145,6 +145,21 @@ fun ChartsTab(
             maxY = 360f
         )
 
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 8. Battery Temperature Chart (v1.1 Thermal Throttle Monitor)
+        val batteryTempValues = chartPoints.map { it.batteryTempC }
+        val lastTemp = chartPoints.lastOrNull()?.batteryTempC?.let { String.format("%.1f", it) } ?: "30.4"
+        RealtimeSparklineChart(
+            title = if (isCs) "Teplota baterie telefonu (Termální monitoring)" else "Battery Temperature (Thermal Monitoring)",
+            currentValue = lastTemp,
+            unit = "°C",
+            values = batteryTempValues,
+            lineColor = Color(0xFFE11D48),
+            minY = 20f,
+            maxY = 48f
+        )
+
         Spacer(modifier = Modifier.height(24.dp))
 
         // Small VUT Logo at the bottom

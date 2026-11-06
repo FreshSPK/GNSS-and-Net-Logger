@@ -465,12 +465,12 @@ fun SessionDetailInspector(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "HDOP: ${String.format("%.2f", r.hdop)} • VDOP: ${String.format("%.2f", r.vdop)} • PDOP: ${String.format("%.2f", r.pdop)}",
+                                text = "HDOP: ${String.format(Locale.US, "%.2f", r.hdop)} • VDOP: ${String.format(Locale.US, "%.2f", r.vdop)} • PDOP: ${String.format(Locale.US, "%.2f", r.pdop)}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 color = TextSecondaryDark
                             )
                             Text(
-                                text = if (isCs) "Rychlost: ${String.format("%.1f km/h", r.speedKmh)}" else "Speed: ${String.format("%.1f km/h", r.speedKmh)}",
+                                text = if (isCs) "Rychlost: ${String.format(Locale.US, "%.1f km/h", r.speedKmh)}" else "Speed: ${String.format(Locale.US, "%.1f km/h", r.speedKmh)}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 color = TextPrimaryDark
                             )
@@ -493,6 +493,25 @@ fun SessionDetailInspector(
                                 fontWeight = FontWeight.Bold,
                                 color = if ((r.sim1Rsrp ?: -120) >= -85) EmeraldSignal else AmberWarning
                             )
+                        }
+
+                        if (r.rawDopplerHz != null || r.batteryTempC != null) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Doppler: ${r.rawDopplerHz?.let { String.format(Locale.US, "%.0f Hz", it) } ?: "—"}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    color = CyanTertiary
+                                )
+                                Text(
+                                    text = "Baterie: ${r.batteryTempC?.let { String.format(Locale.US, "%.1f °C", it) } ?: "—"}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    color = TextSecondaryDark
+                                )
+                            }
                         }
                     }
                 }

@@ -263,8 +263,15 @@ class TelemetryLoggingService : Service() {
                             neighborServingDeltaDb = if (fields.logNeighbors) bestNeighbor?.deltaFromServingDb else null,
                             pressureHpa = if (fields.logSensors) env.pressureHpa else null,
                             baroRelativeAltM = if (fields.logSensors) env.relativeAltitudeM else null,
+                            seaLevelPressureHpa = if (fields.logSensors) env.seaLevelPressureHpa else null,
                             pingRttMs = if (fields.logPing) cellular.pingRttMs else null,
-                            pingPacketLoss = if (fields.logPing) cellular.pingPacketLoss else false
+                            pingPacketLoss = if (fields.logPing) cellular.pingPacketLoss else false,
+                            sim1Plmn = if (fields.logCellularRf) sim1.plmn else "N/A",
+                            sim2Plmn = if (fields.logCellularRf) sim2.plmn else "N/A",
+                            batteryTempC = if (fields.logBattery) env.battery.temperatureC else null,
+                            batteryLevelPct = if (fields.logBattery) env.battery.levelPct else null,
+                            nmeaSentence = if (fields.logNmea) gnss.latestNmeaSentence else null,
+                            rawDopplerHz = if (fields.logGnss) gnss.rawDopplerHz else null
                         )
 
                         app.database.telemetryDao().insertRecord(record)
@@ -278,7 +285,8 @@ class TelemetryLoggingService : Service() {
                                 pingMs = cellular.pingRttMs?.toFloat(),
                                 accelMagnitude = motion.accelMagnitude,
                                 gyroZ = motion.gyroZ,
-                                compassAzimuth = motion.compassAzimuthDeg
+                                compassAzimuth = motion.compassAzimuthDeg,
+                                batteryTempC = env.battery.temperatureC
                             )
                         )
 

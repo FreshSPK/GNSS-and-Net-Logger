@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -71,12 +72,27 @@ fun AboutAndHelpDialog(
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Ing. Jan Kufa, Ph.D.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimaryDark
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Ing. Jan Kufa, Ph.D.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimaryDark
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(EmeraldSignal.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "Release v1.1",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = EmeraldSignal
+                                )
+                            }
+                        }
                         Text(
                             text = if (isCs) {
                                 "Ústav radioelektroniky (UREL)\nFakulta elektrotechniky a komunikačních technologií (FEKT)\nVysoké učení technické v Brně (VUT)"
@@ -116,6 +132,35 @@ fun AboutAndHelpDialog(
                                 modifier = Modifier.height(26.dp).width(85.dp)
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Release v1.1 New Features Box
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = CyanTertiary.copy(alpha = 0.12f)),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CyanTertiary))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (isCs) "✨ Novinky verze 1.1 (Release v1.1)" else "✨ What's New in Release v1.1",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = CyanTertiary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isCs) {
+                                "• Čtení surových NMEA vět (\$GNGGA, \$GNRMC) a fázového stavu ADR\n• Výpočet surového Dopplerova posuvu satelitů (Hz)\n• Detekce PLMN sítě (kódy MCC + MNC operátora)\n• Telemetrie teploty (°C), napětí (mV) a stavu baterie telefonu\n• Přepočet tlaku na hladinu moře (MSL) a rozšířený CSV export"
+                            } else {
+                                "• Raw NMEA sentence logging (\$GNGGA, \$GNRMC) and ADR phase state\n• Satellite raw Doppler shift calculation (Hz)\n• Cellular network PLMN identification (MCC + MNC)\n• Device thermal temperature (°C), voltage (mV) and battery level\n• Sea level pressure calculation (MSL) and extended scientific CSV"
+                            },
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = TextPrimaryDark
+                        )
                     }
                 }
 

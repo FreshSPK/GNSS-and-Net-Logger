@@ -10,7 +10,9 @@ data class SatelliteInfo(
     val hasCarrierFrequency: Boolean,
     val carrierFrequencyHz: Float,
     val bandLabel: String, // "L1/E1", "L5/E5a", "L2", etc.
-    val usedInFix: Boolean
+    val usedInFix: Boolean,
+    val pseudorangeRateMps: Float? = null, // Doppler velocity
+    val adrState: String? = null // Carrier Phase / ADR status
 )
 
 data class GnssState(
@@ -35,7 +37,10 @@ data class GnssState(
     val jammingAlert: Boolean = false,
     val constellationCountMap: Map<String, Pair<Int, Int>> = emptyMap(), // Constellation -> (used, total)
     val l1Count: Int = 0,
-    val l5Count: Int = 0
+    val l5Count: Int = 0,
+    val latestNmeaSentence: String? = null,
+    val rawDopplerHz: Float? = null,
+    val adrValidCount: Int = 0
 )
 
 data class CellNeighbor(
@@ -49,6 +54,27 @@ data class CellNeighbor(
     val ulFreqMhz: Double? = null
 )
 
+enum class AnomalySeverity {
+    INFO,
+    WARNING,
+    CRITICAL
+}
+
+enum class AnomalyType {
+    ROGUE_BTS_ISOLATED,      // Isolated strong cell with no neighbors
+    DOWNGRADE_ATTACK_2G,     // Insecure 2G GSM downgrade without mutual auth
+    TAC_INCONSISTENCY,       // Sudden TAC change or invalid area code
+    RF_INTERFERENCE_JAMMING, // Strong RSRP but collapsed SINR
+    INVALID_CELL_ID          // Invalid eNodeB or zero sector ID
+}
+
+data class CellularAnomaly(
+    val type: AnomalyType,
+    val severity: AnomalySeverity,
+    val title: String,
+    val description: String
+)
+
 data class SimCellInfo(
     val slotIndex: Int = 0,
     val subscriptionId: Int = -1,
@@ -56,6 +82,7 @@ data class SimCellInfo(
     val operatorAlpha: String = "No Service",
     val networkGen: String = "Searching", // 2G, 3G, 4G, 5G NSA, 5G SA
     val isServing: Boolean = false,
+    val plmn: String = "N/A", // e.g. "230-01" or "23001"
     val tac: String = "N/A",
     val ci: String = "N/A",
     val enbOrGnbId: String = "N/A",
@@ -79,7 +106,8 @@ data class SimCellInfo(
     val csiSinr: Float? = null,
     val timingAdvance: Int? = null,
     val estimatedDistanceM: Double? = null,
-    val neighbors: List<CellNeighbor> = emptyList()
+    val neighbors: List<CellNeighbor> = emptyList(),
+    val anomalies: List<CellularAnomaly> = emptyList()
 )
 
 data class CellularState(
@@ -102,11 +130,20 @@ data class MotionSensorState(
     val hasSensors: Boolean = true
 )
 
+data class BatteryState(
+    val temperatureC: Float? = null,
+    val levelPct: Int? = null,
+    val voltageMv: Int? = null,
+    val isCharging: Boolean = false
+)
+
 data class EnvironmentState(
     val pressureHpa: Float? = null,
     val baseQnhHpa: Float = 1013.25f,
     val relativeAltitudeM: Float? = null,
-    val motion: MotionSensorState = MotionSensorState()
+    val seaLevelPressureHpa: Float? = null,
+    val motion: MotionSensorState = MotionSensorState(),
+    val battery: BatteryState = BatteryState()
 )
 
 data class ChartPoint(
@@ -117,7 +154,8 @@ data class ChartPoint(
     val pingMs: Float?,
     val accelMagnitude: Float = 9.81f,
     val gyroZ: Float = 0f,
-    val compassAzimuth: Float = 0f
+    val compassAzimuth: Float = 0f,
+    val batteryTempC: Float? = null
 )
 
 enum class LogTriggerMode {
@@ -131,7 +169,9 @@ data class LoggedFieldsSelection(
     val logCellularRf: Boolean = true,
     val logSensors: Boolean = true,
     val logPing: Boolean = true,
-    val logNeighbors: Boolean = true
+    val logNeighbors: Boolean = true,
+    val logBattery: Boolean = true,
+    val logNmea: Boolean = true
 )
 
 data class LoggingSettings(

@@ -7,6 +7,7 @@ import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.OnNmeaMessageListener
 import android.os.Build
 import android.os.Bundle
 import androidx.core.content.ContextCompat
@@ -50,8 +51,19 @@ class GnssTelemetryEngine(
     private val gnssMeasurementsCallback = object : GnssMeasurementsEvent.Callback() {
         override fun onGnssMeasurementsReceived(event: GnssMeasurementsEvent) {
             analyzeAgcAndInterference(event)
+            parseRawMeasurements(event)
         }
     }
+
+    private val nmeaListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        OnNmeaMessageListener { message, _ ->
+            if (message.startsWith("\$GNGGA") || message.startsWith("\$GNRMC") || message.startsWith("\$GPGGA") || message.startsWith("\$GNVTG")) {
+                val clean = message.trim()
+                val cur = _gnssState.value
+                _gnssState.value = cur.copy(latestNmeaSentence = clean)
+            }
+        }
+    } else null
 
     fun start() {
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -71,12 +83,19 @@ class GnssTelemetryEngine(
             // Register GnssStatus callback
             lm.registerGnssStatusCallback(gnssStatusCallback, null)
 
-            // Register GnssMeasurements callback for AGC Jamming/Interference detection
+            // Register GnssMeasurements callback for AGC Jamming & Raw Doppler/ADR
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 try {
                     lm.registerGnssMeasurementsCallback(gnssMeasurementsCallback, null)
                 } catch (e: Exception) {
                     // Some OEM chipsets don't expose raw measurements
+                }
+
+                // Register NMEA message listener
+                try {
+                    nmeaListener?.let { lm.addNmeaListener(it, null) }
+                } catch (e: Exception) {
+                    // NMEA registration safe catch
                 }
             }
         } catch (e: SecurityException) {
@@ -92,6 +111,7 @@ class GnssTelemetryEngine(
             locationManager?.unregisterGnssStatusCallback(gnssStatusCallback)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 locationManager?.unregisterGnssMeasurementsCallback(gnssMeasurementsCallback)
+                nmeaListener?.let { locationManager?.removeNmeaListener(it) }
             }
         } catch (e: Exception) {
             // Safe teardown
@@ -229,6 +249,39 @@ class GnssTelemetryEngine(
                 jammingAlert = jamming
             )
         }
+    }
+
+    private fun parseRawMeasurements(event: GnssMeasurementsEvent) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+
+        var adrValidCount = 0
+        var sumDopplerHz = 0.0
+        var dopplerCount = 0
+
+        for (m in event.measurements) {
+            val state = m.accumulatedDeltaRangeState
+            if ((state and android.location.GnssMeasurement.ADR_STATE_VALID) != 0) {
+                adrValidCount++
+            }
+
+            val prRate = m.pseudorangeRateMetersPerSecond
+            // prRate in m/s: Doppler shift fd = - prRate * fc / c
+            if (prRate in -6000.0..6000.0 && prRate != 0.0) {
+                val carrierHz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && m.hasCarrierFrequencyHz()) {
+                    m.carrierFrequencyHz.toDouble()
+                } else 1575420000.0 // Default L1/E1 carrier
+                val dopplerHz = - (prRate * carrierHz / 299792458.0)
+                sumDopplerHz += dopplerHz
+                dopplerCount++
+            }
+        }
+
+        val avgDoppler = if (dopplerCount > 0) (sumDopplerHz / dopplerCount).toFloat() else null
+        val current = _gnssState.value
+        _gnssState.value = current.copy(
+            rawDopplerHz = avgDoppler,
+            adrValidCount = adrValidCount
+        )
     }
 
     private fun getConstellationName(type: Int): String {

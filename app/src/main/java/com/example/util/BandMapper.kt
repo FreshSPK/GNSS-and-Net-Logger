@@ -113,4 +113,81 @@ object BandMapper {
         if (value == null || value.isNaN() || value == Double.MAX_VALUE || value > 100.0 || value < -50.0) return null
         return value.toFloat()
     }
+
+    /**
+     * Detect cellular RF anomalies, fake base stations (IMSI Catchers), 2G downgrades, and interference.
+     */
+    fun detectCellularAnomalies(
+        networkGen: String,
+        tac: String,
+        enbOrGnbId: String,
+        sectorId: String,
+        rsrp: Int?,
+        sinr: Float?,
+        neighborsCount: Int,
+        isServing: Boolean,
+        lang: String = "CS"
+    ): List<com.example.model.CellularAnomaly> {
+        val isCs = lang != "EN"
+        val list = mutableListOf<com.example.model.CellularAnomaly>()
+        if (!isServing || networkGen == "Searching" || networkGen == "Unknown") return list
+
+        // 1. 2G Downgrade Attack Check
+        if (networkGen.contains("2G") || networkGen.contains("GSM") || networkGen.contains("GPRS") || networkGen.contains("EDGE")) {
+            list.add(
+                com.example.model.CellularAnomaly(
+                    type = com.example.model.AnomalyType.DOWNGRADE_ATTACK_2G,
+                    severity = com.example.model.AnomalySeverity.CRITICAL,
+                    title = if (isCs) "Varování: Vynucený downgrade na 2G GSM" else "Warning: Forced 2G GSM Downgrade",
+                    description = if (isCs) 
+                        "Telefon byl přepnut do zastaralé sítě 2G bez vzájemné autentizace. Typický projev podvržené BTS / IMSI Catcheru."
+                        else "Phone forced to legacy 2G GSM with no mutual authentication. Typical rogue BTS / IMSI Catcher signature."
+                )
+            )
+        }
+
+        // 2. Isolated Rogue Cell Check (High power but zero neighbor cells)
+        if (rsrp != null && rsrp > -85 && neighborsCount == 0) {
+            list.add(
+                com.example.model.CellularAnomaly(
+                    type = com.example.model.AnomalyType.ROGUE_BTS_ISOLATED,
+                    severity = com.example.model.AnomalySeverity.WARNING,
+                    title = if (isCs) "Podezření: Izolovaná buňka bez sousedů" else "Suspicious: Isolated Cell (No Neighbors)",
+                    description = if (isCs)
+                        "Silný signál ($rsrp dBm), avšak vysílač nevysílá žádné sousední buňky v SIB tabulce. Běžný znak testovací či podvržené BTS."
+                        else "Strong signal ($rsrp dBm) without any neighbor cell relations in SIB. Common fake BTS / femtocell signature."
+                )
+            )
+        }
+
+        // 3. RF Interference & Jamming (Strong RSRP but low/negative SINR)
+        if (rsrp != null && rsrp > -90 && sinr != null && sinr < -3f) {
+            list.add(
+                com.example.model.CellularAnomaly(
+                    type = com.example.model.AnomalyType.RF_INTERFERENCE_JAMMING,
+                    severity = com.example.model.AnomalySeverity.WARNING,
+                    title = if (isCs) "Kritický RF šum / Rušení kanálu" else "High RF Noise / Channel Interference",
+                    description = if (isCs)
+                        "Signál je silný ($rsrp dBm), ale poměr SINR (${String.format(java.util.Locale.US, "%.1f", sinr)} dB) indikuje silné soukanálové rušení."
+                        else "High signal power ($rsrp dBm) but degraded SINR (${String.format(java.util.Locale.US, "%.1f", sinr)} dB) indicates severe co-channel interference."
+                )
+            )
+        }
+
+        // 4. Invalid Cell ID / Area code check
+        if (enbOrGnbId == "0" || sectorId == "0" || tac == "0" || tac == "65534") {
+            list.add(
+                com.example.model.CellularAnomaly(
+                    type = com.example.model.AnomalyType.INVALID_CELL_ID,
+                    severity = com.example.model.AnomalySeverity.INFO,
+                    title = if (isCs) "Nekonzistentní identifikátor buňky" else "Inconsistent Cell Identity",
+                    description = if (isCs)
+                        "Buňka vysílá nestandardní TAC ($tac) nebo nulové ID vysílače."
+                        else "Cell is broadcasting non-standard TAC ($tac) or zero transmitter ID."
+                )
+            )
+        }
+
+        return list
+    }
 }

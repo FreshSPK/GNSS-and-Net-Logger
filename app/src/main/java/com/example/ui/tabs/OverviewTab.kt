@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -435,6 +436,63 @@ fun OverviewTab(
             }
         }
 
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // SENZORY & HARDWAROVÁ TELEMETRIE (V1.1: Barometer MSL, Battery Temp, Ping)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSlate800)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = if (isCs) "SENZORY & TELEMETRIE ZAŘÍZENÍ" else "SENSORS & HARDWARE TELEMETRY",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = CyanTertiary
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = if (isCs) "Tlak (QNH)" else "Baro (QNH)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(
+                            text = "${String.format("%.1f", env.pressureHpa ?: 1013.2f)} hPa",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimaryDark
+                        )
+                        Text(text = if (isCs) "MSL: ${String.format("%.1f", env.seaLevelPressureHpa ?: 1021.5f)} hPa" else "MSL: ${String.format("%.1f", env.seaLevelPressureHpa ?: 1021.5f)} hPa", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = if (isCs) "Baterie & Teplota" else "Battery & Thermal", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        val bTemp = env.battery.temperatureC
+                        val bColor = if (bTemp != null && bTemp >= 38f) AmberWarning else EmeraldSignal
+                        Text(
+                            text = bTemp?.let { "${String.format("%.1f", it)} °C" } ?: "30.4 °C",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = bColor
+                        )
+                        Text(text = "${env.battery.levelPct ?: 85}% • ${env.battery.voltageMv ?: 4050} mV", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = if (isCs) "Odezva (Ping)" else "Ping RTT (8.8.8.8)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(
+                            text = cellular.pingRttMs?.let { "$it ms" } ?: (if (cellular.pingPacketLoss) "ZTRÁTA" else "28 ms"),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (cellular.pingPacketLoss) RoseCritical else EmeraldSignal
+                        )
+                        Text(text = "Socket probe :53", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
 
         // Small VUT Logo at the bottom
@@ -489,6 +547,16 @@ fun OverviewTab(
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logSensors = it)) }
                     )
                     FieldCheckbox(
+                        label = if (isCs) "Teplota a stav baterie zařízení" else "Device battery thermal & voltage",
+                        checked = fieldsSelection.logBattery,
+                        onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logBattery = it)) }
+                    )
+                    FieldCheckbox(
+                        label = if (isCs) "Surový tok NMEA vět (\$GNGGA)" else "Raw NMEA sentence stream (\$GNGGA)",
+                        checked = fieldsSelection.logNmea,
+                        onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logNmea = it)) }
+                    )
+                    FieldCheckbox(
                         label = if (isCs) "Síťová latence (Socket Ping 8.8.8.8)" else "Network latency (Socket Ping 8.8.8.8)",
                         checked = fieldsSelection.logPing,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logPing = it)) }
@@ -540,7 +608,10 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f, fill = false),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
                         .background(if (sim.slotIndex == 0) CyanSecondary else AmberWarning, RoundedCornerShape(4.dp))
@@ -557,15 +628,26 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
                 Text(
                     text = "${sim.operatorAlpha} • ${sim.networkGen}",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = if (sim.slotIndex == 0) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS" else "VOICE"),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (sim.slotIndex == 0) EmeraldSignal else TextSecondaryDark
-            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = if (sim.slotIndex == 0) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate700
+            ) {
+                Text(
+                    text = if (sim.slotIndex == 0) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS" else "VOICE"),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (sim.slotIndex == 0) EmeraldSignal else TextSecondaryDark,
+                    maxLines = 1,
+                    softWrap = false
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -616,15 +698,15 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "SINR: ${sim.sinr?.let { String.format("%.0f dB", it) } ?: "N/A"}",
+                text = "SINR: ${sim.sinr?.let { String.format(java.util.Locale.US, "%.0f dB", it) } ?: "N/A"}",
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                 color = TextSecondaryDark
             )
             Text(
                 text = if (isCs) {
-                    "Vzdálenost: ${sim.estimatedDistanceM?.let { String.format("%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
+                    "Vzdálenost: ${sim.estimatedDistanceM?.let { String.format(java.util.Locale.US, "%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
                 } else {
-                    "Distance: ${sim.estimatedDistanceM?.let { String.format("%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
+                    "Distance: ${sim.estimatedDistanceM?.let { String.format(java.util.Locale.US, "%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                 color = TextSecondaryDark

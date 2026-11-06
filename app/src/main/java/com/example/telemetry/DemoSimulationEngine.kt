@@ -98,7 +98,10 @@ class DemoSimulationEngine {
             jammingAlert = false,
             constellationCountMap = constCounts,
             l1Count = l1Count,
-            l5Count = l5Count
+            l5Count = l5Count,
+            latestNmeaSentence = "\$GNGGA,100800.00,4913.823,N,01634.731,E,1,18,0.94,286.9,M,44.1,M,,*47",
+            rawDopplerHz = -1240.5f + (80f * sin(tick * 0.15f)).toFloat(),
+            adrValidCount = (satUsed * 0.75).toInt()
         )
 
         // RF Dual-SIM
@@ -114,6 +117,7 @@ class DemoSimulationEngine {
             operatorAlpha = "T-Mobile CZ",
             networkGen = "4G LTE Advanced",
             isServing = true,
+            plmn = "230-01",
             tac = "51200",
             ci = "25840897",
             enbOrGnbId = "100941",
@@ -136,7 +140,8 @@ class DemoSimulationEngine {
                 CellNeighbor("LTE", 290, 3100, "B7 (2600 MHz FDD)", lteRsrp - 12, 12, 2620.0, 2500.0),
                 CellNeighbor("LTE", 277, 6300, "B20 (800 MHz FDD)", lteRsrp - 18, 18, 791.0, 832.0),
                 CellNeighbor("LTE", 241, 1650, "B3 (1800 MHz FDD)", lteRsrp - 24, 24, 816.0, 857.0)
-            )
+            ),
+            anomalies = BandMapper.detectCellularAnomalies("4G LTE Advanced", "51200", "100941", "133", lteRsrp, lteSinr, 4, true)
         )
 
         val sim2Ta = 4
@@ -148,6 +153,7 @@ class DemoSimulationEngine {
             operatorAlpha = "O2 - CZ",
             networkGen = "5G NR NSA",
             isServing = true,
+            plmn = "230-02",
             tac = "51201",
             ci = "18941952",
             enbOrGnbId = "73992",
@@ -168,7 +174,8 @@ class DemoSimulationEngine {
             neighbors = listOf(
                 CellNeighbor("LTE", 428, 6300, "B20 (800 MHz FDD)", sim2Rsrp - 4, 4),
                 CellNeighbor("5G NR", 342, 641666, "n78 (3500 MHz C-Band)", sim2Rsrp - 6, 6)
-            )
+            ),
+            anomalies = BandMapper.detectCellularAnomalies("5G NR NSA", "51201", "73992", "151", sim2Rsrp, 12.0f, 2, true)
         )
 
         val pingMs = (28L + (8 * sin(tick * 0.2)).toLong()).coerceAtLeast(18L)
@@ -186,6 +193,7 @@ class DemoSimulationEngine {
             pressureHpa = baroPressure,
             baseQnhHpa = 1013.25f,
             relativeAltitudeM = 286.9f,
+            seaLevelPressureHpa = baroPressure + 33.2f,
             motion = MotionSensorState(
                 accelX = 0.2f * sin(tick * 0.2f).toFloat(),
                 accelY = 0.4f * cos(tick * 0.2f).toFloat(),
@@ -193,6 +201,12 @@ class DemoSimulationEngine {
                 accelMagnitude = 9.82f,
                 gyroZ = 0.05f * sin(tick * 0.1f).toFloat(),
                 compassAzimuthDeg = bearing
+            ),
+            battery = BatteryState(
+                temperatureC = 30.5f + (1.2f * sin(tick * 0.05f)).toFloat(),
+                levelPct = 85,
+                voltageMv = 4060,
+                isCharging = false
             )
         )
 
