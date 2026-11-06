@@ -1,0 +1,6 @@
+{
+  "name": "Signal & GNSS Field Logger",
+  "description": "Professional cellular RF (LTE/5G Dual-SIM) and multi-band GNSS telemetry logger with live OpenStreetMap HUD, polar skyplot, AGC jamming monitor, and SQLite export created by Ing. Jan Kufa, Ph.D. (VUT Brno FEKT UREL).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
