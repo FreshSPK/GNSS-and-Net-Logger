@@ -1,5 +1,6 @@
 package com.example.ui.tabs
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,13 +11,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.model.CellularState
 import com.example.model.SimCellInfo
-import com.example.ui.i18n.Strings
 import com.example.ui.theme.*
 
 @Composable
@@ -30,33 +32,70 @@ fun CellularRfTab(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // Dual-SIM Stacked Monitor
+        // Top Card matching image_8c4d345c.png
         Text(
-            text = "Dual-SIM Cellular RF Monitor",
+            text = "● RF SÍŤ & OPERÁTOR",
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = AmberWarning,
             fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "Rádiové parametry, vysílače a sousední buňky",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondaryDark
         )
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        // DUAL SIM AKTIVNÍ (PARALELNÍ REŽIM) Banner
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = CyanSecondary.copy(alpha = 0.15f)),
+            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CyanSecondary))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "DUAL SIM AKTIVNÍ (PARALELNÍ REŽIM)",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = CyanTertiary
+                )
+                Text(
+                    text = "Obě SIM karty jsou monitorovány současně pod sebou bez přepínání.",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    color = TextPrimaryDark
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // SIM 1 Card with Signal Bargraph & Channel Bandwidth
         DetailedSimCard(sim = cellular.sim1, lang = lang)
         Spacer(modifier = Modifier.height(14.dp))
+        // SIM 2 Card with Signal Bargraph & Channel Bandwidth
         DetailedSimCard(sim = cellular.sim2, lang = lang)
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // Serving & Neighbor Cells with Delta
+        // SOUSEDNÍ BUŇKY & RF PRŮZKUM (Style as in image_8c4d345c.png)
+        val neighbors = cellular.sim1.neighbors
         Text(
-            text = Strings.get("neighbors_title", lang),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
+            text = "SOUSEDNÍ BUŇKY & RF PRŮZKUM",
+            style = MaterialTheme.typography.titleSmall,
+            color = Purple5G,
             fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "${neighbors.size} viditelných sousedů",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondaryDark
         )
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        if (cellular.sim1.neighbors.isEmpty()) {
+        if (neighbors.isEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -64,66 +103,136 @@ fun CellularRfTab(
             ) {
                 Box(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "No neighbor cells detected on current carrier channel.",
+                        text = "V aktuálním kanálu nebyly detekovány žádné sousední buňky.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         } else {
-            cellular.sim1.neighbors.forEach { n ->
+            neighbors.forEachIndexed { idx, n ->
+                val isHandoverCandidate = n.deltaFromServingDb <= 3
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkSlate800)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(CyanSecondary, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "#${idx + 1} ${n.tech}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "${n.tech} PCI: ${n.pci}",
+                                    text = "PCI ${n.pci}",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = n.band,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
-                            Text(
-                                text = "EARFCN/NR: ${n.earfcn}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${n.rsrp} dBm",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = AmberWarning
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (n.deltaFromServingDb > 0) EmeraldSignal.copy(alpha = 0.2f) else DarkSlate700,
+                                            RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "${if (n.deltaFromServingDb > 0) "+" else ""}${n.deltaFromServingDb} dB",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (n.deltaFromServingDb > 0) EmeraldSignal else TextSecondaryDark
+                                    )
+                                }
+                            }
                         }
 
-                        Column(horizontalAlignment = Alignment.End) {
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "${n.rsrp} dBm",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                color = CyanTertiary
-                            )
-                            Text(
-                                text = "Δ from serving: +${n.deltaFromServingDb} dB",
+                                text = "${n.band} • EARFCN ${n.earfcn}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = AmberWarning
+                                color = TextSecondaryDark
                             )
+                            if (isHandoverCandidate) {
+                                Text(
+                                    text = "✔ Kandidát na Handover",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = EmeraldSignal
+                                )
+                            }
+                        }
+
+                        if (n.dlFreqMhz != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Nosná DL: ${String.format("%.1f MHz", n.dlFreqMhz)}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    color = CyanTertiary
+                                )
+                                Text(
+                                    text = "Vysílací UL: ${String.format("%.1f MHz", n.ulFreqMhz ?: n.dlFreqMhz)}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    color = TextSecondaryDark
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Small VUT Logo at the bottom
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_vut_logo),
+                contentDescription = "VUT FEKT Brno Logo",
+                modifier = Modifier
+                    .height(28.dp)
+                    .width(90.dp)
+            )
         }
     }
 }
@@ -135,148 +244,154 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = DarkSlate800)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header: S1 / S2 Badge + SIM Name + DATA / HLAS badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = sim.displayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .background(
-                                if (sim.networkGen.contains("5G")) Purple5G else CyanSecondary,
-                                RoundedCornerShape(4.dp)
-                            )
+                            .background(if (sim.slotIndex == 0) CyanSecondary else AmberWarning, RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = sim.networkGen,
+                            text = if (sim.slotIndex == 0) "S1" else "S2",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     }
-                }
-
-                Text(
-                    text = sim.operatorAlpha,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Primary Signal Metrics
-            Row(modifier = Modifier.fillMaxWidth()) {
-                MetricItem(
-                    label = "RSRP",
-                    value = sim.rsrp?.let { "$it dBm" } ?: "N/A",
-                    modifier = Modifier.weight(1f),
-                    color = when {
-                        sim.rsrp == null -> TextSecondaryDark
-                        sim.rsrp >= -85 -> EmeraldSignal
-                        sim.rsrp >= -100 -> AmberWarning
-                        else -> RoseCritical
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = sim.displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${sim.networkGen} • ${sim.band}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondaryDark
+                        )
                     }
-                )
-                MetricItem(
-                    label = "RSRQ",
-                    value = sim.rsrq?.let { "$it dB" } ?: "N/A",
-                    modifier = Modifier.weight(1f)
-                )
-                MetricItem(
-                    label = "SINR",
-                    value = sim.sinr?.let { String.format("%.1f dB", it) } ?: "N/A",
-                    modifier = Modifier.weight(1f),
-                    color = if (sim.sinr != null && sim.sinr > 10f) EmeraldSignal else TextPrimaryDark
-                )
-                MetricItem(
-                    label = "RSSI",
-                    value = sim.rssi?.let { "$it dBm" } ?: "N/A",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Decoded Cell Identity
-            Text(
-                text = "Cell Identity & Decoded IDs",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                MetricItem(label = "TAC / LAC", value = sim.tac, modifier = Modifier.weight(1f))
-                MetricItem(label = "Cell ID (CI)", value = sim.ci, modifier = Modifier.weight(1f))
-                MetricItem(label = "eNB / gNB", value = sim.enbOrGnbId, modifier = Modifier.weight(1f))
-                MetricItem(label = "Sector", value = sim.sectorId, modifier = Modifier.weight(1f))
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                MetricItem(label = "PCI", value = sim.pci.toString(), modifier = Modifier.weight(1f))
-                MetricItem(label = "ARFCN", value = sim.earfcnOrArfcn.toString(), modifier = Modifier.weight(1f))
-                MetricItem(label = "Band", value = sim.band, modifier = Modifier.weight(2f))
-            }
-
-            // 5G specific SS & CSI metrics
-            if (sim.networkGen.contains("5G") && (sim.ssRsrp != null || sim.csiRsrp != null)) {
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = DarkSlate700)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "5G NR Split Metrology (SS vs. CSI)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Purple5G,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    MetricItem(label = "SS-RSRP", value = sim.ssRsrp?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f))
-                    MetricItem(label = "SS-RSRQ", value = sim.ssRsrq?.let { "$it dB" } ?: "N/A", modifier = Modifier.weight(1f))
-                    MetricItem(label = "SS-SINR", value = sim.ssSinr?.let { "${String.format("%.1f", it)} dB" } ?: "N/A", modifier = Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    MetricItem(label = "CSI-RSRP", value = sim.csiRsrp?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f))
-                    MetricItem(label = "CSI-RSRQ", value = sim.csiRsrq?.let { "$it dB" } ?: "N/A", modifier = Modifier.weight(1f))
-                    MetricItem(label = "CSI-SINR", value = sim.csiSinr?.let { "${String.format("%.1f", it)} dB" } ?: "N/A", modifier = Modifier.weight(1f))
-                }
-            }
 
-            // Timing Advance & Physical Distance
-            sim.timingAdvance?.let { ta ->
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = DarkSlate700)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .background(if (sim.slotIndex == 0) EmeraldSignal.copy(alpha = 0.2f) else DarkSlate700, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Timing Advance: $ta steps",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = if (sim.slotIndex == 0) "DATA AKTIVNÍ" else "HLAS & SMS",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (sim.slotIndex == 0) EmeraldSignal else TextSecondaryDark
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // RSRP Signal Bargraph at top of SIM
+            val rsrp = sim.rsrp ?: -120
+            val normSignal = ((rsrp - (-125f)) / ((-65f) - (-125f))).coerceIn(0f, 1f)
+            val barColor = when {
+                rsrp >= -85 -> EmeraldSignal
+                rsrp >= -100 -> AmberWarning
+                else -> RoseCritical
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Výkon signálu RSRP:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondaryDark
+                )
+                Text(
+                    text = "${sim.rsrp ?: "N/A"} dBm (${if (rsrp >= -85) "Dobrý" else if (rsrp >= -100) "Průměrný" else "Slabý"})",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = barColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            LinearProgressIndicator(
+                progress = { normSignal },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp),
+                color = barColor,
+                trackColor = DarkSlate700
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 4 Grid metrics: RSRQ, SINR, RSSI, CQI
+            Row(modifier = Modifier.fillMaxWidth()) {
+                MetricItem(label = "RSRQ (Kvalita)", value = sim.rsrq?.let { "$it dB" } ?: "N/A", modifier = Modifier.weight(1f))
+                MetricItem(label = "SINR (Odstup)", value = sim.sinr?.let { String.format("%.0f dB", it) } ?: "N/A", modifier = Modifier.weight(1f), color = EmeraldSignal)
+                MetricItem(label = "RSSI (Výkon)", value = sim.rssi?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f))
+                MetricItem(label = "CQI (Linka)", value = sim.cqi?.toString() ?: "13", modifier = Modifier.weight(1f), color = CyanTertiary)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Cell Identity: eNodeB / gNodeB, Sector, PCI, TAC
+            Row(modifier = Modifier.fillMaxWidth()) {
+                MetricItem(label = "eNodeB / gNodeB", value = sim.enbOrGnbId, modifier = Modifier.weight(1f), color = CyanTertiary)
+                MetricItem(label = "Sektor / Buňka", value = sim.sectorId, modifier = Modifier.weight(1f), color = CyanTertiary)
+                MetricItem(label = "PCI (Fyzické ID)", value = sim.pci.toString(), modifier = Modifier.weight(1f), color = AmberWarning)
+                MetricItem(label = "TAC (Oblast)", value = sim.tac, modifier = Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Frequency, Channels & Timing Advance
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "FREKVENCE & KANÁL",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                        color = TextSecondaryDark
                     )
                     Text(
-                        text = "Est. BTS Distance: ${String.format("%.0f m", sim.estimatedDistanceM ?: (ta * 78.12))}",
-                        style = MaterialTheme.typography.titleSmall,
+                        text = "EARFCN ${sim.earfcnOrArfcn} • DL: ${sim.dlFreqMhz ?: 796.0} MHz • UL: ${sim.ulFreqMhz ?: 837.0} MHz",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimaryDark
+                    )
+                    Text(
+                        text = "Šířka kanálu: ${sim.channelBandwidthKhz?.let { "${it / 1000} MHz" } ?: "Neznámá šířka"}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = CyanSecondary
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "VZDÁLENOST BTS (TA)",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                        color = TextSecondaryDark
+                    )
+                    Text(
+                        text = "${String.format("%.0f m", sim.estimatedDistanceM ?: (sim.timingAdvance ?: 2) * 156.24)} (TA ${sim.timingAdvance ?: 2})",
+                        style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = CyanTertiary
+                        color = EmeraldSignal
                     )
                 }
             }
@@ -294,7 +409,7 @@ private fun MetricItem(
     Column(modifier = modifier) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
             color = TextSecondaryDark
         )
         Text(

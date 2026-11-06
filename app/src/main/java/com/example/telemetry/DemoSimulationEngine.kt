@@ -1,6 +1,7 @@
 package com.example.telemetry
 
 import com.example.model.*
+import com.example.util.BandMapper
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -10,7 +11,7 @@ class DemoSimulationEngine {
     private var centerLat = 49.2266
     private var centerLon = 16.5746
 
-    fun nextSimulationStep(): Triple<GnssState, CellularState, EnvironmentState> {
+    fun nextSimulationStep(taMultiplierMode: Int = 2): Triple<GnssState, CellularState, EnvironmentState> {
         tick++
         val angle = (tick * 2.5) * (Math.PI / 180.0)
         val radius = 0.0035 + 0.001 * sin(tick * 0.05)
@@ -21,29 +22,35 @@ class DemoSimulationEngine {
         val speedMs = speedKmh / 3.6f
         val bearing = ((tick * 2.5 + 90) % 360).toFloat()
 
-        // Satellites cycle: 18 - 28 satellites
-        val satTotal = 24 + (4 * sin(tick * 0.1)).toInt()
-        val satUsed = (satTotal * 0.85).toInt()
-        val hdop = 0.8f + 0.2f * sin(tick * 0.2f).toFloat()
-        val vdop = hdop * 1.3f
-        val pdop = 1.4f
+        // Satellites cycle: 16 - 24 satellites
+        val satTotal = 20 + (4 * sin(tick * 0.1)).toInt()
+        val satUsed = (satTotal * 0.82).toInt()
+        val hdop = 0.85f + 0.15f * sin(tick * 0.2f).toFloat()
+        val vdop = 1.20f + 0.10f * cos(tick * 0.18f).toFloat()
+        val pdop = 1.48f
 
-        val dualRatio = 72f + 15f * sin(tick * 0.15f).toFloat()
+        val dualRatio = 75f
 
-        // Generate dynamic satellites list for Polar SkyPlot
         val satList = mutableListOf<SatelliteInfo>()
         val constellations = listOf(
             Triple(1, "GPS", "L1/L5"),
-            Triple(3, "GLONASS", "G1/G2"),
             Triple(6, "Galileo", "E1/E5a"),
-            Triple(5, "BeiDou", "B1/B2a")
+            Triple(3, "GLONASS", "G1"),
+            Triple(5, "BeiDou", "B1/B2")
         )
+
+        var l1Count = 0
+        var l5Count = 0
 
         for (i in 1..satTotal) {
             val constInfo = constellations[i % constellations.size]
             val az = ((i * 360f / satTotal) + (tick * 1.2f)) % 360f
-            val el = (20f + ((i * 47) % 65)).toFloat()
-            val cn0 = 34f + (15f * sin((i + tick) * 0.3)).toFloat().coerceIn(-4f, 16f)
+            val el = (18f + ((i * 47) % 68)).toFloat()
+            val cn0 = 32f + (16f * sin((i + tick) * 0.3)).toFloat().coerceIn(-4f, 18f)
+            val hasL5 = (i % 2 == 0) && (constInfo.first == 1 || constInfo.first == 6)
+            val bandLabel = if (hasL5) "L5/E5a" else "L1/E1"
+            if (hasL5) l5Count++ else l1Count++
+
             satList.add(
                 SatelliteInfo(
                     svid = i,
@@ -53,8 +60,8 @@ class DemoSimulationEngine {
                     elevationDegrees = el,
                     azimuthDegrees = az,
                     hasCarrierFrequency = true,
-                    carrierFrequencyHz = 1575420000f,
-                    bandLabel = constInfo.third,
+                    carrierFrequencyHz = if (hasL5) 1176450000f else 1575420000f,
+                    bandLabel = bandLabel,
                     usedInFix = i <= satUsed
                 )
             )
@@ -62,25 +69,24 @@ class DemoSimulationEngine {
 
         val constCounts = mapOf(
             "GPS" to Pair(7, 8),
-            "Galileo" to Pair(6, 6),
-            "GLONASS" to Pair(4, 5),
-            "BeiDou" to Pair(4, 5)
+            "Galileo" to Pair(5, 6),
+            "GLONASS" to Pair(3, 4),
+            "BeiDou" to Pair(3, 4)
         )
 
-        // AGC Jamming test (periodic slight perturbation, normal: ~12%)
-        val agcScore = (12f + 5f * sin(tick * 0.2f).toFloat()).coerceIn(0f, 100f)
+        val agcScore = (10f + 4f * sin(tick * 0.2f).toFloat()).coerceIn(0f, 100f)
 
         val gnss = GnssState(
             hasFix = true,
             latitude = curLat,
             longitude = curLon,
-            altitudeMsl = 295.0 + 15.0 * sin(tick * 0.08),
-            altitudeWgs84 = 340.0 + 15.0 * sin(tick * 0.08),
+            altitudeMsl = 286.9 + 5.0 * sin(tick * 0.08),
+            altitudeWgs84 = 331.0 + 5.0 * sin(tick * 0.08),
             speedKmh = speedKmh,
             speedMs = speedMs,
             bearingDeg = bearing,
-            horizontalAccuracyM = 1.8f + 0.4f * sin(tick * 0.3f).toFloat(),
-            verticalAccuracyM = 2.9f,
+            horizontalAccuracyM = 1.4f,
+            verticalAccuracyM = 2.0f,
             satellitesInView = satTotal,
             satellitesUsedInFix = satUsed,
             pdop = pdop,
@@ -90,71 +96,82 @@ class DemoSimulationEngine {
             satellites = satList,
             agcInterferenceScore = agcScore,
             jammingAlert = false,
-            constellationCountMap = constCounts
+            constellationCountMap = constCounts,
+            l1Count = l1Count,
+            l5Count = l5Count
         )
 
         // RF Dual-SIM
         val is5gSector = (tick / 20) % 2 == 0
-        val lteRsrp = -82 + (12 * sin(tick * 0.1)).toInt()
-        val lteSinr = 16f + 6f * sin(tick * 0.12f).toFloat()
+        val lteRsrp = -82 + (6 * sin(tick * 0.1)).toInt()
+        val lteSinr = 18f + 3f * sin(tick * 0.12f).toFloat()
 
+        val sim1Ta = 2
         val sim1 = SimCellInfo(
             slotIndex = 0,
             subscriptionId = 1,
-            displayName = "O2-CZ (SIM 1)",
-            operatorAlpha = "O2-CZ",
-            networkGen = if (is5gSector) "5G NSA" else "4G LTE",
+            displayName = "SIM 1: T-Mobile CZ",
+            operatorAlpha = "T-Mobile CZ",
+            networkGen = "4G LTE Advanced",
             isServing = true,
-            tac = "24201",
-            ci = "1849201",
-            enbOrGnbId = "7223",
-            sectorId = if (is5gSector) "12" else "3",
+            tac = "51200",
+            ci = "25840897",
+            enbOrGnbId = "100941",
+            sectorId = "133",
             pci = 184,
-            earfcnOrArfcn = if (is5gSector) 641666 else 1650,
-            band = if (is5gSector) "n78 (3500)" else "B3 (1800)",
+            earfcnOrArfcn = 6300,
+            band = "B20 (800 MHz FDD)",
+            channelBandwidthKhz = 10000,
+            dlFreqMhz = 796.0,
+            ulFreqMhz = 837.0,
             rsrp = lteRsrp,
-            rsrq = -10,
-            rssi = -65,
+            rsrq = -9,
+            rssi = -54,
             sinr = lteSinr,
-            ssRsrp = if (is5gSector) lteRsrp - 4 else null,
-            ssRsrq = if (is5gSector) -11 else null,
-            ssSinr = if (is5gSector) lteSinr - 1.5f else null,
-            timingAdvance = 4,
-            estimatedDistanceM = 4 * 78.12,
+            cqi = 13,
+            timingAdvance = sim1Ta,
+            estimatedDistanceM = BandMapper.calculateLteDistanceMeters(sim1Ta, taMultiplierMode),
             neighbors = listOf(
-                CellNeighbor("LTE", 185, 1650, "B3 (1800)", lteRsrp - 7, 7),
-                CellNeighbor("LTE", 92, 6300, "B20 (800 DD)", lteRsrp - 11, 11),
-                CellNeighbor("5G NR", 310, 641666, "n78 (3500)", lteRsrp - 14, 14)
+                CellNeighbor("LTE", 428, 1650, "B3 (1800 MHz FDD)", lteRsrp - 13, 13, 1805.0, 1710.0),
+                CellNeighbor("LTE", 290, 3100, "B7 (2600 MHz FDD)", lteRsrp - 12, 12, 2620.0, 2500.0),
+                CellNeighbor("LTE", 277, 6300, "B20 (800 MHz FDD)", lteRsrp - 18, 18, 791.0, 832.0),
+                CellNeighbor("LTE", 241, 1650, "B3 (1800 MHz FDD)", lteRsrp - 24, 24, 816.0, 857.0)
             )
         )
 
-        val sim2Rsrp = -89 + (8 * cos(tick * 0.09)).toInt()
+        val sim2Ta = 4
+        val sim2Rsrp = -91 + (4 * cos(tick * 0.09)).toInt()
         val sim2 = SimCellInfo(
             slotIndex = 1,
             subscriptionId = 2,
-            displayName = "T-Mobile CZ (SIM 2)",
-            operatorAlpha = "T-Mobile CZ",
-            networkGen = "4G LTE",
+            displayName = "SIM 2: O2 - CZ",
+            operatorAlpha = "O2 - CZ",
+            networkGen = "5G NR NSA",
             isServing = true,
-            tac = "24110",
-            ci = "294819",
-            enbOrGnbId = "1151",
-            sectorId = "1",
-            pci = 220,
-            earfcnOrArfcn = 6300,
-            band = "B20 (800 DD)",
+            tac = "51201",
+            ci = "18941952",
+            enbOrGnbId = "73992",
+            sectorId = "151",
+            pci = 342,
+            earfcnOrArfcn = 641666,
+            band = "n78 (3500 MHz C-Band)",
+            channelBandwidthKhz = 40000,
+            dlFreqMhz = 3550.0,
+            ulFreqMhz = 3550.0,
             rsrp = sim2Rsrp,
-            rsrq = -12,
-            rssi = -71,
-            sinr = 11.5f,
-            timingAdvance = 7,
-            estimatedDistanceM = 7 * 78.12,
+            rsrq = -11,
+            rssi = -64,
+            sinr = 12.0f,
+            cqi = 10,
+            timingAdvance = sim2Ta,
+            estimatedDistanceM = BandMapper.calculateLteDistanceMeters(sim2Ta, taMultiplierMode),
             neighbors = listOf(
-                CellNeighbor("LTE", 221, 6300, "B20 (800 DD)", sim2Rsrp - 6, 6)
+                CellNeighbor("LTE", 428, 6300, "B20 (800 MHz FDD)", sim2Rsrp - 4, 4),
+                CellNeighbor("5G NR", 342, 641666, "n78 (3500 MHz C-Band)", sim2Rsrp - 6, 6)
             )
         )
 
-        val pingMs = (28L + (14 * sin(tick * 0.2)).toLong()).coerceAtLeast(18L)
+        val pingMs = (28L + (8 * sin(tick * 0.2)).toLong()).coerceAtLeast(18L)
 
         val cell = CellularState(
             sim1 = sim1,
@@ -164,12 +181,19 @@ class DemoSimulationEngine {
             pingPacketLoss = false
         )
 
-        // Environment pressure
-        val baroPressure = 988.5f + 1.2f * sin(tick * 0.05f).toFloat()
+        val baroPressure = 988.5f + 0.8f * sin(tick * 0.05f).toFloat()
         val env = EnvironmentState(
             pressureHpa = baroPressure,
             baseQnhHpa = 1013.25f,
-            relativeAltitudeM = 295f
+            relativeAltitudeM = 286.9f,
+            motion = MotionSensorState(
+                accelX = 0.2f * sin(tick * 0.2f).toFloat(),
+                accelY = 0.4f * cos(tick * 0.2f).toFloat(),
+                accelZ = 9.8f,
+                accelMagnitude = 9.82f,
+                gyroZ = 0.05f * sin(tick * 0.1f).toFloat(),
+                compassAzimuthDeg = bearing
+            )
         )
 
         return Triple(gnss, cell, env)

@@ -69,10 +69,12 @@ class SignalLoggerApp : Application() {
         applicationScope.launch {
             while (true) {
                 if (_settings.value.isDemoMode) {
-                    val step = demoEngine.nextSimulationStep()
+                    val step = demoEngine.nextSimulationStep(_settings.value.taMultiplierMode)
                     gnssEngine.updateDemoState(step.first)
                     cellularEngine.updateDemoData(step.second.sim1, step.second.sim2, step.second.pingRttMs)
                     environmentEngine.updateDemoPressure(step.third.pressureHpa ?: 1013.25f, step.third.baseQnhHpa)
+                    val m = step.third.motion
+                    environmentEngine.updateDemoMotion(m.accelX, m.accelY, m.accelZ, m.gyroX, m.gyroY, m.gyroZ, m.compassAzimuthDeg)
                 }
                 kotlinx.coroutines.delay(1000)
             }

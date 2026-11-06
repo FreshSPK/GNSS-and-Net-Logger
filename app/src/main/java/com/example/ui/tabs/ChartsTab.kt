@@ -1,17 +1,21 @@
 package com.example.ui.tabs
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.model.ChartPoint
 import com.example.ui.components.RealtimeSparklineChart
-import com.example.ui.i18n.Strings
 import com.example.ui.theme.*
 
 @Composable
@@ -23,11 +27,17 @@ fun ChartsTab(
     val speedValues = chartPoints.map { it.speedKmh }
     val satValues = chartPoints.map { it.satCount.toFloat() }
     val pingValues = chartPoints.map { it.pingMs }
+    val accelValues = chartPoints.map { it.accelMagnitude }
+    val gyroValues = chartPoints.map { it.gyroZ }
+    val compassValues = chartPoints.map { it.compassAzimuth }
 
     val lastRsrp = chartPoints.lastOrNull()?.rsrp?.let { String.format("%.0f", it) } ?: "—"
     val lastSpeed = chartPoints.lastOrNull()?.let { String.format("%.1f", it.speedKmh) } ?: "0.0"
     val lastSats = chartPoints.lastOrNull()?.satCount?.toString() ?: "0"
     val lastPing = chartPoints.lastOrNull()?.pingMs?.let { String.format("%.0f", it) } ?: "—"
+    val lastAccel = chartPoints.lastOrNull()?.let { String.format("%.2f", it.accelMagnitude) } ?: "9.81"
+    val lastGyro = chartPoints.lastOrNull()?.let { String.format("%.2f", it.gyroZ) } ?: "0.00"
+    val lastCompass = chartPoints.lastOrNull()?.let { String.format("%.0f°", it.compassAzimuth) } ?: "143°"
 
     Column(
         modifier = Modifier
@@ -36,9 +46,9 @@ fun ChartsTab(
             .padding(16.dp)
     ) {
         Text(
-            text = Strings.get("charts_title", lang),
+            text = "Časové průběhy v reálném čase",
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = CyanTertiary,
             fontWeight = FontWeight.Bold
         )
 
@@ -46,7 +56,7 @@ fun ChartsTab(
 
         // 1. Serving RSRP Chart
         RealtimeSparklineChart(
-            title = Strings.get("rsrp_chart", lang),
+            title = "RSRP signál základnové stanice v čase",
             currentValue = lastRsrp,
             unit = "dBm",
             values = rsrpValues,
@@ -59,7 +69,7 @@ fun ChartsTab(
 
         // 2. Speed Chart
         RealtimeSparklineChart(
-            title = Strings.get("speed_chart", lang),
+            title = "Rychlost pohybu vozidla / chodce",
             currentValue = lastSpeed,
             unit = "km/h",
             values = speedValues,
@@ -72,9 +82,9 @@ fun ChartsTab(
 
         // 3. Satellite in Fix Count Chart
         RealtimeSparklineChart(
-            title = Strings.get("sat_chart", lang),
+            title = "Počet satelitů v fixu a v dosahu",
             currentValue = lastSats,
-            unit = "sats",
+            unit = "satelitů",
             values = satValues,
             lineColor = BlueSatellite,
             minY = 0f,
@@ -85,7 +95,7 @@ fun ChartsTab(
 
         // 4. Ping Latency Chart
         RealtimeSparklineChart(
-            title = Strings.get("ping_chart", lang),
+            title = "Latence pingu (Google DNS 8.8.8.8)",
             currentValue = lastPing,
             unit = "ms",
             values = pingValues,
@@ -93,5 +103,60 @@ fun ChartsTab(
             minY = 0f,
             maxY = 200f
         )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 5. Accelerometer Magnitude Chart
+        RealtimeSparklineChart(
+            title = "Akcelerometr: Výsledné přetížení / otřesy",
+            currentValue = lastAccel,
+            unit = "m/s²",
+            values = accelValues,
+            lineColor = Color(0xFFA855F7),
+            minY = 5f,
+            maxY = 18f
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 6. Gyroscope Z Chart
+        RealtimeSparklineChart(
+            title = "Gyroskop: Úhlová rychlost zatáčení (Z-osa)",
+            currentValue = lastGyro,
+            unit = "rad/s",
+            values = gyroValues,
+            lineColor = Color(0xFFEC4899),
+            minY = -1.5f,
+            maxY = 1.5f
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 7. Magnetometer Compass Chart
+        RealtimeSparklineChart(
+            title = "Magnetický kompas: Azimut natočení",
+            currentValue = lastCompass,
+            unit = "T (směr)",
+            values = compassValues,
+            lineColor = Color(0xFFF97316),
+            minY = 0f,
+            maxY = 360f
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Small VUT Logo at the bottom
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_vut_logo),
+                contentDescription = "VUT Logo",
+                modifier = Modifier.height(28.dp).width(90.dp)
+            )
+        }
     }
 }

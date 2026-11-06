@@ -39,12 +39,17 @@ class TelemetryLoggingService : Service() {
 
     companion object {
         const val ACTION_START = "ACTION_START_LOGGING"
+        const val ACTION_PAUSE = "ACTION_PAUSE_LOGGING"
+        const val ACTION_RESUME = "ACTION_RESUME_LOGGING"
         const val ACTION_STOP = "ACTION_STOP_LOGGING"
         const val NOTIFICATION_CHANNEL_ID = "channel_field_logger_service"
         const val NOTIFICATION_ID = 1001
 
         private val _isLogging = MutableStateFlow(false)
         val isLogging: StateFlow<Boolean> = _isLogging.asStateFlow()
+
+        private val _isPaused = MutableStateFlow(false)
+        val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
 
         private val _activeSessionId = MutableStateFlow<Long?>(null)
         val activeSessionId: StateFlow<Long?> = _activeSessionId.asStateFlow()
@@ -59,7 +64,7 @@ class TelemetryLoggingService : Service() {
         fun addChartPoint(point: ChartPoint) {
             val list = _recentChartPoints.value.toMutableList()
             list.add(point)
-            if (list.size > 60) {
+            if (list.size > 80) {
                 list.removeAt(0)
             }
             _recentChartPoints.value = list
@@ -74,6 +79,8 @@ class TelemetryLoggingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startLogging()
+            ACTION_PAUSE -> pauseLogging()
+            ACTION_RESUME -> resumeLogging()
             ACTION_STOP -> stopLogging()
         }
         return START_STICKY
@@ -87,13 +94,11 @@ class TelemetryLoggingService : Service() {
         val app = application as SignalLoggerApp
         val settings = app.settings.value
 
-        // Acquire partial wake lock
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SignalLogger::LoggingWakeLock").apply {
             acquire(10 * 60 * 60 * 1000L) // up to 10 hours
         }
 
-        // Create foreground notification
         val notification = buildNotification("Field logging active", "Recording GNSS & RF Telemetry...")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
@@ -102,6 +107,7 @@ class TelemetryLoggingService : Service() {
         }
 
         _isLogging.value = true
+        _isPaused.value = false
         loggedCount = 0
         totalDistanceM = 0.0
         maxSpeedKmh = 0.0
@@ -121,8 +127,21 @@ class TelemetryLoggingService : Service() {
             currentSession = newSession.copy(id = id)
             _activeSessionId.value = id
 
-            // Start logging loop
             startLoop(settings)
+        }
+    }
+
+    private fun pauseLogging() {
+        if (_isLogging.value && !_isPaused.value) {
+            _isPaused.value = true
+            updateNotification("Logging PAUSED - samples on hold")
+        }
+    }
+
+    private fun resumeLogging() {
+        if (_isLogging.value && _isPaused.value) {
+            _isPaused.value = false
+            updateNotification("Logging RESUMED - collecting samples")
         }
     }
 
@@ -131,139 +150,143 @@ class TelemetryLoggingService : Service() {
         logLoopJob = serviceScope.launch {
             val app = application as SignalLoggerApp
             while (isActive && _isLogging.value) {
-                val gnss = app.gnssEngine.gnssState.value
-                val cellular = app.cellularEngine.cellularState.value
-                val env = app.environmentEngine.envState.value
+                if (!_isPaused.value) {
+                    val gnss = app.gnssEngine.gnssState.value
+                    val cellular = app.cellularEngine.cellularState.value
+                    val env = app.environmentEngine.envState.value
+                    val motion = env.motion
 
-                var shouldLog = false
-                val now = System.currentTimeMillis()
+                    var shouldLog = false
+                    val now = System.currentTimeMillis()
 
-                val loc = Location("current").apply {
-                    latitude = gnss.latitude
-                    longitude = gnss.longitude
-                    altitude = gnss.altitudeMsl
-                }
-
-                when (settings.triggerMode) {
-                    LogTriggerMode.TIME -> {
-                        val intervalMs = settings.timeIntervalSeconds * 1000L
-                        if (now - lastLogTimestampMs >= intervalMs) {
-                            shouldLog = true
-                        }
+                    val loc = Location("current").apply {
+                        latitude = gnss.latitude
+                        longitude = gnss.longitude
+                        altitude = gnss.altitudeMsl
                     }
-                    LogTriggerMode.DISTANCE -> {
-                        if (lastLoggedLocation == null) {
-                            shouldLog = true
-                        } else {
-                            val dist = lastLoggedLocation!!.distanceTo(loc)
-                            if (dist >= settings.distanceThresholdMeters) {
+
+                    when (settings.triggerMode) {
+                        LogTriggerMode.TIME -> {
+                            val intervalMs = settings.timeIntervalSeconds * 1000L
+                            if (now - lastLogTimestampMs >= intervalMs) {
+                                shouldLog = true
+                            }
+                        }
+                        LogTriggerMode.DISTANCE -> {
+                            if (lastLoggedLocation == null) {
+                                shouldLog = true
+                            } else {
+                                val dist = lastLoggedLocation!!.distanceTo(loc)
+                                if (dist >= settings.distanceThresholdMeters) {
+                                shouldLog = true
+                                }
+                            }
+                        }
+                        LogTriggerMode.HYBRID -> {
+                            val intervalMs = settings.timeIntervalSeconds * 1000L
+                            val dist = lastLoggedLocation?.distanceTo(loc) ?: Float.MAX_VALUE
+                            if (now - lastLogTimestampMs >= intervalMs || dist >= settings.distanceThresholdMeters) {
                                 shouldLog = true
                             }
                         }
                     }
-                    LogTriggerMode.HYBRID -> {
-                        val intervalMs = settings.timeIntervalSeconds * 1000L
-                        val dist = lastLoggedLocation?.distanceTo(loc) ?: Float.MAX_VALUE
-                        if (now - lastLogTimestampMs >= intervalMs || dist >= settings.distanceThresholdMeters) {
-                            shouldLog = true
+
+                    if (shouldLog && currentSessionId != null) {
+                        if (lastLoggedLocation != null) {
+                            val stepDist = lastLoggedLocation!!.distanceTo(loc).toDouble()
+                            if (stepDist in 0.1..2000.0) {
+                                totalDistanceM += stepDist
+                            }
                         }
-                    }
-                }
+                        lastLoggedLocation = loc
+                        lastLogTimestampMs = now
+                        loggedCount++
+                        _loggedPointsCount.value = loggedCount
 
-                if (shouldLog && currentSessionId != null) {
-                    if (lastLoggedLocation != null) {
-                        val stepDist = lastLoggedLocation!!.distanceTo(loc).toDouble()
-                        if (stepDist in 0.1..2000.0) {
-                            totalDistanceM += stepDist
+                        if (gnss.speedKmh > maxSpeedKmh) {
+                            maxSpeedKmh = gnss.speedKmh.toDouble()
                         }
-                    }
-                    lastLoggedLocation = loc
-                    lastLogTimestampMs = now
-                    loggedCount++
-                    _loggedPointsCount.value = loggedCount
 
-                    if (gnss.speedKmh > maxSpeedKmh) {
-                        maxSpeedKmh = gnss.speedKmh.toDouble()
-                    }
+                        val sim1 = cellular.sim1
+                        val sim2 = cellular.sim2
+                        val bestNeighbor = sim1.neighbors.firstOrNull()
 
-                    // Save record
-                    val sim1 = cellular.sim1
-                    val sim2 = cellular.sim2
-                    val bestNeighbor = sim1.neighbors.firstOrNull()
+                        val fields = settings.fieldsSelection
 
-                    val record = TelemetryRecord(
-                        sessionId = currentSessionId!!,
-                        timestampMs = now,
-                        latitude = gnss.latitude,
-                        longitude = gnss.longitude,
-                        altitudeMsl = gnss.altitudeMsl,
-                        altitudeWgs84 = gnss.altitudeWgs84,
-                        speedKmh = gnss.speedKmh,
-                        speedMs = gnss.speedMs,
-                        bearingDeg = gnss.bearingDeg,
-                        horizontalAccuracyM = gnss.horizontalAccuracyM,
-                        verticalAccuracyM = gnss.verticalAccuracyM,
-                        satellitesInView = gnss.satellitesInView,
-                        satellitesUsedInFix = gnss.satellitesUsedInFix,
-                        pdop = gnss.pdop,
-                        hdop = gnss.hdop,
-                        vdop = gnss.vdop,
-                        dualFrequencyRatioPct = gnss.dualFrequencyRatioPct,
-                        agcInterferenceScore = gnss.agcInterferenceScore,
-                        constellationBreakdown = gnss.constellationCountMap.entries.joinToString(",") { "${it.key}:${it.value.first}/${it.value.second}" },
-                        sim1Operator = sim1.operatorAlpha,
-                        sim1NetworkGen = sim1.networkGen,
-                        sim1TacLac = sim1.tac,
-                        sim1CellId = sim1.ci,
-                        sim1EnbOrGnb = sim1.enbOrGnbId,
-                        sim1SectorId = sim1.sectorId,
-                        sim1Pci = sim1.pci,
-                        sim1Arfcn = sim1.earfcnOrArfcn,
-                        sim1Band = sim1.band,
-                        sim1Rsrp = sim1.rsrp,
-                        sim1Rsrq = sim1.rsrq,
-                        sim1Rssi = sim1.rssi,
-                        sim1Sinr = sim1.sinr,
-                        sim1SsRsrp = sim1.ssRsrp,
-                        sim1SsRsrq = sim1.ssRsrq,
-                        sim1SsSinr = sim1.ssSinr,
-                        sim1CsiRsrp = sim1.csiRsrp,
-                        sim1CsiRsrq = sim1.csiRsrq,
-                        sim1CsiSinr = sim1.csiSinr,
-                        sim1TimingAdvance = sim1.timingAdvance,
-                        sim1EstimatedDistanceM = sim1.estimatedDistanceM,
-                        sim2Operator = sim2.operatorAlpha,
-                        sim2NetworkGen = sim2.networkGen,
-                        sim2Band = sim2.band,
-                        sim2Rsrp = sim2.rsrp,
-                        sim2Sinr = sim2.sinr,
-                        bestNeighborRsrp = bestNeighbor?.rsrp,
-                        neighborServingDeltaDb = bestNeighbor?.deltaFromServingDb,
-                        pressureHpa = env.pressureHpa,
-                        baroRelativeAltM = env.relativeAltitudeM,
-                        pingRttMs = cellular.pingRttMs,
-                        pingPacketLoss = cellular.pingPacketLoss
-                    )
-
-                    app.database.telemetryDao().insertRecord(record)
-
-                    // Also add to chart buffer
-                    addChartPoint(
-                        ChartPoint(
+                        val record = TelemetryRecord(
+                            sessionId = currentSessionId!!,
                             timestampMs = now,
-                            rsrp = sim1.rsrp?.toFloat(),
-                            speedKmh = gnss.speedKmh,
-                            satCount = gnss.satellitesUsedInFix,
-                            pingMs = cellular.pingRttMs?.toFloat()
+                            latitude = if (fields.logGnss) gnss.latitude else 0.0,
+                            longitude = if (fields.logGnss) gnss.longitude else 0.0,
+                            altitudeMsl = if (fields.logGnss) gnss.altitudeMsl else 0.0,
+                            altitudeWgs84 = if (fields.logGnss) gnss.altitudeWgs84 else 0.0,
+                            speedKmh = if (fields.logGnss) gnss.speedKmh else 0f,
+                            speedMs = if (fields.logGnss) gnss.speedMs else 0f,
+                            bearingDeg = if (fields.logGnss) gnss.bearingDeg else motion.compassAzimuthDeg,
+                            horizontalAccuracyM = if (fields.logGnss) gnss.horizontalAccuracyM else 0f,
+                            verticalAccuracyM = if (fields.logGnss) gnss.verticalAccuracyM else 0f,
+                            satellitesInView = if (fields.logGnss) gnss.satellitesInView else 0,
+                            satellitesUsedInFix = if (fields.logGnss) gnss.satellitesUsedInFix else 0,
+                            pdop = if (fields.logGnss) gnss.pdop else 0f,
+                            hdop = if (fields.logGnss) gnss.hdop else 0f,
+                            vdop = if (fields.logGnss) gnss.vdop else 0f,
+                            dualFrequencyRatioPct = if (fields.logGnss) gnss.dualFrequencyRatioPct else 0f,
+                            agcInterferenceScore = if (fields.logGnss) gnss.agcInterferenceScore else 0f,
+                            constellationBreakdown = if (fields.logGnss) gnss.constellationCountMap.entries.joinToString(",") { "${it.key}:${it.value.first}/${it.value.second}" } else "",
+                            sim1Operator = if (fields.logCellularRf) sim1.operatorAlpha else "",
+                            sim1NetworkGen = if (fields.logCellularRf) sim1.networkGen else "",
+                            sim1TacLac = if (fields.logCellularRf) sim1.tac else "",
+                            sim1CellId = if (fields.logCellularRf) sim1.ci else "",
+                            sim1EnbOrGnb = if (fields.logCellularRf) sim1.enbOrGnbId else "",
+                            sim1SectorId = if (fields.logCellularRf) sim1.sectorId else "",
+                            sim1Pci = if (fields.logCellularRf) sim1.pci else 0,
+                            sim1Arfcn = if (fields.logCellularRf) sim1.earfcnOrArfcn else 0,
+                            sim1Band = if (fields.logCellularRf) sim1.band else "",
+                            sim1Rsrp = if (fields.logCellularRf) sim1.rsrp else null,
+                            sim1Rsrq = if (fields.logCellularRf) sim1.rsrq else null,
+                            sim1Rssi = if (fields.logCellularRf) sim1.rssi else null,
+                            sim1Sinr = if (fields.logCellularRf) sim1.sinr else null,
+                            sim1SsRsrp = if (fields.logCellularRf) sim1.ssRsrp else null,
+                            sim1SsRsrq = if (fields.logCellularRf) sim1.ssRsrq else null,
+                            sim1SsSinr = if (fields.logCellularRf) sim1.ssSinr else null,
+                            sim1CsiRsrp = if (fields.logCellularRf) sim1.csiRsrp else null,
+                            sim1CsiRsrq = if (fields.logCellularRf) sim1.csiRsrq else null,
+                            sim1CsiSinr = if (fields.logCellularRf) sim1.csiSinr else null,
+                            sim1TimingAdvance = if (fields.logCellularRf) sim1.timingAdvance else null,
+                            sim1EstimatedDistanceM = if (fields.logCellularRf) sim1.estimatedDistanceM else null,
+                            sim2Operator = if (fields.logCellularRf) sim2.operatorAlpha else "",
+                            sim2NetworkGen = if (fields.logCellularRf) sim2.networkGen else "",
+                            sim2Band = if (fields.logCellularRf) sim2.band else "",
+                            sim2Rsrp = if (fields.logCellularRf) sim2.rsrp else null,
+                            sim2Sinr = if (fields.logCellularRf) sim2.sinr else null,
+                            bestNeighborRsrp = if (fields.logNeighbors) bestNeighbor?.rsrp else null,
+                            neighborServingDeltaDb = if (fields.logNeighbors) bestNeighbor?.deltaFromServingDb else null,
+                            pressureHpa = if (fields.logSensors) env.pressureHpa else null,
+                            baroRelativeAltM = if (fields.logSensors) env.relativeAltitudeM else null,
+                            pingRttMs = if (fields.logPing) cellular.pingRttMs else null,
+                            pingPacketLoss = if (fields.logPing) cellular.pingPacketLoss else false
                         )
-                    )
 
-                    // Update notification periodically
-                    if (loggedCount % 5 == 0) {
-                        updateNotification("Logging: $loggedCount points | Sats: ${gnss.satellitesUsedInFix} | RSRP: ${sim1.rsrp ?: "N/A"} dBm")
+                        app.database.telemetryDao().insertRecord(record)
+
+                        addChartPoint(
+                            ChartPoint(
+                                timestampMs = now,
+                                rsrp = sim1.rsrp?.toFloat(),
+                                speedKmh = gnss.speedKmh,
+                                satCount = gnss.satellitesUsedInFix,
+                                pingMs = cellular.pingRttMs?.toFloat(),
+                                accelMagnitude = motion.accelMagnitude,
+                                gyroZ = motion.gyroZ,
+                                compassAzimuth = motion.compassAzimuthDeg
+                            )
+                        )
+
+                        if (loggedCount % 5 == 0) {
+                            updateNotification("Logging: $loggedCount points | Sats: ${gnss.satellitesUsedInFix} | RSRP: ${sim1.rsrp ?: "N/A"} dBm")
+                        }
                     }
                 }
-
                 delay(500)
             }
         }
@@ -274,6 +297,7 @@ class TelemetryLoggingService : Service() {
 
         logLoopJob?.cancel()
         _isLogging.value = false
+        _isPaused.value = false
 
         serviceScope.launch {
             val app = application as SignalLoggerApp
@@ -333,17 +357,44 @@ class TelemetryLoggingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        val pauseIntent = Intent(this, TelemetryLoggingService::class.java).apply {
+            action = if (_isPaused.value) ACTION_RESUME else ACTION_PAUSE
+        }
+        val pausePendingIntent = PendingIntent.getService(
+            this,
+            1,
+            pauseIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val stopIntent = Intent(this, TelemetryLoggingService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this,
+            2,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
-            .build()
+            .addAction(
+                if (_isPaused.value) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
+                if (_isPaused.value) "Pokračovat" else "Pozastavit",
+                pausePendingIntent
+            )
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Zastavit", stopPendingIntent)
+
+        return builder.build()
     }
 
     private fun updateNotification(content: String) {
-        val notification = buildNotification("Signal & GNSS Field Logger", content)
+        val notification = buildNotification("GNSS & Net Logger", content)
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, notification)
     }

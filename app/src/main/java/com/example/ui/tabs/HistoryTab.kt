@@ -2,17 +2,17 @@ package com.example.ui.tabs
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,15 +20,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.example.R
 import com.example.data.db.LogSession
 import com.example.data.db.TelemetryRecord
 import com.example.export.Exporter
-import com.example.ui.i18n.Strings
 import com.example.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,12 +44,49 @@ fun HistoryTab(
     sessions: List<LogSession>,
     lang: String,
     onSelectSessionForReplay: (Long) -> Unit,
+    onRenameSession: (Long, String) -> Unit,
     onDeleteSession: (LogSession) -> Unit,
+    onDeleteRecord: (TelemetryRecord) -> Unit,
     loadRecords: suspend (Long) -> List<TelemetryRecord>
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
+
+    // Detailed inspector state (matching image_dfcc45c4.png)
+    var inspectedSession by remember { mutableStateOf<LogSession?>(null) }
+    var inspectedRecords by remember { mutableStateOf<List<TelemetryRecord>?>(null) }
+
+    // Rename dialog state
+    var sessionToRename by remember { mutableStateOf<LogSession?>(null) }
+    var renameText by remember { mutableStateOf("") }
+
+    if (inspectedSession != null && inspectedRecords != null) {
+        BackHandler {
+            inspectedSession = null
+            inspectedRecords = null
+        }
+
+        SessionDetailInspector(
+            session = inspectedSession!!,
+            records = inspectedRecords!!,
+            lang = lang,
+            onBack = {
+                inspectedSession = null
+                inspectedRecords = null
+            },
+            onExportCsv = {
+                coroutineScope.launch {
+                    exportSessionFile(context, inspectedSession!!, "CSV", loadRecords)
+                }
+            },
+            onDeletePoint = { record ->
+                onDeleteRecord(record)
+                inspectedRecords = inspectedRecords?.filter { it.id != record.id }
+            }
+        )
+        return
+    }
 
     val filtered = remember(sessions, searchQuery) {
         if (searchQuery.isBlank()) sessions
@@ -65,12 +103,25 @@ fun HistoryTab(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = Strings.get("history_title", lang),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "HISTORIE MĚŘICÍCH RELACÍ",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = CyanTertiary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Lokální SQLite databáze bez cloudových závislostí",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondaryDark
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -79,7 +130,7 @@ fun HistoryTab(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth().testTag("history_search_field"),
-            placeholder = { Text(text = Strings.get("filter_search", lang)) },
+            placeholder = { Text(text = "Hledat relaci podle názvu, technologie, pásma...") },
             leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
@@ -95,7 +146,7 @@ fun HistoryTab(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = Strings.get("no_sessions", lang),
+                    text = "Zatím žádné zaznamenané relace. Spusťte měření na záložce Měření.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -109,6 +160,17 @@ fun HistoryTab(
                     SessionCard(
                         session = session,
                         lang = lang,
+                        onOpenInspector = {
+                            coroutineScope.launch {
+                                val list = loadRecords(session.id)
+                                inspectedRecords = list
+                                inspectedSession = session
+                            }
+                        },
+                        onRename = {
+                            sessionToRename = session
+                            renameText = session.title
+                        },
                         onReplay = { onSelectSessionForReplay(session.id) },
                         onDelete = { onDeleteSession(session) },
                         onExport = { format ->
@@ -118,8 +180,55 @@ fun HistoryTab(
                         }
                     )
                 }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_vut_logo),
+                            contentDescription = "VUT Logo",
+                            modifier = Modifier.height(28.dp).width(90.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
+    }
+
+    // Rename Session Dialog
+    if (sessionToRename != null) {
+        AlertDialog(
+            onDismissRequest = { sessionToRename = null },
+            title = { Text("Přejmenovat relaci", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text("Nový název relace") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (renameText.isNotBlank()) {
+                        onRenameSession(sessionToRename!!.id, renameText.trim())
+                    }
+                    sessionToRename = null
+                }) {
+                    Text("Uložit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sessionToRename = null }) {
+                    Text("Zrušit")
+                }
+            }
+        )
     }
 }
 
@@ -127,6 +236,8 @@ fun HistoryTab(
 fun SessionCard(
     session: LogSession,
     lang: String,
+    onOpenInspector: () -> Unit,
+    onRename: () -> Unit,
     onReplay: () -> Unit,
     onDelete: () -> Unit,
     onExport: (String) -> Unit
@@ -135,7 +246,9 @@ fun SessionCard(
     val startTimeStr = remember(session.startTimeMs) { dateFormat.format(Date(session.startTimeMs)) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenInspector() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = DarkSlate800)
     ) {
@@ -145,11 +258,17 @@ fun SessionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = session.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = session.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = CyanTertiary
+                    )
+                    IconButton(onClick = onRename, modifier = Modifier.size(24.dp)) {
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Přejmenovat", tint = TextSecondaryDark, modifier = Modifier.size(16.dp))
+                    }
+                }
                 Text(
                     text = startTimeStr,
                     style = MaterialTheme.typography.bodySmall,
@@ -160,15 +279,14 @@ fun SessionCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
-                HistoryMetricItem(label = "Points", value = session.pointCount.toString(), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = "Distance", value = String.format("%.1f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = "Max Speed", value = String.format("%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = "Tech/Operator", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.5f))
+                HistoryMetricItem(label = "Vzorků", value = session.pointCount.toString(), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = "Vzdálenost", value = String.format("%.1f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = "Max rychlost", value = String.format("%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = "Síť & Operátor", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.5f))
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Action Buttons: Replay on Map, Export CSV/KML/GeoJSON, Delete
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -176,13 +294,25 @@ fun SessionCard(
             ) {
                 Row {
                     FilledTonalButton(
+                        onClick = onOpenInspector,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Procházet body", fontSize = 11.sp)
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    OutlinedButton(
                         onClick = onReplay,
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Icon(imageVector = Icons.Default.Map, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = Strings.get("show_on_map", lang), fontSize = 12.sp)
+                        Text(text = "Mapa", fontSize = 11.sp)
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -192,11 +322,11 @@ fun SessionCard(
                         OutlinedButton(
                             onClick = { showMenu = true },
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Export", fontSize = 12.sp)
+                            Text(text = "Export", fontSize = 11.sp)
                         }
 
                         DropdownMenu(
@@ -204,15 +334,15 @@ fun SessionCard(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text(Strings.get("export_csv", lang)) },
+                                text = { Text("Export CSV") },
                                 onClick = { showMenu = false; onExport("CSV") }
                             )
                             DropdownMenuItem(
-                                text = { Text(Strings.get("export_kml", lang)) },
+                                text = { Text("Export 3D KML") },
                                 onClick = { showMenu = false; onExport("KML") }
                             )
                             DropdownMenuItem(
-                                text = { Text(Strings.get("export_geojson", lang)) },
+                                text = { Text("Export GeoJSON") },
                                 onClick = { showMenu = false; onExport("GEOJSON") }
                             )
                         }
@@ -220,7 +350,156 @@ fun SessionCard(
                 }
 
                 IconButton(onClick = onDelete) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = Strings.get("delete_session", lang), tint = RoseCritical)
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Smazat", tint = RoseCritical)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Detailed point-by-point session inspector matching user screenshot image_dfcc45c4.png
+ */
+@Composable
+fun SessionDetailInspector(
+    session: LogSession,
+    records: List<TelemetryRecord>,
+    lang: String,
+    onBack: () -> Unit,
+    onExportCsv: () -> Unit,
+    onDeletePoint: (TelemetryRecord) -> Unit
+) {
+    val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Header with Back button and Export CSV button matching image_dfcc45c4.png
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Zpět", tint = TextPrimaryDark)
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Column {
+                    Text(
+                        text = session.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimaryDark
+                    )
+                    Text(
+                        text = "Editace a inspekce ${records.size} z ${session.pointCount} záznamů",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondaryDark
+                    )
+                }
+            }
+
+            Button(
+                onClick = onExportCsv,
+                colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = DarkSlate900)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(text = "Export CSV", fontWeight = FontWeight.Bold, color = DarkSlate900, fontSize = 12.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(records, key = { it.id }) { r ->
+                val timeStr = timeFormat.format(Date(r.timestampMs))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSlate800)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "#${r.id} • $timeStr",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimaryDark
+                            )
+                            IconButton(onClick = { onDeletePoint(r) }, modifier = Modifier.size(24.dp)) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Smazat bod", tint = RoseCritical, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "GNSS: ${String.format("%.5f", r.latitude)}, ${String.format("%.5f", r.longitude)} (±${String.format("%.1f", r.horizontalAccuracyM)}m)",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = CyanTertiary
+                            )
+                            Text(
+                                text = "Sats: ${r.satellitesUsedInFix}/${r.satellitesInView} (L5: ${if (r.dualFrequencyRatioPct > 0) "6" else "0"})",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = EmeraldSignal
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "HDOP: ${String.format("%.2f", r.hdop)} • VDOP: ${String.format("%.2f", r.vdop)} • PDOP: ${String.format("%.2f", r.pdop)}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = TextSecondaryDark
+                            )
+                            Text(
+                                text = "Rychlost: ${String.format("%.1f km/h", r.speedKmh)}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = TextPrimaryDark
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Operátor: ${r.sim1Operator} (${r.sim1Band})",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = AmberWarning
+                            )
+                            Text(
+                                text = "RSRP: ${r.sim1Rsrp ?: "N/A"} dBm",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = if ((r.sim1Rsrp ?: -120) >= -85) EmeraldSignal else AmberWarning
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -251,16 +530,16 @@ private suspend fun exportSessionFile(
         val records = loadRecords(session.id)
         if (records.isEmpty()) {
             withContext(Dispatchers.Main) {
-                Toast.makeText(context, "No records to export in this session", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Žádné záznamy k exportu v této relaci", Toast.LENGTH_SHORT).show()
             }
             return@withContext
         }
 
         val exportDir = File(context.cacheDir, "exports").apply { if (!exists()) mkdirs() }
         val filename = when (format) {
-            "CSV" -> "Session_${session.id}_${session.startTimeMs}.csv"
-            "KML" -> "Session_${session.id}_${session.startTimeMs}.kml"
-            else -> "Session_${session.id}_${session.startTimeMs}.geojson"
+            "CSV" -> "${session.title.replace(" ", "_")}_${session.id}.csv"
+            "KML" -> "${session.title.replace(" ", "_")}_${session.id}.kml"
+            else -> "${session.title.replace(" ", "_")}_${session.id}.geojson"
         }
         val file = File(exportDir, filename)
 
@@ -282,12 +561,12 @@ private suspend fun exportSessionFile(
                         else -> "application/geo+json"
                     }
                     putExtra(Intent.EXTRA_STREAM, uri)
-                    putExtra(Intent.EXTRA_SUBJECT, "Signal & GNSS Field Logger Export: ${session.title}")
+                    putExtra(Intent.EXTRA_SUBJECT, "GNSS & Net Logger Export: ${session.title}")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                context.startActivity(Intent.createChooser(shareIntent, "Share / Save Export"))
+                context.startActivity(Intent.createChooser(shareIntent, "Sdílet / Uložit export"))
             } catch (e: Exception) {
-                Toast.makeText(context, "Export saved to: ${file.name}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Export uložen do: ${file.name}", Toast.LENGTH_LONG).show()
             }
         }
     }

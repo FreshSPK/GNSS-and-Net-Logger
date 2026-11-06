@@ -11,6 +11,9 @@ interface TelemetryDao {
     @Update
     suspend fun updateSession(session: LogSession)
 
+    @Query("UPDATE log_sessions SET title = :newTitle WHERE id = :sessionId")
+    suspend fun renameSession(sessionId: Long, newTitle: String)
+
     @Delete
     suspend fun deleteSession(session: LogSession)
 
@@ -19,6 +22,12 @@ interface TelemetryDao {
 
     @Query("SELECT * FROM log_sessions WHERE id = :sessionId LIMIT 1")
     suspend fun getSessionById(sessionId: Long): LogSession?
+
+    @Update
+    suspend fun updateRecord(record: TelemetryRecord)
+
+    @Delete
+    suspend fun deleteRecord(record: TelemetryRecord)
 
     @Insert
     suspend fun insertRecord(record: TelemetryRecord): Long
