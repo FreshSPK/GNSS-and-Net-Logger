@@ -23,6 +23,8 @@ fun ChartsTab(
     chartPoints: List<ChartPoint>,
     lang: String
 ) {
+    val isCs = lang != "EN"
+
     val rsrpValues = chartPoints.map { it.rsrp }
     val speedValues = chartPoints.map { it.speedKmh }
     val satValues = chartPoints.map { it.satCount.toFloat() }
@@ -46,7 +48,7 @@ fun ChartsTab(
             .padding(16.dp)
     ) {
         Text(
-            text = "Časové průběhy v reálném čase",
+            text = if (isCs) "Časové průběhy v reálném čase" else "Real-time Telemetry Waveforms",
             style = MaterialTheme.typography.titleMedium,
             color = CyanTertiary,
             fontWeight = FontWeight.Bold
@@ -56,7 +58,7 @@ fun ChartsTab(
 
         // 1. Serving RSRP Chart
         RealtimeSparklineChart(
-            title = "RSRP signál základnové stanice v čase",
+            title = if (isCs) "RSRP signál základnové stanice v čase" else "Serving Base Station RSRP over Time",
             currentValue = lastRsrp,
             unit = "dBm",
             values = rsrpValues,
@@ -69,7 +71,7 @@ fun ChartsTab(
 
         // 2. Speed Chart
         RealtimeSparklineChart(
-            title = "Rychlost pohybu vozidla / chodce",
+            title = if (isCs) "Rychlost pohybu vozidla / chodce" else "Movement Speed (Vehicle / Walk)",
             currentValue = lastSpeed,
             unit = "km/h",
             values = speedValues,
@@ -82,9 +84,9 @@ fun ChartsTab(
 
         // 3. Satellite in Fix Count Chart
         RealtimeSparklineChart(
-            title = "Počet satelitů v fixu a v dosahu",
+            title = if (isCs) "Počet satelitů v fixu a v dosahu" else "Satellites in Fix and in View",
             currentValue = lastSats,
-            unit = "satelitů",
+            unit = if (isCs) "satelitů" else "sats",
             values = satValues,
             lineColor = BlueSatellite,
             minY = 0f,
@@ -95,7 +97,7 @@ fun ChartsTab(
 
         // 4. Ping Latency Chart
         RealtimeSparklineChart(
-            title = "Latence pingu (Google DNS 8.8.8.8)",
+            title = if (isCs) "Latence pingu (Google DNS 8.8.8.8)" else "Ping RTT Latency (Google DNS 8.8.8.8)",
             currentValue = lastPing,
             unit = "ms",
             values = pingValues,
@@ -108,7 +110,7 @@ fun ChartsTab(
 
         // 5. Accelerometer Magnitude Chart
         RealtimeSparklineChart(
-            title = "Akcelerometr: Výsledné přetížení / otřesy",
+            title = if (isCs) "Akcelerometr: Výsledné přetížení / otřesy" else "Accelerometer: Resultant G-Force / Jolt",
             currentValue = lastAccel,
             unit = "m/s²",
             values = accelValues,
@@ -121,7 +123,7 @@ fun ChartsTab(
 
         // 6. Gyroscope Z Chart
         RealtimeSparklineChart(
-            title = "Gyroskop: Úhlová rychlost zatáčení (Z-osa)",
+            title = if (isCs) "Gyroskop: Úhlová rychlost zatáčení (Z-osa)" else "Gyroscope: Yaw Angular Velocity (Z-axis)",
             currentValue = lastGyro,
             unit = "rad/s",
             values = gyroValues,
@@ -134,7 +136,7 @@ fun ChartsTab(
 
         // 7. Magnetometer Compass Chart
         RealtimeSparklineChart(
-            title = "Magnetický kompas: Azimut natočení",
+            title = if (isCs) "Magnetický kompas: Azimut natočení" else "Magnetic Compass: Azimuth Heading",
             currentValue = lastCompass,
             unit = "T (směr)",
             values = compassValues,

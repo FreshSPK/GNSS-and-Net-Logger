@@ -42,6 +42,7 @@ fun OverviewTab(
     onStopLogging: () -> Unit,
     onUpdateFieldsSelection: (LoggedFieldsSelection) -> Unit
 ) {
+    val isCs = lang != "EN"
     var showFieldsDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -90,9 +91,9 @@ fun OverviewTab(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = when {
-                                    isLogging && !isPaused -> "ZÁZNAM AKTIVNÍ"
-                                    isLogging && isPaused -> "ZÁZNAM POZASTAVEN"
-                                    else -> "ZÁZNAM NEAKTIVNÍ"
+                                    isLogging && !isPaused -> if (isCs) "ZÁZNAM AKTIVNÍ" else "LOGGING ACTIVE"
+                                    isLogging && isPaused -> if (isCs) "ZÁZNAM POZASTAVEN" else "LOGGING PAUSED"
+                                    else -> if (isCs) "ZÁZNAM NEAKTIVNÍ" else "LOGGING INACTIVE"
                                 },
                                 fontWeight = FontWeight.Bold,
                                 color = when {
@@ -106,7 +107,7 @@ fun OverviewTab(
                         if (isLogging) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Uloženo vzorků: $loggedPoints",
+                                text = if (isCs) "Uloženo vzorků: $loggedPoints" else "Recorded samples: $loggedPoints",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -121,7 +122,7 @@ fun OverviewTab(
                     ) {
                         Icon(imageVector = Icons.Default.Checklist, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Položky", fontSize = 12.sp)
+                        Text(text = if (isCs) "Položky" else "Fields", fontSize = 12.sp)
                     }
                 }
 
@@ -141,7 +142,11 @@ fun OverviewTab(
                         ) {
                             Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp), tint = DarkSlate900)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "ZAHÁJIT ZÁZNAM MĚŘENÍ", fontWeight = FontWeight.Bold, color = DarkSlate900)
+                            Text(
+                                text = if (isCs) "ZAHÁJIT ZÁZNAM MĚŘENÍ" else "START FIELD LOGGING",
+                                fontWeight = FontWeight.Bold,
+                                color = DarkSlate900
+                            )
                         }
                     } else {
                         // Pause / Resume
@@ -159,7 +164,10 @@ fun OverviewTab(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = if (isPaused) "Pokračovat" else "Pozastavit", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isPaused) (if (isCs) "Pokračovat" else "Resume") else (if (isCs) "Pozastavit" else "Pause"),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
                         // Stop
@@ -171,7 +179,7 @@ fun OverviewTab(
                         ) {
                             Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Zastavit", fontWeight = FontWeight.Bold)
+                            Text(text = if (isCs) "Zastavit" else "Stop", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -194,14 +202,14 @@ fun OverviewTab(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "GNSS POLOHA & RYCHLOST",
+                            text = if (isCs) "GNSS POLOHA & RYCHLOST" else "GNSS POSITION & SPEED",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
                         )
                     }
                     Text(
-                        text = if (gnss.hasFix) "3D GNSS Fix Aktivní" else "Vyhledávání...",
+                        text = if (gnss.hasFix) (if (isCs) "3D GNSS Fix Aktivní" else "3D GNSS Fix Active") else (if (isCs) "Vyhledávání..." else "Searching..."),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = if (gnss.hasFix) EmeraldSignal else AmberWarning
@@ -212,7 +220,7 @@ fun OverviewTab(
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "ZEMĚPÍSNÁ ŠÍŘKA", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "ZEMĚPÍSNÁ ŠÍŘKA" else "LATITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
                             text = String.format("%.6f°", gnss.latitude),
                             style = MaterialTheme.typography.titleMedium,
@@ -222,7 +230,7 @@ fun OverviewTab(
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "ZEMĚPÍSNÁ DÉLKA", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "ZEMĚPÍSNÁ DÉLKA" else "LONGITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
                             text = String.format("%.6f°", gnss.longitude),
                             style = MaterialTheme.typography.titleMedium,
@@ -237,7 +245,7 @@ fun OverviewTab(
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "RYCHLOST (PŘESNOST)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "RYCHLOST (PŘESNOST)" else "SPEED (ACCURACY)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
                             text = "${String.format("%.1f", gnss.speedKmh)} km/h",
                             style = MaterialTheme.typography.bodyLarge,
@@ -245,10 +253,10 @@ fun OverviewTab(
                             fontFamily = FontFamily.Monospace,
                             color = CyanTertiary
                         )
-                        Text(text = "±0,7 km/h", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = "±0.7 km/h", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "HORIZ. PŘESNOST", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "HORIZ. PŘESNOST" else "HORIZ. ACCURACY", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
                             text = "±${String.format("%.1f", gnss.horizontalAccuracyM)} m",
                             style = MaterialTheme.typography.bodyLarge,
@@ -259,7 +267,7 @@ fun OverviewTab(
                         Text(text = "68% interval", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "VÝŠKA", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "VÝŠKA" else "ALTITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
                             text = "${String.format("%.1f", gnss.altitudeMsl)} m",
                             style = MaterialTheme.typography.bodyLarge,
@@ -270,7 +278,7 @@ fun OverviewTab(
                         Text(text = "±${String.format("%.1f", gnss.verticalAccuracyM)} m", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "AZIMUT (SMĚR)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "AZIMUT (SMĚR)" else "AZIMUTH (BEARING)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
                             text = "${String.format("%.0f", gnss.bearingDeg)}°",
                             style = MaterialTheme.typography.bodyLarge,
@@ -278,7 +286,7 @@ fun OverviewTab(
                             fontFamily = FontFamily.Monospace,
                             color = AmberWarning
                         )
-                        Text(text = "T (SMĚR)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = "T (BEARING)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                 }
             }
@@ -294,13 +302,13 @@ fun OverviewTab(
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
-                    text = "DOP PŘESNOST (DILUTION OF PRECISION)",
+                    text = if (isCs) "DOP PŘESNOST (DILUTION OF PRECISION)" else "DILUTION OF PRECISION (DOP)",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = CyanTertiary
                 )
                 Text(
-                    text = "Geometrie rozložení satelitů na obloze",
+                    text = if (isCs) "Geometrie rozložení satelitů na obloze" else "Satellite constellation geometry distribution",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondaryDark
                 )
@@ -309,7 +317,7 @@ fun OverviewTab(
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "HDOP (Horizontální)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "HDOP (Horizontální)" else "HDOP (Horizontal)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
                             text = String.format("%.2f", gnss.hdop),
                             style = MaterialTheme.typography.titleMedium,
@@ -317,10 +325,10 @@ fun OverviewTab(
                             fontFamily = FontFamily.Monospace,
                             color = EmeraldSignal
                         )
-                        Text(text = "Vliv na polohu X/Y", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Vliv na polohu X/Y" else "Impact on X/Y", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "VDOP (Vertikální)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "VDOP (Vertikální)" else "VDOP (Vertical)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
                             text = String.format("%.2f", gnss.vdop),
                             style = MaterialTheme.typography.titleMedium,
@@ -328,10 +336,10 @@ fun OverviewTab(
                             fontFamily = FontFamily.Monospace,
                             color = TextPrimaryDark
                         )
-                        Text(text = "Vliv na výšku Z", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Vliv na výšku Z" else "Impact on Altitude Z", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "PDOP (Prostorový 3D)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "PDOP (Prostorový 3D)" else "PDOP (Spatial 3D)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
                             text = String.format("%.2f", gnss.pdop),
                             style = MaterialTheme.typography.titleMedium,
@@ -339,7 +347,7 @@ fun OverviewTab(
                             fontFamily = FontFamily.Monospace,
                             color = CyanTertiary
                         )
-                        Text(text = "Celková geometrie", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Celková geometrie" else "Total geometry", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                 }
             }
@@ -360,13 +368,13 @@ fun OverviewTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "SATELITY & PÁSMA GNSS",
+                        text = if (isCs) "SATELITY & PÁSMA GNSS" else "GNSS SATELLITES & BANDS",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = CyanTertiary
                     )
                     Text(
-                        text = "${gnss.satellitesUsedInFix} použito z ${gnss.satellitesInView} viditelných",
+                        text = if (isCs) "${gnss.satellitesUsedInFix} použito z ${gnss.satellitesInView} viditelných" else "${gnss.satellitesUsedInFix} used of ${gnss.satellitesInView} visible",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = EmeraldSignal
@@ -377,7 +385,7 @@ fun OverviewTab(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (gnss.l5Count > 0) "DVOUFREKVENČNÍ PŘÍJEM L1+L5" else "JEDNOFREKVENČNÍ PŘÍJEM L1",
+                        text = if (gnss.l5Count > 0) (if (isCs) "DVOUFREKVENČNÍ PŘÍJEM L1+L5" else "DUAL-FREQUENCY FIX L1+L5") else (if (isCs) "JEDNOFREKVENČNÍ PŘÍJEM L1" else "SINGLE-FREQUENCY FIX L1"),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = if (gnss.l5Count > 0) EmeraldSignal else TextSecondaryDark
                     )
@@ -411,7 +419,7 @@ fun OverviewTab(
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text(
-                    text = "MOBILNÍ SÍŤ & OPERÁTOR",
+                    text = if (isCs) "MOBILNÍ SÍŤ & OPERÁTOR" else "CELLULAR NETWORK & OPERATOR",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = CyanTertiary
@@ -419,11 +427,11 @@ fun OverviewTab(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                SimCardRow(sim = cellular.sim1)
+                SimCardRow(sim = cellular.sim1, lang = lang)
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = DarkSlate700)
                 Spacer(modifier = Modifier.height(12.dp))
-                SimCardRow(sim = cellular.sim2)
+                SimCardRow(sim = cellular.sim2, lang = lang)
             }
         }
 
@@ -450,38 +458,38 @@ fun OverviewTab(
     if (showFieldsDialog) {
         AlertDialog(
             onDismissRequest = { showFieldsDialog = false },
-            title = { Text(text = "Výběr položek k logování", fontWeight = FontWeight.Bold) },
+            title = { Text(text = if (isCs) "Výběr položek k logování" else "Select Logging Fields", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     Text(
-                        text = "Zvolte parametry a telemetrická data, která se mají ukládat při každém kroku:",
+                        text = if (isCs) "Zvolte parametry a telemetrická data, která se mají ukládat při každém kroku:" else "Select which telemetry data sets will be stored with each recorded point:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
                     FieldCheckbox(
-                        label = "GNSS satelitní data & DOP",
+                        label = if (isCs) "GNSS satelitní data & DOP" else "GNSS satellite data & DOP",
                         checked = fieldsSelection.logGnss,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logGnss = it)) }
                     )
                     FieldCheckbox(
-                        label = "Mobilní RF parametry (RSRP, SINR, TA)",
+                        label = if (isCs) "Mobilní RF parametry (RSRP, SINR, TA)" else "Cellular RF parameters (RSRP, SINR, TA)",
                         checked = fieldsSelection.logCellularRf,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logCellularRf = it)) }
                     )
                     FieldCheckbox(
-                        label = "Sousední buňky & RF průzkum",
+                        label = if (isCs) "Sousední buňky & RF průzkum" else "Neighbor cells & RF survey",
                         checked = fieldsSelection.logNeighbors,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logNeighbors = it)) }
                     )
                     FieldCheckbox(
-                        label = "Environmentální senzory (Barometr, IMU)",
+                        label = if (isCs) "Environmentální senzory (Barometr, IMU)" else "Environmental sensors (Barometer, IMU)",
                         checked = fieldsSelection.logSensors,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logSensors = it)) }
                     )
                     FieldCheckbox(
-                        label = "Síťová latence (Socket Ping 8.8.8.8)",
+                        label = if (isCs) "Síťová latence (Socket Ping 8.8.8.8)" else "Network latency (Socket Ping 8.8.8.8)",
                         checked = fieldsSelection.logPing,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logPing = it)) }
                     )
@@ -489,7 +497,7 @@ fun OverviewTab(
             },
             confirmButton = {
                 Button(onClick = { showFieldsDialog = false }) {
-                    Text("Hotovo")
+                    Text(if (isCs) "Hotovo" else "Done")
                 }
             }
         )
@@ -523,7 +531,9 @@ private fun ConstellationMiniBox(name: String, counts: Pair<Int, Int>?, modifier
 }
 
 @Composable
-private fun SimCardRow(sim: SimCellInfo) {
+private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
+    val isCs = lang != "EN"
+
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -551,7 +561,7 @@ private fun SimCardRow(sim: SimCellInfo) {
                 )
             }
             Text(
-                text = if (sim.slotIndex == 0) "DATA AKTIVNÍ" else "HLAS",
+                text = if (sim.slotIndex == 0) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS" else "VOICE"),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (sim.slotIndex == 0) EmeraldSignal else TextSecondaryDark
@@ -611,7 +621,11 @@ private fun SimCardRow(sim: SimCellInfo) {
                 color = TextSecondaryDark
             )
             Text(
-                text = "Vzdálenost: ${sim.estimatedDistanceM?.let { String.format("%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}",
+                text = if (isCs) {
+                    "Vzdálenost: ${sim.estimatedDistanceM?.let { String.format("%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
+                } else {
+                    "Distance: ${sim.estimatedDistanceM?.let { String.format("%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
+                },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                 color = TextSecondaryDark
             )

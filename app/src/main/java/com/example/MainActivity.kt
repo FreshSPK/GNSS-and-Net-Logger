@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
                                             color = Color.White
                                         )
                                         Text(
-                                            text = "Aplikaci vytvořil Jan Kufa z VUT",
+                                            text = if (currentLang != "EN") "Aplikaci vytvořil Jan Kufa z VUT" else "Developed by Jan Kufa (BUT Brno)",
                                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                             color = MaterialTheme.colorScheme.primary
                                         )
@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                                     onClick = { showSettingsDialog = true },
                                     modifier = Modifier.testTag("settings_top_button")
                                 ) {
-                                    Icon(imageVector = Icons.Default.Tune, contentDescription = "Nastavení", tint = Color.White)
+                                    Icon(imageVector = Icons.Default.Tune, contentDescription = if (currentLang != "EN") "Nastavení" else "Settings", tint = Color.White)
                                 }
 
                                 // Help / Info button (i)
@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity() {
                                     onClick = { showHelpDialog = true },
                                     modifier = Modifier.testTag("help_top_button")
                                 ) {
-                                    Icon(imageVector = Icons.Default.Info, contentDescription = "Nápověda a autor", tint = MaterialTheme.colorScheme.primary)
+                                    Icon(imageVector = Icons.Default.Info, contentDescription = if (currentLang != "EN") "Nápověda a autor" else "Help & Credits", tint = MaterialTheme.colorScheme.primary)
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
@@ -159,11 +159,19 @@ class MainActivity : ComponentActivity() {
                             containerColor = DarkSlate900
                         ) {
                             AppTab.values().forEach { tab ->
+                                val tabTitle = when (tab) {
+                                    AppTab.OVERVIEW -> if (currentLang != "EN") "Měření" else "Overview"
+                                    AppTab.CELLULAR_RF -> if (currentLang != "EN") "Mobily" else "Cellular"
+                                    AppTab.GNSS -> if (currentLang != "EN") "Satelity" else "Satellites"
+                                    AppTab.MAP -> if (currentLang != "EN") "Mapa" else "Map"
+                                    AppTab.CHARTS -> if (currentLang != "EN") "Grafy" else "Charts"
+                                    AppTab.HISTORY -> if (currentLang != "EN") "Historie" else "History"
+                                }
                                 NavigationBarItem(
                                     selected = currentTab == tab,
                                     onClick = { currentTab = tab },
-                                    icon = { Icon(imageVector = tab.icon, contentDescription = tab.title) },
-                                    label = { Text(text = tab.title, fontSize = 11.sp, fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal) },
+                                    icon = { Icon(imageVector = tab.icon, contentDescription = tabTitle) },
+                                    label = { Text(text = tabTitle, fontSize = 11.sp, fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal) },
                                     modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
                                 )
                             }

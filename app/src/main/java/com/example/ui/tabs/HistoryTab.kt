@@ -5,7 +5,6 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -49,15 +47,14 @@ fun HistoryTab(
     onDeleteRecord: (TelemetryRecord) -> Unit,
     loadRecords: suspend (Long) -> List<TelemetryRecord>
 ) {
+    val isCs = lang != "EN"
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
 
-    // Detailed inspector state (matching image_dfcc45c4.png)
     var inspectedSession by remember { mutableStateOf<LogSession?>(null) }
     var inspectedRecords by remember { mutableStateOf<List<TelemetryRecord>?>(null) }
 
-    // Rename dialog state
     var sessionToRename by remember { mutableStateOf<LogSession?>(null) }
     var renameText by remember { mutableStateOf("") }
 
@@ -110,13 +107,13 @@ fun HistoryTab(
         ) {
             Column {
                 Text(
-                    text = "HISTORIE MĚŘICÍCH RELACÍ",
+                    text = if (isCs) "HISTORIE MĚŘICÍCH RELACÍ" else "MEASUREMENT SESSIONS HISTORY",
                     style = MaterialTheme.typography.titleMedium,
                     color = CyanTertiary,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Lokální SQLite databáze bez cloudových závislostí",
+                    text = if (isCs) "Lokální SQLite databáze bez cloudových závislostí" else "Local SQLite Room database without external cloud keys",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondaryDark
                 )
@@ -130,7 +127,7 @@ fun HistoryTab(
             value = searchQuery,
             onValueChange = { searchQuery = it },
             modifier = Modifier.fillMaxWidth().testTag("history_search_field"),
-            placeholder = { Text(text = "Hledat relaci podle názvu, technologie, pásma...") },
+            placeholder = { Text(text = if (isCs) "Hledat relaci podle názvu, technologie, pásma..." else "Search sessions by title, network, band...") },
             leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null) },
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
@@ -146,7 +143,7 @@ fun HistoryTab(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Zatím žádné zaznamenané relace. Spusťte měření na záložce Měření.",
+                    text = if (isCs) "Zatím žádné zaznamenané relace. Spusťte měření na záložce Měření." else "No sessions recorded yet. Start logging from the Measurement tab.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -203,12 +200,12 @@ fun HistoryTab(
     if (sessionToRename != null) {
         AlertDialog(
             onDismissRequest = { sessionToRename = null },
-            title = { Text("Přejmenovat relaci", fontWeight = FontWeight.Bold) },
+            title = { Text(if (isCs) "Přejmenovat relaci" else "Rename Session", fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = renameText,
                     onValueChange = { renameText = it },
-                    label = { Text("Nový název relace") },
+                    label = { Text(if (isCs) "Nový název relace" else "New session title") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -220,12 +217,12 @@ fun HistoryTab(
                     }
                     sessionToRename = null
                 }) {
-                    Text("Uložit")
+                    Text(if (isCs) "Uložit" else "Save")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { sessionToRename = null }) {
-                    Text("Zrušit")
+                    Text(if (isCs) "Zrušit" else "Cancel")
                 }
             }
         )
@@ -242,6 +239,7 @@ fun SessionCard(
     onDelete: () -> Unit,
     onExport: (String) -> Unit
 ) {
+    val isCs = lang != "EN"
     val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
     val startTimeStr = remember(session.startTimeMs) { dateFormat.format(Date(session.startTimeMs)) }
 
@@ -266,7 +264,7 @@ fun SessionCard(
                         color = CyanTertiary
                     )
                     IconButton(onClick = onRename, modifier = Modifier.size(24.dp)) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Přejmenovat", tint = TextSecondaryDark, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = if (isCs) "Přejmenovat" else "Rename", tint = TextSecondaryDark, modifier = Modifier.size(16.dp))
                     }
                 }
                 Text(
@@ -279,10 +277,10 @@ fun SessionCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
-                HistoryMetricItem(label = "Vzorků", value = session.pointCount.toString(), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = "Vzdálenost", value = String.format("%.1f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = "Max rychlost", value = String.format("%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = "Síť & Operátor", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.5f))
+                HistoryMetricItem(label = if (isCs) "Vzorků" else "Samples", value = session.pointCount.toString(), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = if (isCs) "Vzdálenost" else "Distance", value = String.format("%.1f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = if (isCs) "Max rychlost" else "Max Speed", value = String.format("%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = if (isCs) "Síť & Operátor" else "Net & Operator", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.5f))
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -300,7 +298,7 @@ fun SessionCard(
                     ) {
                         Icon(imageVector = Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Procházet body", fontSize = 11.sp)
+                        Text(text = if (isCs) "Procházet body" else "Inspect Points", fontSize = 11.sp)
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -312,7 +310,7 @@ fun SessionCard(
                     ) {
                         Icon(imageVector = Icons.Default.Map, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Mapa", fontSize = 11.sp)
+                        Text(text = if (isCs) "Mapa" else "Map", fontSize = 11.sp)
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))
@@ -350,16 +348,13 @@ fun SessionCard(
                 }
 
                 IconButton(onClick = onDelete) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = "Smazat", tint = RoseCritical)
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = if (isCs) "Smazat" else "Delete", tint = RoseCritical)
                 }
             }
         }
     }
 }
 
-/**
- * Detailed point-by-point session inspector matching user screenshot image_dfcc45c4.png
- */
 @Composable
 fun SessionDetailInspector(
     session: LogSession,
@@ -369,6 +364,7 @@ fun SessionDetailInspector(
     onExportCsv: () -> Unit,
     onDeletePoint: (TelemetryRecord) -> Unit
 ) {
+    val isCs = lang != "EN"
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
 
     Column(
@@ -376,7 +372,6 @@ fun SessionDetailInspector(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Header with Back button and Export CSV button matching image_dfcc45c4.png
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -384,7 +379,7 @@ fun SessionDetailInspector(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Zpět", tint = TextPrimaryDark)
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = if (isCs) "Zpět" else "Back", tint = TextPrimaryDark)
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
@@ -395,7 +390,7 @@ fun SessionDetailInspector(
                         color = TextPrimaryDark
                     )
                     Text(
-                        text = "Editace a inspekce ${records.size} z ${session.pointCount} záznamů",
+                        text = if (isCs) "Editace a inspekce ${records.size} z ${session.pointCount} záznamů" else "Inspection of ${records.size} of ${session.pointCount} records",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryDark
                     )
@@ -440,7 +435,7 @@ fun SessionDetailInspector(
                                 color = TextPrimaryDark
                             )
                             IconButton(onClick = { onDeletePoint(r) }, modifier = Modifier.size(24.dp)) {
-                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Smazat bod", tint = RoseCritical, modifier = Modifier.size(16.dp))
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = if (isCs) "Smazat bod" else "Delete Point", tint = RoseCritical, modifier = Modifier.size(16.dp))
                             }
                         }
 
@@ -475,7 +470,7 @@ fun SessionDetailInspector(
                                 color = TextSecondaryDark
                             )
                             Text(
-                                text = "Rychlost: ${String.format("%.1f km/h", r.speedKmh)}",
+                                text = if (isCs) "Rychlost: ${String.format("%.1f km/h", r.speedKmh)}" else "Speed: ${String.format("%.1f km/h", r.speedKmh)}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 color = TextPrimaryDark
                             )
@@ -488,7 +483,7 @@ fun SessionDetailInspector(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Operátor: ${r.sim1Operator} (${r.sim1Band})",
+                                text = "${if (isCs) "Operátor" else "Operator"}: ${r.sim1Operator} (${r.sim1Band})",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 color = AmberWarning
                             )
