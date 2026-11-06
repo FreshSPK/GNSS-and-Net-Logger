@@ -1,4 +1,4 @@
-# 📡 GNSS & Net Logger (Release v1.1)
+# 📡 GNSS & Net Logger
 
 [![Android](https://img.shields.io/badge/Platform-Android%208.0%2B%20(API%2026%E2%80%9335)-3DDC84.svg?style=flat&logo=android)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org/)
