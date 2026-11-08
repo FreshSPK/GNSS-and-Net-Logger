@@ -2,8 +2,10 @@ package com.example.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -205,13 +207,22 @@ fun SkyPlotView(
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (isCs) "● Plné = Ve fixu   ○ Prázdné = Mimo fix   ⭕ Zelený kruh = L5/E5a" else "● Solid = In fix   ○ Dimmed = Unused   ⭕ Green ring = L5/E5a",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        color = TextSecondaryDark
-                    )
+                    Box(modifier = Modifier.size(7.dp).background(Color.White, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isCs) "Ve fixu" else "In fix", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(modifier = Modifier.size(7.dp).border(1.dp, Color.Gray, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isCs) "Mimo fix" else "Unused", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(modifier = Modifier.size(9.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isCs) "Zelený kroužek = L5/E5a" else "Green ring = L5/E5a", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = EmeraldSignal)
                 }
             }
         } else {
@@ -231,13 +242,17 @@ fun SkyPlotView(
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (isCs) "● Bílá záře = Ve fixu   ⭕ Zelený kruh = Pásmo L5/E5a" else "● White border = In fix   ⭕ Green ring = L5/E5a band",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        color = TextSecondaryDark
-                    )
+                    Box(modifier = Modifier.size(7.dp).border(1.5.dp, Color.White, CircleShape).background(EmeraldSignal, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isCs) "Bílá záře = Ve fixu" else "White border = In fix", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(modifier = Modifier.size(9.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (isCs) "Zelený kroužek = Pásmo L5/E5a" else "Green ring = L5/E5a band", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = EmeraldSignal)
                 }
             }
         }
