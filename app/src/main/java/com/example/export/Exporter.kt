@@ -35,9 +35,10 @@ object Exporter {
             sb.append("${r.verticalAccuracyM},")
             sb.append("${r.satellitesInView},")
             sb.append("${r.satellitesUsedInFix},")
-            sb.append("${r.pdop},")
-            sb.append("${r.hdop},")
-            sb.append("${r.vdop},")
+            val hasDop = r.satellitesUsedInFix >= 4 && r.pdop > 0f && r.pdop < 9.0f
+            sb.append("${if (hasDop) r.pdop else "-"},")
+            sb.append("${if (hasDop && r.hdop > 0f) r.hdop else "-"},")
+            sb.append("${if (hasDop && r.vdop > 0f) r.vdop else "-"},")
             sb.append("${r.dualFrequencyRatioPct},")
             sb.append("${r.agcInterferenceScore},")
             sb.append("\"${r.constellationBreakdown}\",")

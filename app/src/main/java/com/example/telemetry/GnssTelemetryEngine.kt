@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 class GnssTelemetryEngine(
@@ -28,13 +30,15 @@ class GnssTelemetryEngine(
     private val _gnssState = MutableStateFlow(GnssState())
     val gnssState: StateFlow<GnssState> = _gnssState.asStateFlow()
 
-    private var lastLocation: Location? = null
+    private var lastValidGpsLocation: Location? = null
     private var agcBaselineDb: Double? = null
+    private var isNmeaDopAvailable = false
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
-            lastLocation = location
-            updateLocationState(location)
+            if (filterGpsLocation(location)) {
+                updateLocationState(location)
+            }
         }
         @Deprecated("Deprecated in Java")
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
@@ -57,11 +61,7 @@ class GnssTelemetryEngine(
 
     private val nmeaListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
         OnNmeaMessageListener { message, _ ->
-            if (message.startsWith("\$GNGGA") || message.startsWith("\$GNRMC") || message.startsWith("\$GPGGA") || message.startsWith("\$GNVTG")) {
-                val clean = message.trim()
-                val cur = _gnssState.value
-                _gnssState.value = cur.copy(latestNmeaSentence = clean)
-            }
+            processNmeaSentence(message.trim())
         }
     } else null
 
@@ -72,12 +72,11 @@ class GnssTelemetryEngine(
 
         try {
             val lm = locationManager ?: return
-            // Register for location updates (GPS + Network)
+
+            // CRITICAL: Listen EXCLUSIVELY to GPS_PROVIDER. Do NOT listen to NETWORK_PROVIDER
+            // which injects distant cell-tower/Wi-Fi locations and creates zig-zag spikes.
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener)
-            }
-            if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 0f, locationListener)
             }
 
             // Register GnssStatus callback
@@ -88,14 +87,14 @@ class GnssTelemetryEngine(
                 try {
                     lm.registerGnssMeasurementsCallback(gnssMeasurementsCallback, null)
                 } catch (e: Exception) {
-                    // Some OEM chipsets don't expose raw measurements
+                    // Safe catch
                 }
 
                 // Register NMEA message listener
                 try {
                     nmeaListener?.let { lm.addNmeaListener(it, null) }
                 } catch (e: Exception) {
-                    // NMEA registration safe catch
+                    // Safe catch
                 }
             }
         } catch (e: SecurityException) {
@@ -122,6 +121,38 @@ class GnssTelemetryEngine(
         _gnssState.value = state
     }
 
+    /**
+     * Rejects invalid fixes, non-GPS providers, poor accuracy, and multipath jump spikes.
+     */
+    private fun filterGpsLocation(loc: Location): Boolean {
+        // Must be GPS provider
+        if (loc.provider != null && loc.provider != LocationManager.GPS_PROVIDER) return false
+
+        // Coordinate validity
+        if (loc.latitude == 0.0 && loc.longitude == 0.0) return false
+        if (loc.latitude < -90.0 || loc.latitude > 90.0 || loc.longitude < -180.0 || loc.longitude > 180.0) return false
+
+        // Accuracy filter: discard fixes with accuracy > 25 meters
+        if (loc.hasAccuracy() && loc.accuracy > 25f) return false
+
+        // Multipath jump filter
+        val last = lastValidGpsLocation
+        if (last != null) {
+            val distM = last.distanceTo(loc)
+            val dtSec = (loc.time - last.time) / 1000.0
+            if (dtSec in 0.1..15.0) {
+                val impliedSpeedMs = distM / dtSec
+                // If jump is > 65 m/s (234 km/h) without high-speed tag, it is a multipath spike
+                if (impliedSpeedMs > 65.0 && (!loc.hasSpeed() || loc.speed < 45f)) {
+                    return false
+                }
+            }
+        }
+
+        lastValidGpsLocation = loc
+        return true
+    }
+
     private fun updateLocationState(loc: Location) {
         val speedMs = if (loc.hasSpeed()) loc.speed else 0f
         val speedKmh = speedMs * 3.6f
@@ -136,13 +167,66 @@ class GnssTelemetryEngine(
             latitude = loc.latitude,
             longitude = loc.longitude,
             altitudeMsl = loc.altitude,
-            altitudeWgs84 = loc.altitude, // Best available representation
+            altitudeWgs84 = loc.altitude,
             speedKmh = speedKmh,
             speedMs = speedMs,
             bearingDeg = if (loc.hasBearing()) loc.bearing else current.bearingDeg,
             horizontalAccuracyM = hAcc,
             verticalAccuracyM = vAcc
         )
+    }
+
+    /**
+     * NMEA parser directly matching standard GNSS specification (and GPSTest):
+     * Parses real hardware PDOP, HDOP, VDOP from GSA sentences, and HDOP from GGA.
+     */
+    private fun processNmeaSentence(sentence: String) {
+        if (sentence.isEmpty()) return
+
+        val cleanSentence = sentence.trim()
+        val cur = _gnssState.value
+
+        // Store sentence for display
+        if (cleanSentence.startsWith("\$GNGGA") || cleanSentence.startsWith("\$GNRMC") || cleanSentence.startsWith("\$GPGGA")) {
+            _gnssState.value = cur.copy(latestNmeaSentence = cleanSentence)
+        }
+
+        // Parse GSA sentences (PDOP, HDOP, VDOP)
+        // Format: $GNGSA,A,3,sv1,...,sv12,PDOP,HDOP,VDOP*checksum
+        if (cleanSentence.startsWith("\$GNGSA") || cleanSentence.startsWith("\$GPGSA") ||
+            cleanSentence.startsWith("\$GAGSA") || cleanSentence.startsWith("\$GLGSA") ||
+            cleanSentence.startsWith("\$GBGSA") || cleanSentence.startsWith("\$BDGSA")) {
+
+            val body = cleanSentence.substringBefore('*')
+            val tokens = body.split(',')
+            if (tokens.size >= 18) {
+                val pdopVal = tokens[15].toFloatOrNull()
+                val hdopVal = tokens[16].toFloatOrNull()
+                val vdopVal = tokens[17].toFloatOrNull()
+
+                if (pdopVal != null && pdopVal > 0f) {
+                    isNmeaDopAvailable = true
+                    _gnssState.value = _gnssState.value.copy(
+                        pdop = pdopVal,
+                        hdop = hdopVal ?: (pdopVal * 0.7f),
+                        vdop = vdopVal ?: (pdopVal * 0.7f)
+                    )
+                }
+            }
+        } else if (cleanSentence.startsWith("\$GNGGA") || cleanSentence.startsWith("\$GPGGA")) {
+            val body = cleanSentence.substringBefore('*')
+            val tokens = body.split(',')
+            if (tokens.size > 8) {
+                val hdopVal = tokens[8].toFloatOrNull()
+                if (hdopVal != null && hdopVal > 0f) {
+                    val p = _gnssState.value.pdop
+                    _gnssState.value = _gnssState.value.copy(
+                        hdop = hdopVal,
+                        pdop = if (p <= 0f) hdopVal * 1.4f else p
+                    )
+                }
+            }
+        }
     }
 
     private fun parseGnssStatus(status: GnssStatus) {
@@ -199,10 +283,44 @@ class GnssTelemetryEngine(
             )
         }
 
-        // DOP approximations based on satellite count & distribution
-        val hdop = if (usedCount > 3) (20.0f / usedCount.coerceAtLeast(4)).coerceIn(0.7f, 9.9f) else 15f
-        val vdop = hdop * 1.4f
-        val pdop = sqrt(hdop * hdop + vdop * vdop)
+        // Geometric DOP calculation if NMEA has not arrived yet
+        var currentPdop = _gnssState.value.pdop
+        var currentHdop = _gnssState.value.hdop
+        var currentVdop = _gnssState.value.vdop
+
+        if (!isNmeaDopAvailable || currentPdop <= 0f) {
+            val usedSats = satList.filter { it.usedInFix }
+            if (usedSats.size >= 4) {
+                // Compute geometry spread: dispersion of unit vectors
+                var sumSinEl = 0.0
+                var sumCosElSinAz = 0.0
+                var sumCosElCosAz = 0.0
+                for (s in usedSats) {
+                    val elRad = Math.toRadians(s.elevationDegrees.toDouble())
+                    val azRad = Math.toRadians(s.azimuthDegrees.toDouble())
+                    sumSinEl += sin(elRad)
+                    sumCosElSinAz += cos(elRad) * sin(azRad)
+                    sumCosElCosAz += cos(elRad) * cos(azRad)
+                }
+                val n = usedSats.size.toDouble()
+                val meanSinEl = sumSinEl / n
+                val meanHorizSpread = sqrt((sumCosElSinAz / n) * (sumCosElSinAz / n) + (sumCosElCosAz / n) * (sumCosElCosAz / n))
+                
+                // Good geometry produces low meanHorizSpread and balanced elevation
+                val geomQuality = (1.0 - meanHorizSpread.coerceIn(0.0, 0.95)) * (meanSinEl.coerceIn(0.2, 0.85))
+                val calculatedPdop = (2.5 / (geomQuality * sqrt(n / 4.0))).toFloat().coerceIn(0.8f, 15f)
+                val calculatedHdop = (calculatedPdop * 0.65f).coerceIn(0.6f, 10f)
+                val calculatedVdop = sqrt(calculatedPdop * calculatedPdop - calculatedHdop * calculatedHdop).coerceIn(0.6f, 12f)
+
+                currentPdop = calculatedPdop
+                currentHdop = calculatedHdop
+                currentVdop = calculatedVdop
+            } else {
+                currentPdop = 0f
+                currentHdop = 0f
+                currentVdop = 0f
+            }
+        }
 
         val dualRatio = if (usedCount > 0) (dualFreqCount.toFloat() / usedCount.toFloat() * 100f).coerceAtMost(100f) else 0f
 
@@ -211,9 +329,11 @@ class GnssTelemetryEngine(
             satellitesInView = satCount,
             satellitesUsedInFix = usedCount,
             satellites = satList,
-            hdop = hdop,
-            vdop = vdop,
-            pdop = pdop,
+            hdop = currentHdop,
+            vdop = currentVdop,
+            pdop = currentPdop,
+            l1Count = usedCount - dualFreqCount,
+            l5Count = dualFreqCount,
             dualFrequencyRatioPct = dualRatio,
             constellationCountMap = constellationMap
         )
@@ -239,7 +359,6 @@ class GnssTelemetryEngine(
 
             val baseline = agcBaselineDb ?: avgAgc
             val diff = baseline - avgAgc
-            // Significant AGC drop indicates RF front-end gain reduction, often caused by high out-of-band/in-band jamming power
             val interferenceScore = (diff * 5f).toFloat().coerceIn(0f, 100f)
             val jamming = interferenceScore > 65f
 
@@ -265,11 +384,10 @@ class GnssTelemetryEngine(
             }
 
             val prRate = m.pseudorangeRateMetersPerSecond
-            // prRate in m/s: Doppler shift fd = - prRate * fc / c
             if (prRate in -6000.0..6000.0 && prRate != 0.0) {
                 val carrierHz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && m.hasCarrierFrequencyHz()) {
                     m.carrierFrequencyHz.toDouble()
-                } else 1575420000.0 // Default L1/E1 carrier
+                } else 1575420000.0
                 val dopplerHz = - (prRate * carrierHz / 299792458.0)
                 sumDopplerHz += dopplerHz
                 dopplerCount++
@@ -305,7 +423,7 @@ class GnssTelemetryEngine(
                     freqMhz in 1570.0..1580.0 -> "L1 (1575.42 MHz)"
                     freqMhz in 1170.0..1185.0 -> "L5 (1176.45 MHz)"
                     freqMhz in 1220.0..1235.0 -> "L2 (1227.60 MHz)"
-                    else -> String.format("%.1f MHz", freqMhz)
+                    else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
                 }
             }
             GnssStatus.CONSTELLATION_GALILEO -> {
@@ -313,7 +431,7 @@ class GnssTelemetryEngine(
                     freqMhz in 1570.0..1580.0 -> "E1 (1575.42 MHz)"
                     freqMhz in 1170.0..1185.0 -> "E5a (1176.45 MHz)"
                     freqMhz in 1200.0..1215.0 -> "E5b (1207.14 MHz)"
-                    else -> String.format("%.1f MHz", freqMhz)
+                    else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
                 }
             }
             GnssStatus.CONSTELLATION_BEIDOU -> {
@@ -321,17 +439,17 @@ class GnssTelemetryEngine(
                     freqMhz in 1555.0..1570.0 -> "B1I (1561.09 MHz)"
                     freqMhz in 1570.0..1580.0 -> "B1C (1575.42 MHz)"
                     freqMhz in 1170.0..1185.0 -> "B2a (1176.45 MHz)"
-                    else -> String.format("%.1f MHz", freqMhz)
+                    else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
                 }
             }
             GnssStatus.CONSTELLATION_GLONASS -> {
                 when {
                     freqMhz in 1595.0..1610.0 -> "G1 (~1602 MHz)"
                     freqMhz in 1240.0..1255.0 -> "G2 (~1246 MHz)"
-                    else -> String.format("%.1f MHz", freqMhz)
+                    else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
                 }
             }
-            else -> String.format("%.1f MHz", freqMhz)
+            else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
         }
     }
 }

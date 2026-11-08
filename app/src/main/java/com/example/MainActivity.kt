@@ -90,7 +90,8 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 val permissions = mutableListOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.READ_PHONE_STATE
                 )
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permissions.add(Manifest.permission.POST_NOTIFICATIONS)

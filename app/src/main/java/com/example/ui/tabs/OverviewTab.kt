@@ -316,37 +316,38 @@ fun OverviewTab(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                val hasValidDop = gnss.hasFix && gnss.satellitesUsedInFix >= 4 && gnss.pdop > 0f && gnss.pdop < 9.0f
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "HDOP (Horizontální)" else "HDOP (Horizontal)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = String.format("%.2f", gnss.hdop),
+                            text = if (hasValidDop && gnss.hdop > 0f) String.format("%.2f", gnss.hdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = EmeraldSignal
+                            color = if (hasValidDop) EmeraldSignal else TextSecondaryDark
                         )
                         Text(text = if (isCs) "Vliv na polohu X/Y" else "Impact on X/Y", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "VDOP (Vertikální)" else "VDOP (Vertical)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = String.format("%.2f", gnss.vdop),
+                            text = if (hasValidDop && gnss.vdop > 0f) String.format("%.2f", gnss.vdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = TextPrimaryDark
+                            color = if (hasValidDop) TextPrimaryDark else TextSecondaryDark
                         )
                         Text(text = if (isCs) "Vliv na výšku Z" else "Impact on Altitude Z", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "PDOP (Prostorový 3D)" else "PDOP (Spatial 3D)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = String.format("%.2f", gnss.pdop),
+                            text = if (hasValidDop) String.format("%.2f", gnss.pdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = CyanTertiary
+                            color = if (hasValidDop) CyanTertiary else TextSecondaryDark
                         )
                         Text(text = if (isCs) "Celková geometrie" else "Total geometry", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -636,14 +637,14 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 shape = RoundedCornerShape(4.dp),
-                color = if (sim.slotIndex == 0) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate700
+                color = if (sim.isDataActive) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate700
             ) {
                 Text(
-                    text = if (sim.slotIndex == 0) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS" else "VOICE"),
+                    text = if (sim.isDataActive) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS & SMS" else "VOICE & SMS"),
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (sim.slotIndex == 0) EmeraldSignal else TextSecondaryDark,
+                    color = if (sim.isDataActive) EmeraldSignal else TextSecondaryDark,
                     maxLines = 1,
                     softWrap = false
                 )

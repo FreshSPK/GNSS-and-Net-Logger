@@ -82,6 +82,7 @@ data class SimCellInfo(
     val operatorAlpha: String = "No Service",
     val networkGen: String = "Searching", // 2G, 3G, 4G, 5G NSA, 5G SA
     val isServing: Boolean = false,
+    val isDataActive: Boolean = false,
     val plmn: String = "N/A", // e.g. "230-01" or "23001"
     val tac: String = "N/A",
     val ci: String = "N/A",
@@ -115,7 +116,8 @@ data class CellularState(
     val sim2: SimCellInfo = SimCellInfo(slotIndex = 1, displayName = "SIM 2"),
     val activeSimSlot: Int = 0,
     val pingRttMs: Long? = null,
-    val pingPacketLoss: Boolean = false
+    val pingPacketLoss: Boolean = false,
+    val lastUpdateEpochMs: Long = System.currentTimeMillis()
 )
 
 data class MotionSensorState(
@@ -149,13 +151,16 @@ data class EnvironmentState(
 data class ChartPoint(
     val timestampMs: Long,
     val rsrp: Float?,
+    val rsrpSim2: Float? = null,
     val speedKmh: Float,
     val satCount: Int,
     val pingMs: Float?,
     val accelMagnitude: Float = 9.81f,
     val gyroZ: Float = 0f,
     val compassAzimuth: Float = 0f,
-    val batteryTempC: Float? = null
+    val batteryTempC: Float? = null,
+    val sim1Operator: String = "SIM 1",
+    val sim2Operator: String = "SIM 2"
 )
 
 enum class LogTriggerMode {

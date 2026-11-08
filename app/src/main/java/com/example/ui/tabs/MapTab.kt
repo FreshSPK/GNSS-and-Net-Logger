@@ -74,6 +74,7 @@ fun MapTab(
                 MapView(ctx).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
+                    zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(16.5)
 
                     val initPos = if (gnss.latitude != 0.0) GeoPoint(gnss.latitude, gnss.longitude) else GeoPoint(49.2266, 16.5746) // FEKT VUT
@@ -100,20 +101,86 @@ fun MapTab(
             update = { mv ->
                 if (replayRecords != null && replayRecords.isNotEmpty()) {
                     mv.overlays.removeAll { it is Polyline && it != livePolyline }
-                    val replayPolyline = Polyline().apply {
-                        outlinePaint.strokeWidth = 10f
-                        outlinePaint.color = when (activeMode) {
-                            MapVisualizationMode.RSRP_SIGNAL -> AndroidColor.parseColor("#10B981")
-                            MapVisualizationMode.SPEED -> AndroidColor.parseColor("#3B82F6")
-                            MapVisualizationMode.SATELLITES -> AndroidColor.parseColor("#F59E0B")
-                            MapVisualizationMode.PDOP -> AndroidColor.parseColor("#06B6D4")
+
+                    val validRecords = replayRecords.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+                    if (validRecords.size >= 2) {
+                        var curPoints = mutableListOf<GeoPoint>()
+                        var curColor = -1
+
+                        for (i in 0 until validRecords.size - 1) {
+                            val r = validRecords[i]
+                            val nextR = validRecords[i + 1]
+
+                            val segColor = when (activeMode) {
+                                MapVisualizationMode.RSRP_SIGNAL -> {
+                                    val rsrp = r.sim1Rsrp ?: r.sim2Rsrp ?: -120
+                                    when {
+                                        rsrp >= -80 -> AndroidColor.parseColor("#10B981") // Green > -80
+                                        rsrp >= -90 -> AndroidColor.parseColor("#84CC16") // Lime -80 to -90
+                                        rsrp >= -105 -> AndroidColor.parseColor("#F59E0B") // Amber -90 to -105
+                                        else -> AndroidColor.parseColor("#F43F5E") // Red < -105
+                                    }
+                                }
+                                MapVisualizationMode.SPEED -> {
+                                    val sp = r.speedKmh
+                                    when {
+                                        sp < 10f -> AndroidColor.parseColor("#3B82F6") // Blue < 10
+                                        sp < 50f -> AndroidColor.parseColor("#06B6D4") // Cyan 10 to 50
+                                        sp < 90f -> AndroidColor.parseColor("#10B981") // Green 50 to 90
+                                        else -> AndroidColor.parseColor("#F43F5E") // Red > 90
+                                    }
+                                }
+                                MapVisualizationMode.SATELLITES -> {
+                                    val sats = r.satellitesUsedInFix
+                                    when {
+                                        sats < 5 -> AndroidColor.parseColor("#F43F5E") // Red < 5
+                                        sats <= 10 -> AndroidColor.parseColor("#F59E0B") // Amber 5 to 10
+                                        sats <= 25 -> AndroidColor.parseColor("#10B981") // Green 11 to 25
+                                        else -> AndroidColor.parseColor("#3B82F6") // Blue > 25
+                                    }
+                                }
+                                MapVisualizationMode.PDOP -> {
+                                    val pdop = r.pdop
+                                    when {
+                                        pdop < 1.5f -> AndroidColor.parseColor("#10B981") // Green < 1.5
+                                        pdop <= 3.0f -> AndroidColor.parseColor("#06B6D4") // Cyan 1.5 to 3.0
+                                        pdop <= 5.0f -> AndroidColor.parseColor("#F59E0B") // Amber 3.0 to 5.0
+                                        else -> AndroidColor.parseColor("#F43F5E") // Red > 5.0
+                                    }
+                                }
+                            }
+
+                            if (curPoints.isEmpty()) {
+                                curPoints.add(GeoPoint(r.latitude, r.longitude))
+                                curPoints.add(GeoPoint(nextR.latitude, nextR.longitude))
+                                curColor = segColor
+                            } else if (segColor == curColor) {
+                                curPoints.add(GeoPoint(nextR.latitude, nextR.longitude))
+                            } else {
+                                val poly = Polyline().apply {
+                                    outlinePaint.strokeWidth = 9f
+                                    outlinePaint.color = curColor
+                                    setPoints(curPoints)
+                                }
+                                mv.overlays.add(poly)
+
+                                curPoints = mutableListOf(GeoPoint(r.latitude, r.longitude), GeoPoint(nextR.latitude, nextR.longitude))
+                                curColor = segColor
+                            }
                         }
-                        val geoPoints = replayRecords.map { GeoPoint(it.latitude, it.longitude) }
-                        setPoints(geoPoints)
+
+                        if (curPoints.isNotEmpty()) {
+                            val poly = Polyline().apply {
+                                outlinePaint.strokeWidth = 9f
+                                outlinePaint.color = curColor
+                                setPoints(curPoints)
+                            }
+                            mv.overlays.add(poly)
+                        }
+
+                        mv.controller.setCenter(GeoPoint(validRecords.first().latitude, validRecords.first().longitude))
+                        mv.invalidate()
                     }
-                    mv.overlays.add(replayPolyline)
-                    mv.controller.setCenter(GeoPoint(replayRecords.first().latitude, replayRecords.first().longitude))
-                    mv.invalidate()
                 }
             }
         )
@@ -266,35 +333,44 @@ fun MapTab(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Zoom In / Out
+            // Compact Zoom In / Out
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSlate800)
+                colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.95f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                Column {
-                    IconButton(onClick = { mapViewInstance?.controller?.zoomIn() }) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Zoom In", tint = TextPrimaryDark)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    IconButton(
+                        onClick = { mapViewInstance?.controller?.zoomIn() },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Zoom In", tint = TextPrimaryDark, modifier = Modifier.size(20.dp))
                     }
-                    HorizontalDivider(color = DarkSlate700)
-                    IconButton(onClick = { mapViewInstance?.controller?.zoomOut() }) {
-                        Icon(imageVector = Icons.Default.Remove, contentDescription = "Zoom Out", tint = TextPrimaryDark)
+                    HorizontalDivider(color = DarkSlate700, modifier = Modifier.width(36.dp))
+                    IconButton(
+                        onClick = { mapViewInstance?.controller?.zoomOut() },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Remove, contentDescription = "Zoom Out", tint = TextPrimaryDark, modifier = Modifier.size(20.dp))
                     }
                 }
             }
 
-            // Recenter FAB matching bright cyan circle in image_7a3c57d5.png
+            // Recenter FAB
             FloatingActionButton(
                 onClick = {
                     if (gnss.latitude != 0.0 && gnss.longitude != 0.0) {
                         mapViewInstance?.controller?.animateTo(GeoPoint(gnss.latitude, gnss.longitude))
                     }
                 },
-                modifier = Modifier.testTag("recenter_map_button"),
+                modifier = Modifier
+                    .size(44.dp)
+                    .testTag("recenter_map_button"),
                 containerColor = CyanTertiary,
                 contentColor = DarkSlate900,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(14.dp)
             ) {
-                Icon(imageVector = Icons.Default.MyLocation, contentDescription = "Vycentrovat")
+                Icon(imageVector = Icons.Default.MyLocation, contentDescription = "Vycentrovat", modifier = Modifier.size(20.dp))
             }
         }
     }

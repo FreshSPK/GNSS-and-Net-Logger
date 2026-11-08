@@ -58,6 +58,9 @@ fun HistoryTab(
     var sessionToRename by remember { mutableStateOf<LogSession?>(null) }
     var renameText by remember { mutableStateOf("") }
 
+    var sessionForExportDialog by remember { mutableStateOf<LogSession?>(null) }
+    var selectedExportFormat by remember { mutableStateOf("CSV") }
+
     if (inspectedSession != null && inspectedRecords != null) {
         BackHandler {
             inspectedSession = null
@@ -73,9 +76,8 @@ fun HistoryTab(
                 inspectedRecords = null
             },
             onExportCsv = {
-                coroutineScope.launch {
-                    exportSessionFile(context, inspectedSession!!, "CSV", loadRecords)
-                }
+                sessionForExportDialog = inspectedSession
+                selectedExportFormat = "CSV"
             },
             onDeletePoint = { record ->
                 onDeleteRecord(record)
@@ -171,9 +173,8 @@ fun HistoryTab(
                         onReplay = { onSelectSessionForReplay(session.id) },
                         onDelete = { onDeleteSession(session) },
                         onExport = { format ->
-                            coroutineScope.launch {
-                                exportSessionFile(context, session, format, loadRecords)
-                            }
+                            sessionForExportDialog = session
+                            selectedExportFormat = format
                         }
                     )
                 }
@@ -223,6 +224,119 @@ fun HistoryTab(
             dismissButton = {
                 TextButton(onClick = { sessionToRename = null }) {
                     Text(if (isCs) "Zrušit" else "Cancel")
+                }
+            }
+        )
+    }
+
+    // Export & Download Options Dialog
+    if (sessionForExportDialog != null) {
+        val s = sessionForExportDialog!!
+        AlertDialog(
+            onDismissRequest = { sessionForExportDialog = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.SaveAlt, contentDescription = null, tint = CyanTertiary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isCs) "Export & Stažení do zařízení" else "Export & Download to Device",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = s.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimaryDark
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (isCs) "Zvolte formát exportu:" else "Select export format:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondaryDark
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("CSV", "KML", "GEOJSON").forEach { fmt ->
+                            val isSel = selectedExportFormat == fmt
+                            OutlinedButton(
+                                onClick = { selectedExportFormat = fmt },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (isSel) CyanTertiary.copy(alpha = 0.2f) else DarkSlate700
+                                ),
+                                border = if (isSel) ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(CyanTertiary)) else null,
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = fmt,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSel) CyanTertiary else TextSecondaryDark
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 1. Download directly to device storage (Downloads folder)
+                    Button(
+                        onClick = {
+                            val fmt = selectedExportFormat
+                            sessionForExportDialog = null
+                            coroutineScope.launch {
+                                saveSessionFileToDownloads(context, s, fmt, loadRecords)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("download_to_device_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isCs) "Stáhnout do zařízení (Downloads)" else "Save to Device (Downloads)",
+                            fontWeight = FontWeight.Bold,
+                            color = DarkSlate900
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 2. Share via App / Intent
+                    OutlinedButton(
+                        onClick = {
+                            val fmt = selectedExportFormat
+                            sessionForExportDialog = null
+                            coroutineScope.launch {
+                                exportSessionFile(context, s, fmt, loadRecords)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("share_export_button"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isCs) "Sdílet soubor (Share dialog)" else "Share file (System share)",
+                            color = TextPrimaryDark
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { sessionForExportDialog = null }) {
+                    Text(if (isCs) "Zavřít" else "Close", color = TextSecondaryDark)
                 }
             }
         )
@@ -451,7 +565,7 @@ fun SessionDetailInspector(
                                 color = CyanTertiary
                             )
                             Text(
-                                text = "Sats: ${r.satellitesUsedInFix}/${r.satellitesInView} (L5: ${if (r.dualFrequencyRatioPct > 0) "6" else "0"})",
+                                text = "Sats: ${r.satellitesUsedInFix}/${r.satellitesInView} (L1/L5: ${String.format(Locale.US, "%.0f%%", r.dualFrequencyRatioPct)})",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 fontWeight = FontWeight.Bold,
                                 color = EmeraldSignal
@@ -482,16 +596,19 @@ fun SessionDetailInspector(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            val s1Txt = if (r.sim1Operator.isNotEmpty()) "S1: ${r.sim1Operator} ${r.sim1Rsrp?.let { "$it dBm" } ?: ""}".trim() else "S1: N/A"
+                            val s2Txt = if (r.sim2Operator.isNotEmpty()) "S2: ${r.sim2Operator} ${r.sim2Rsrp?.let { "$it dBm" } ?: ""}".trim() else ""
                             Text(
-                                text = "${if (isCs) "Operátor" else "Operator"}: ${r.sim1Operator} (${r.sim1Band})",
+                                text = if (s2Txt.isNotEmpty()) "$s1Txt • $s2Txt" else s1Txt,
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 color = AmberWarning
                             )
+                            val mainRsrp = r.sim1Rsrp ?: r.sim2Rsrp
                             Text(
-                                text = "RSRP: ${r.sim1Rsrp ?: "N/A"} dBm",
+                                text = "RSRP: ${mainRsrp?.let { "$it dBm" } ?: "N/A"}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 fontWeight = FontWeight.Bold,
-                                color = if ((r.sim1Rsrp ?: -120) >= -85) EmeraldSignal else AmberWarning
+                                color = if ((mainRsrp ?: -120) >= -85) EmeraldSignal else AmberWarning
                             )
                         }
 
@@ -581,6 +698,86 @@ private suspend fun exportSessionFile(
                 context.startActivity(Intent.createChooser(shareIntent, "Sdílet / Uložit export"))
             } catch (e: Exception) {
                 Toast.makeText(context, "Export uložen do: ${file.name}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+}
+
+private suspend fun saveSessionFileToDownloads(
+    context: Context,
+    session: LogSession,
+    format: String,
+    loadRecords: suspend (Long) -> List<TelemetryRecord>
+) {
+    withContext(Dispatchers.IO) {
+        val records = loadRecords(session.id)
+        if (records.isEmpty()) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Žádné záznamy k exportu v této relaci", Toast.LENGTH_SHORT).show()
+            }
+            return@withContext
+        }
+
+        val cleanTitle = session.title.replace("[^a-zA-Z0-9_.-]".toRegex(), "_")
+        val filename = when (format) {
+            "CSV" -> "${cleanTitle}_${session.id}.csv"
+            "KML" -> "${cleanTitle}_${session.id}.kml"
+            else -> "${cleanTitle}_${session.id}.geojson"
+        }
+        val mimeType = when (format) {
+            "CSV" -> "text/csv"
+            "KML" -> "application/vnd.google-earth.kml+xml"
+            else -> "application/geo+json"
+        }
+
+        val content = when (format) {
+            "CSV" -> Exporter.exportToCsv(session, records)
+            "KML" -> Exporter.exportToKml(session, records)
+            else -> Exporter.exportToGeoJson(session, records)
+        }
+
+        var savedPath = ""
+        var success = false
+
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val resolver = context.contentResolver
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/GNSS_Net_Logger")
+                    put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { os ->
+                        os.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                    values.clear()
+                    values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                    success = true
+                    savedPath = "Download/GNSS_Net_Logger/$filename"
+                }
+            }
+
+            if (!success) {
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val appFolder = File(downloadsDir, "GNSS_Net_Logger").apply { if (!exists()) mkdirs() }
+                val targetFile = File(appFolder, filename)
+                FileOutputStream(targetFile).use { it.write(content.toByteArray(Charsets.UTF_8)) }
+                success = true
+                savedPath = targetFile.absolutePath
+            }
+        } catch (e: Exception) {
+            success = false
+        }
+
+        withContext(Dispatchers.Main) {
+            if (success) {
+                Toast.makeText(context, "✓ Soubor stažen do: $savedPath", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(context, "Nepodařilo se uložit soubor do zařízení", Toast.LENGTH_SHORT).show()
             }
         }
     }

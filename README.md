@@ -6,6 +6,7 @@
 [![Room](https://img.shields.io/badge/Database-Room%20(SQLite)-FFA000.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OSMDroid%20(OpenStreetMap)-7EBC6F.svg?style=flat&logo=openstreetmap)](https://github.com/osmdroid/osmdroid)
 [![Zero API Keys](https://img.shields.io/badge/Architecture-Zero%20External%20Keys-06B6D4.svg?style=flat)](#zero-external-api-keys-architecture-100-standalone)
+[![Release](https://img.shields.io/badge/Release-v1.2%20Stable-10B981.svg?style=flat)](APK/)
 [![VUT FEKT](https://img.shields.io/badge/VUT-FEKT%20Brno-E4002B.svg?style=flat)](https://www.fekt.vut.cz/)
 
 Advanced native Android application for **scientific field measurements, radiofrequency drive-test analysis, and long-term recording of multi-constellation GNSS satellite telemetry and cellular mobile network parameters (LTE 4G & 5G NR)**. Designed for telecommunications researchers, RF drive-test engineers, university students, and radio enthusiasts.
@@ -62,13 +63,16 @@ Tap the blue **(i)** icon in the top-right corner to open the technical referenc
 
 #### 1. „Overview“ Tab (Live Telemetry HUD)
 * **GNSS Kinematics:** Latitude and Longitude to 6 decimal places ($0.000001^\circ$), vehicle speed (km/h & m/s), bearing azimuth ($0–360^\circ$), and 68% confidence horizontal/vertical error bounds.
-* **DOP Dilution of Precision:** Live HDOP (horizontal), VDOP (vertical), and PDOP (3D spatial geometry) with explanatory popup dialog.
+* **DOP Dilution of Precision:** Live HDOP (horizontal), VDOP (vertical), and PDOP (3D spatial geometry) with intelligent no-fix filtering (cleanly displays dash `"—"` instead of degraded numerical values when fewer than 4 satellites are locked) and explanatory popup dialog.
 * **GNSS Satellites & Bands:** Total used vs. visible satellites, dual-frequency reception indicator (L1 single-band vs. L1+L5 dual-band), and per-constellation breakdowns.
 * **Cellular Glance (SIM 1 & SIM 2):** Real-time stacked signal strength bargraphs with color indicators, operator names, and calculated BTS distances.
 * **Hardware & Battery Telemetry:** Battery temperature (°C), charge level, battery voltage (mV), station pressure, and mean sea-level pressure (MSL / QFF).
 
 #### 2. „Cellular RF“ Tab (BTS & Serving Network Metrology)
-* **Parallel Dual-SIM Stacked Monitor:** SIM 1 and SIM 2 monitored simultaneously stacked vertically without manual switching.
+* **Top SIM Selector Switcher (`[SIM 1]` | `[SIM 2]` | `[Both SIMs]`):** Easily toggle between dedicated full-screen inspection of SIM 1, dedicated inspection of SIM 2, or side-by-side comparative mode.
+* **Strict DSDS / DSDA Radio Separation:** Hardware RF polling ensures each SIM is bound exclusively to its own operator (e.g., Vodafone PLMN 230-03 is strictly isolated from T-Mobile PLMN 230-01). Independent 1 Hz hardware signal strength querying guarantees real-time RSRP updates.
+* **DSDS Explanatory Status Banners:** Explicitly indicates whether a slot is in `DATA ACTIVE (RRC Connected)` state or `VOICE & SMS (DSDS Standby / RRC Idle)` state.
+* **Dual-Operator RF Delta Comparison:** In comparison mode, automatically computes real-time signal delta ($\Delta\text{RSRP}$) to identify which carrier provides stronger coverage.
 * **Operator & PLMN Identification:** Mobile Country Code (MCC) + Mobile Network Code (MNC) detection (e.g., `PLMN 230-01` T-Mobile, `PLMN 230-02` O2, `PLMN 230-03` Vodafone).
 * **Cell ID Decomposition:**
   * 4G LTE: $\text{eNodeB ID} = \lfloor \text{CI} / 256 \rfloor, \quad \text{Sector ID} = \text{CI} \pmod{256}$
@@ -89,7 +93,10 @@ Tap the blue **(i)** icon in the top-right corner to open the technical referenc
 * **Dual-Band Carrier Tracking (L1/E1 + L5/E5a):** Frequency separation (1575.42 MHz vs. 1176.45 MHz) and real-time dual-frequency ratio badge.
 * **Constellation Filter Chips:** Instant filtering for *All*, *L5 / E5a Only*, *GPS*, *Galileo*, *GLONASS*, and *BeiDou*.
 * **Three Diagnostic Views:**
-  1. **Skyplot Radar:** 2D polar projection (Azimuth $0–360^\circ$, Elevation $0–90^\circ$). Green ring indicates L5/E5a carriers; white glow indicates satellites used in active fix.
+  1. **Skyplot Radar:** 2D polar projection (Azimuth $0–360^\circ$, Elevation $0–90^\circ$) with dedicated color mode switcher:
+     * `[By Constellation]`: GPS (Cyan), Galileo (Emerald Green), GLONASS (Amber), BeiDou (Purple).
+     * `[By C/N₀ Signal Strength]`: $\ge 35\text{ dB-Hz}$ (Green), $25–34\text{ dB-Hz}$ (Cyan), $< 25\text{ dB-Hz}$ (Amber), Unused (Gray).
+     * In both modes: Green glowing outer ring signifies dual-frequency **L5/E5a** carriers; white halo indicates satellites actively used in the position fix. Includes a synchronized dynamic legend.
   2. **C/N0 Signal Bars:** Horizontal bar charts of Carrier-to-Noise density ratio ($C/N_0$ in dB-Hz).
   3. **Detailed Table:** Full list with SVID/PRN, constellation, band, elevation, azimuth, and fix state.
 * **AGC Jamming & Interference Monitor:** Evaluates Automatic Gain Control from `GnssMeasurementsEvent` to alert against intentional jamming or receiver front-end saturation.
@@ -106,7 +113,7 @@ Tap the blue **(i)** icon in the top-right corner to open the technical referenc
 
 #### 5. „Charts“ Tab (Real-Time Sparklines)
 Hardware Canvas graphs with live Min, Average, and Max statistics:
-- Serving Cell RSRP (dBm)
+- **Dual-SIM Serving RSRP Comparison (dBm):** Simultaneous real-time comparative curves for **SIM 1 (Cyan)** and **SIM 2 (Amber)** plotted side-by-side on a unified $-125\text{ to }-65\text{ dBm}$ RF grid with live operator badges and numeric readouts.
 - Travel Speed (km/h)
 - Satellite Fix Count
 - Network Socket Ping RTT Latency to 8.8.8.8 (ms)
@@ -115,12 +122,15 @@ Hardware Canvas graphs with live Min, Average, and Max statistics:
 - Magnetic Compass Heading ($0–360^\circ$)
 - Battery Thermal Temperature (°C)
 
-#### 6. „History“ Tab (Session Inspection & Multi-Format Exporters)
+#### 6. „History“ Tab (Session Inspection, Direct Device Download & Exporters)
 * **Search & Filter:** Instant multi-parameter search across stored sessions.
 * **Session Renaming:** Pencil button to assign custom descriptive titles.
 * **Point-by-Point Sample Inspector:** Inspect every recorded sample `#1 • 19:01:21.043` with coordinates, satellites, DOP, cellular parameters, Doppler, and battery telemetry. Includes single-point deletion.
+* **Direct Storage Download & Sharing:**
+  * **💾 Save to Device (Downloads):** Saves the file directly to `/storage/emulated/0/Download/GNSS_Net_Logger/` via Android MediaStore for immediate offline access from your device's file manager without requiring cloud sync.
+  * **📤 System Share:** Opens the standard Android share sheet to send recordings via Email, WhatsApp, Google Drive, or Bluetooth.
 * **Exporters:**
-  * **CSV:** Full raw spreadsheet matrix (including PLMN, Doppler, NMEA strings, and battery metrics).
+  * **CSV:** Full raw spreadsheet matrix (including PLMN, Doppler, dual-SIM RSRP, NMEA strings, and battery metrics).
   * **3D KML:** Extruded 3D trajectory for Google Earth.
   * **GeoJSON:** Standards-compliant geospatial layer for QGIS and ArcGIS.
 
@@ -198,13 +208,16 @@ Kliknutím na modré tlačítko **(i)** v pravém horním rohu aplikace se otev�
 
 #### 1. Záložka „Měření“ (Přehledový HUD)
 * **GNSS Poloha a kinetika:** Zeměpisná šířka a délka na 6 desetinných míst, okamžitá rychlost (km/h a m/s), azimut směru pohybu ($0–360^\circ$) a horizontální/vertikální přesnost na 68% intervalu spolehlivosti.
-* **Geometrie rozložení satelitů (DOP):** Živé hodnoty HDOP (horizontální), VDOP (vertikální) a PDOP (prostorový 3D). Klepnutím na kartu se otevře technické vysvětlení limitů přesnosti.
+* **Geometrie rozložení satelitů (DOP):** Živé hodnoty HDOP (horizontální), VDOP (vertikální) a PDOP (prostorový 3D) s inteligentní filtrací (při absenci 3D fixu nebo při méně než 4 satelitech se zobrazuje čistá pomlčka `"—"` namísto degradované hodnoty 9) a vysvětlujícím dialogem.
 * **GNSS Satelity & Pásma:** Poměr použitých a viditelných satelitů, indikátor jednofrekvenčního (L1) nebo dvoufrekvenčního (L1+L5) příjmu a rozpad na konstelace (GPS, GLONASS, BeiDou, Galileo).
 * **Stav mobilní sítě (SIM 1 & SIM 2):** Rychlý náhled na obě SIM karty s barevnými sloupcovými grafy síly signálu RSRP, identifikací sítě a odhadem vzdálenosti k BTS.
 * **Telemetrie hardwaru a baterie:** Teplota baterie (°C), úroveň nabití, napětí článku (mV), staniční tlak z barometru a přepočítaný tlak na hladinu moře (MSL/QFF).
 
 #### 2. Záložka „Mobily“ (Detailní RF parametry a vysílače)
-* **Paralelní Dual-SIM monitor:** Obě SIM karty jsou sledovány současně pod sebou bez nutnosti přepínání.
+* **Horní přepínač zobrazení SIM (`[SIM 1]` | `[SIM 2]` | `[Obě SIM]`):** Rychlé přepínání mezi dedikovaným detailním zobrazením pouze SIM 1, pouze SIM 2, nebo přehledným srovnávacím režimem obou operátorů.
+* **Striktní rádiové oddělení DSDS / DSDA:** Každá SIM karta je striktně vázána na síť svého operátora (např. buňky Vodafone s PLMN 230-03 se nikdy nepřiřadí k T-Mobile a naopak). Nezávislé 1Hz hardwarové dotazování zajišťuje plynulou aktualizaci síly signálu RSRP.
+* **Vysvětlující DSDS informační panely:** Jasně rozlišuje, zda je karta v režimu `DATOVÉ PŘIPOJENÍ AKTIVNÍ (RRC Connected)` s plně dekódovaným vysílačem, nebo v režimu `PŘÍJEM HOVORŮ A SMS (DSDS Standby / RRC Idle)` se samostatným RF měřením signálu.
+* **Duální RF porovnání pokrytí (RF Delta):** V režimu srovnání aplikace automaticky počítá rozdíl úrovně signálu ($\Delta\text{RSRP}$) a okamžitě vyhodnocuje, který operátor má v daném místě silnější pokrytí.
 * **Identifikace operátora & PLMN:** Detekce kódu země a sítě (např. `PLMN 230-01` T-Mobile, `PLMN 230-02` O2, `PLMN 230-03` Vodafone).
 * **Rozklad Cell ID na buňku a sektor:**
   * Pro 4G LTE: $\text{eNodeB ID} = \lfloor \text{CI} / 256 \rfloor, \quad \text{Sektor ID} = \text{CI} \pmod{256}$
@@ -225,7 +238,10 @@ Kliknutím na modré tlačítko **(i)** v pravém horním rohu aplikace se otev�
 * **Dvoufrekvenční příjem (L1/E1 + L5/E5a):** Identifikace nosné frekvence každé družice (1575,42 MHz vs. 1176,45 MHz) a procentuální podíl dvoufrekvenčního fixu.
 * **Filtrování konstelací:** Rychlé přepínání zobrazení: *Všechny*, *Pouze L5/E5a*, *GPS*, *Galileo*, *GLONASS*, *BeiDou*.
 * **Tři režimy zobrazení:**
-  1. **Skyplot Radar:** 2D polární diagram rozmístění satelitů na obloze (azimut $0–360^\circ$, elevace $0–90^\circ$). Zelené mezikruží značí dvoufrekvenční příjem L5/E5a, bílá záře fix.
+  1. **Skyplot Radar:** 2D polární diagram rozmístění satelitů na obloze (azimut $0–360^\circ$, elevace $0–90^\circ$) s přepínačem barevného režimu:
+     * `[Podle konstelace]`: GPS (Azurová), Galileo (Smaragdová), GLONASS (Jantarová), BeiDou (Fialová).
+     * `[Podle síly C/N₀]`: $\ge 35\text{ dB-Hz}$ (Zelená), $25–34\text{ dB-Hz}$ (Azurová), $< 25\text{ dB-Hz}$ (Oranžová), Nepoužité (Šedá).
+     * V obou režimech: Zelené vnější mezikruží značí dvoufrekvenční příjem **L5/E5a**, bílá záře fixovaný satelit. Zahrnuje synchronizovanou legendu.
   2. **Signály C/N0:** Horizontální sloupcové grafy poměru nosná/šum ($C/N_0$ v dB-Hz).
   3. **Podrobná tabulka:** Kompletní soupis všech satelitů s PRN/SVID, konstelací, pásmem, elevací, azimutem a stavem fixu.
 * **Monitor RF rušení (AGC Jamming Detector):** Sledování automatického řízení zisku (AGC) z událostí `GnssMeasurementsEvent`. Varuje před náhlým propadem zisku způsobeným záměrným rušením či silným parazitním signálem.
@@ -243,7 +259,7 @@ Kliknutím na modré tlačítko **(i)** v pravém horním rohu aplikace se otev�
 
 #### 5. Záložka „Grafy“ (Časové průběhy v reálném čase)
 Hardwarově vykreslované spojité grafy (Canvas sparklines) s ukazateli minimální, průměrné a maximální hodnoty pro:
-- Výkon signálu obslužné buňky RSRP (dBm)
+- **Duální srovnání RSRP signálu v čase (dBm):** Současné zobrazení obou SIM karet vedle sebe na jednotné škále $-125\text{ až }-65\text{ dBm}$ – **SIM 1 (tyrkysová křivka)** a **SIM 2 (oranžová křivka)** s živými odznaky operátorů a číselnými hodnotami v dBm pro okamžité srovnání pokrytí v drive-testu.
 - Rychlost pohybu vozidla/pěšího (km/h)
 - Počet satelitů zapojených do výpočtu polohy
 - Síťovou odezvu (Socket Ping RTT v ms na 8.8.8.8)
@@ -252,13 +268,16 @@ Hardwarově vykreslované spojité grafy (Canvas sparklines) s ukazateli minimá
 - Magnetický azimut kompasu ($0–360^\circ$)
 - Teplotu baterie (°C) – sledování termálního zahřívání přístroje
 
-#### 6. Záložka „Historie“ (Správa relací a bodový inspektor)
+#### 6. Záložka „Historie“ (Správa relací, přímé stažení do zařízení a bodový inspektor)
 * **Vyhledávání a filtrace:** Okamžité vyhledávání mezi uloženými měřeními.
 * **Přejmenování relace:** Možnost klepnout na ikonu tužky a relaci libovolně pojmenovat.
 * **Detailní prohlížení bod po bodu:** Otevření relace s možností procházet každý uložený vzorek `#1 • 19:01:21.043` s přesnými souřadnicemi, satelity, DOP, operátorem, frekvenčním pásmem, Dopplerem i teplotou baterie.
 * **Mazání nechtěných bodů:** Ikona koše u jednotlivých vzorků pro odstranění chybného měření.
+* **Přímé stažení do zařízení & Sdílení souborů:**
+  * **💾 Stáhnout do zařízení (Downloads):** Soubor se okamžitě zapíše přímo do interního úložiště telefonu do složky `Download/GNSS_Net_Logger/` přes standardní Android MediaStore bez nutnosti externích cloudů.
+  * **📤 Sdílet soubor (Systémový dialog):** Otevře systémové okno sdílení pro odeslání přes E-mail, WhatsApp, Disk Google nebo Bluetooth.
 * **Tři formáty exportu dat:**
-  * **CSV:** Kompletní tabulka všech parametrů (včetně PLMN, Dopplerova posuvu, NMEA vět a baterie) pro Excel, MATLAB nebo Python pandas.
+  * **CSV:** Kompletní tabulka všech parametrů (včetně PLMN, Dopplerova posuvu, obou RSRP signálů, NMEA vět a baterie) pro Excel, MATLAB nebo Python pandas.
   * **3D KML:** Záznam pro Google Earth s 3D trajektorií a barevným kódováním.
   * **GeoJSON:** Standardizovaný formát pro geografické informační systémy (QGIS, ArcGIS).
 

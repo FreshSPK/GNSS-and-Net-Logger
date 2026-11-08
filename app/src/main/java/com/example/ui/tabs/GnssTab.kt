@@ -189,34 +189,10 @@ fun GnssTab(
 
         when (activeSubTab) {
             GnssSubTab.SKYPLOT_RADAR -> {
-                SkyPlotView(satellites = filteredSatellites)
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = DarkSlate800)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = if (isCs) "VYSVĚTLIVKY • BÍLÁ ZÁŘE = VE FIXU • ZELENÝ KRUH = PÁSMO L5/E5a" else "LEGEND • WHITE GLOW = IN FIX • GREEN CIRCLE = L5/E5a BAND",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                            fontWeight = FontWeight.Bold,
-                            color = TextSecondaryDark
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(text = "● GPS (L1/L5)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = CyanTertiary)
-                            Text(text = "● Galileo (E1/E5)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = EmeraldSignal)
-                            Text(text = "● GLONASS (G1)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = AmberWarning)
-                            Text(text = "● BeiDou (B1/B2)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = Purple5G)
-                        }
-                    }
-                }
+                SkyPlotView(
+                    satellites = filteredSatellites,
+                    lang = lang
+                )
             }
             GnssSubTab.SIGNALY_CN0 -> {
                 Card(
@@ -329,20 +305,36 @@ fun GnssTab(
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
+                val hasValidDop = gnss.hasFix && gnss.satellitesUsedInFix >= 4 && gnss.pdop > 0f && gnss.pdop < 9.0f
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "HDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-                        Text(text = String.format("%.2f", gnss.hdop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = EmeraldSignal)
+                        Text(
+                            text = if (hasValidDop && gnss.hdop > 0f) String.format("%.2f", gnss.hdop) else "—",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasValidDop) EmeraldSignal else TextSecondaryDark
+                        )
                         Text(text = if (isCs) "Horizontální" else "Horizontal", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "VDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-                        Text(text = String.format("%.2f", gnss.vdop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimaryDark)
+                        Text(
+                            text = if (hasValidDop && gnss.vdop > 0f) String.format("%.2f", gnss.vdop) else "—",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasValidDop) TextPrimaryDark else TextSecondaryDark
+                        )
                         Text(text = if (isCs) "Vertikální" else "Vertical", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "PDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-                        Text(text = String.format("%.2f", gnss.pdop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = CyanTertiary)
+                        Text(
+                            text = if (hasValidDop) String.format("%.2f", gnss.pdop) else "—",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasValidDop) CyanTertiary else TextSecondaryDark
+                        )
                         Text(text = if (isCs) "Prostorový 3D" else "Spatial 3D", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                 }

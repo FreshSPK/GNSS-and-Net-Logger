@@ -63,25 +63,199 @@ fun CellularRfTab(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // DUAL SIM AKTIVNÍ (PARALELNÍ REŽIM) Banner
-        Card(
+        // Top SIM Selector Switcher (SIM 1 / SIM 2 / Obě SIM)
+        var selectedSimTab by remember {
+            mutableStateOf(if (cellular.sim2.isDataActive && !cellular.sim1.isDataActive) 1 else 0)
+        }
+
+        Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = CyanSecondary.copy(alpha = 0.15f)),
-            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CyanSecondary))
+            color = DarkSlate800,
+            border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(DarkSlate700))
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = if (isCs) "DUAL SIM AKTIVNÍ (PARALELNÍ REŽIM)" else "DUAL SIM ACTIVE (PARALLEL MODE)",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = CyanTertiary
-                )
-                Text(
-                    text = if (isCs) "Obě SIM karty jsou monitorovány současně pod sebou bez přepínání." else "Both SIM slots are monitored simultaneously without manual switching.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = TextPrimaryDark
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // SIM 1 Tab
+                Button(
+                    onClick = { selectedSimTab = 0 },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedSimTab == 0) CyanSecondary else Color.Transparent,
+                        contentColor = if (selectedSimTab == 0) Color.White else TextSecondaryDark
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "SIM 1: ${cellular.sim1.displayName.take(10)}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // SIM 2 Tab
+                Button(
+                    onClick = { selectedSimTab = 1 },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedSimTab == 1) AmberWarning else Color.Transparent,
+                        contentColor = if (selectedSimTab == 1) DarkSlate900 else TextSecondaryDark
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "SIM 2: ${cellular.sim2.displayName.take(10)}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Both SIMs Tab
+                Button(
+                    onClick = { selectedSimTab = 2 },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedSimTab == 2) Purple5G else Color.Transparent,
+                        contentColor = if (selectedSimTab == 2) Color.White else TextSecondaryDark
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = if (isCs) "Obě SIM" else "Both SIMs",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // DSDS Explanatory Banner based on selected view
+        when (selectedSimTab) {
+            0 -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (cellular.sim1.isDataActive) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate800
+                    ),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(
+                            if (cellular.sim1.isDataActive) EmeraldSignal else CyanSecondary.copy(alpha = 0.5f)
+                        )
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (cellular.sim1.isDataActive) {
+                                if (isCs) "🟢 SIM 1: DATOVÉ PŘIPOJENÍ AKTIVNÍ (RRC Connected)" else "🟢 SIM 1: DATA ACTIVE (RRC Connected)"
+                            } else {
+                                if (isCs) "ℹ️ SIM 1: REŽIM PŘÍJMU (DSDS Standby / RRC Idle)" else "ℹ️ SIM 1: VOICE & SMS (DSDS Standby / RRC Idle)"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (cellular.sim1.isDataActive) EmeraldSignal else CyanTertiary
+                        )
+                        Text(
+                            text = if (cellular.sim1.isDataActive) {
+                                if (isCs) "Tato SIM karta přenáší mobilní data. Modem udržuje aktivní spojení a dekóduje plné ID buňky (eNodeB, TAC, PCI)." else "This SIM carries active mobile data. Modem maintains RRC Connected state with decoded tower details."
+                            } else {
+                                if (isCs) "SIM 1 je na příjmu pro hovory a SMS na síti ${cellular.sim1.displayName}. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "SIM 1 is idling on ${cellular.sim1.displayName} for incoming calls/SMS. Radio measures real-time RSRP and SNR."
+                            },
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = TextPrimaryDark
+                        )
+                    }
+                }
+            }
+            1 -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (cellular.sim2.isDataActive) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate800
+                    ),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = androidx.compose.ui.graphics.SolidColor(
+                            if (cellular.sim2.isDataActive) EmeraldSignal else AmberWarning.copy(alpha = 0.5f)
+                        )
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (cellular.sim2.isDataActive) {
+                                if (isCs) "🟢 SIM 2: DATOVÉ PŘIPOJENÍ AKTIVNÍ (RRC Connected)" else "🟢 SIM 2: DATA ACTIVE (RRC Connected)"
+                            } else {
+                                if (isCs) "ℹ️ SIM 2: REŽIM PŘÍJMU (DSDS Standby / RRC Idle)" else "ℹ️ SIM 2: VOICE & SMS (DSDS Standby / RRC Idle)"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (cellular.sim2.isDataActive) EmeraldSignal else AmberWarning
+                        )
+                        Text(
+                            text = if (cellular.sim2.isDataActive) {
+                                if (isCs) "Tato SIM karta přenáší mobilní data na síti ${cellular.sim2.displayName}. Modem udržuje aktivní spojení s vysílačem." else "This SIM carries active mobile data on ${cellular.sim2.displayName}. Modem maintains RRC Connected state."
+                            } else {
+                                if (isCs) "SIM 2 je na příjmu pro hovory a SMS na síti ${cellular.sim2.displayName}. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "SIM 2 is idling on ${cellular.sim2.displayName} for incoming calls/SMS. Radio measures real-time RSRP and SNR."
+                            },
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = TextPrimaryDark
+                        )
+                    }
+                }
+            }
+            else -> {
+                // Dual SIM Parallel Banner + RF Delta Comparison
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSlate800),
+                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(Purple5G))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (isCs) "📊 POROVNÁNÍ POKRYTÍ OBOU OPERÁTORŮ (RF DELTA)" else "📊 DUAL OPERATOR RF COMPARISON",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Purple5G
+                        )
+                        val r1 = cellular.sim1.rsrp
+                        val r2 = cellular.sim2.rsrp
+                        if (r1 != null && r2 != null) {
+                            val diff = r1 - r2
+                            val comparisonText = when {
+                                diff > 0 -> if (isCs) "${cellular.sim1.displayName} je o +${diff} dB silnější než ${cellular.sim2.displayName}" else "${cellular.sim1.displayName} is +${diff} dB stronger than ${cellular.sim2.displayName}"
+                                diff < 0 -> if (isCs) "${cellular.sim2.displayName} je o +${-diff} dB silnější než ${cellular.sim1.displayName}" else "${cellular.sim2.displayName} is +${-diff} dB stronger than ${cellular.sim1.displayName}"
+                                else -> if (isCs) "Oba operátoři mají identickou úroveň signálu ($r1 dBm)" else "Both operators have identical signal level ($r1 dBm)"
+                            }
+                            Text(
+                                text = comparisonText,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = if (diff >= 0) CyanTertiary else AmberWarning
+                            )
+                        } else {
+                            Text(
+                                text = if (isCs) "Paralelní měření obou slotů současně. Data: ${if (cellular.sim2.isDataActive) cellular.sim2.displayName else cellular.sim1.displayName}" else "Parallel real-time measurements for both SIM slots.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = TextPrimaryDark
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -206,16 +380,34 @@ fun CellularRfTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // SIM 1 Card with Signal Bargraph & Channel Bandwidth & 5G split
-        DetailedSimCard(sim = cellular.sim1, lang = lang)
-        Spacer(modifier = Modifier.height(14.dp))
-        // SIM 2 Card with Signal Bargraph & Channel Bandwidth & 5G split
-        DetailedSimCard(sim = cellular.sim2, lang = lang)
+        // Render SIM Card(s) based on selected tab
+        when (selectedSimTab) {
+            0 -> {
+                // Focus on SIM 1 only
+                DetailedSimCard(sim = cellular.sim1, lang = lang)
+            }
+            1 -> {
+                // Focus on SIM 2 only
+                DetailedSimCard(sim = cellular.sim2, lang = lang)
+            }
+            else -> {
+                // Both SIMs stacked
+                DetailedSimCard(sim = cellular.sim1, lang = lang)
+                Spacer(modifier = Modifier.height(14.dp))
+                DetailedSimCard(sim = cellular.sim2, lang = lang)
+            }
+        }
 
         Spacer(modifier = Modifier.height(18.dp))
 
         // SOUSEDNÍ BUŇKY & RF PRŮZKUM
-        val neighbors = cellular.sim1.neighbors
+        val neighbors = remember(selectedSimTab, cellular.sim1.neighbors, cellular.sim2.neighbors) {
+            when (selectedSimTab) {
+                0 -> cellular.sim1.neighbors
+                1 -> if (cellular.sim2.neighbors.isNotEmpty()) cellular.sim2.neighbors else cellular.sim1.neighbors
+                else -> (cellular.sim1.neighbors + cellular.sim2.neighbors).distinctBy { "${it.tech}_${it.pci}_${it.earfcn}" }
+            }
+        }
         Text(
             text = if (isCs) "SOUSEDNÍ BUŇKY & RF PRŮZKUM" else "NEIGHBOR CELLS & RF SURVEY",
             style = MaterialTheme.typography.titleSmall,
@@ -525,14 +717,14 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                     }
                     Box(
                         modifier = Modifier
-                            .background(if (sim.slotIndex == 0) EmeraldSignal.copy(alpha = 0.2f) else DarkSlate700, RoundedCornerShape(4.dp))
+                            .background(if (sim.isDataActive) EmeraldSignal.copy(alpha = 0.2f) else DarkSlate700, RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = if (sim.slotIndex == 0) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS & SMS" else "VOICE & SMS"),
+                            text = if (sim.isDataActive) (if (isCs) "DATA AKTIVNÍ" else "DATA ACTIVE") else (if (isCs) "HLAS & SMS" else "VOICE & SMS"),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (sim.slotIndex == 0) EmeraldSignal else TextSecondaryDark,
+                            color = if (sim.isDataActive) EmeraldSignal else TextSecondaryDark,
                             softWrap = false,
                             maxLines = 1
                         )
@@ -626,7 +818,7 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 MetricItem(label = "eNodeB / gNodeB", value = sim.enbOrGnbId, modifier = Modifier.weight(1f), color = CyanTertiary)
                 MetricItem(label = if (isCs) "Sektor / Buňka" else "Sector / Cell", value = sim.sectorId, modifier = Modifier.weight(1f), color = CyanTertiary)
-                MetricItem(label = if (isCs) "PCI (Fyzické ID)" else "PCI (Physical ID)", value = sim.pci.toString(), modifier = Modifier.weight(1f), color = AmberWarning)
+                MetricItem(label = if (isCs) "PCI (Fyzické ID)" else "PCI (Physical ID)", value = if (sim.pci > 0) sim.pci.toString() else "N/A", modifier = Modifier.weight(1f), color = AmberWarning)
                 MetricItem(label = if (isCs) "TAC (Oblast)" else "TAC (Area)", value = sim.tac, modifier = Modifier.weight(1f))
             }
 
@@ -665,7 +857,13 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         color = TextSecondaryDark
                     )
                     Text(
-                        text = "EARFCN ${sim.earfcnOrArfcn} • DL: ${sim.dlFreqMhz ?: 796.0} MHz • UL: ${sim.ulFreqMhz ?: 837.0} MHz",
+                        text = if (sim.earfcnOrArfcn > 0 && sim.dlFreqMhz != null) {
+                            "EARFCN ${sim.earfcnOrArfcn} • DL: ${sim.dlFreqMhz} MHz • UL: ${sim.ulFreqMhz ?: sim.dlFreqMhz} MHz"
+                        } else if (sim.earfcnOrArfcn > 0) {
+                            "EARFCN ${sim.earfcnOrArfcn} • Frekvence: Dle přidělení"
+                        } else {
+                            if (isCs) "EARFCN: Na příjmu • Frekvence: Dynamická" else "EARFCN: Standby • Frequency: Dynamic"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimaryDark
@@ -684,10 +882,14 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         color = TextSecondaryDark
                     )
                     Text(
-                        text = "${String.format(java.util.Locale.US, "%.0f m", sim.estimatedDistanceM ?: (sim.timingAdvance ?: 2) * 156.24)} (TA ${sim.timingAdvance ?: 2})",
+                        text = if (sim.timingAdvance != null) {
+                            "${String.format(java.util.Locale.US, "%.0f m", sim.estimatedDistanceM ?: (sim.timingAdvance.toDouble() * 156.24))} (TA ${sim.timingAdvance})"
+                        } else {
+                            if (isCs) "Na příjmu (TA v Idle neznámé)" else "Idle (TA unknown)"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = EmeraldSignal
+                        color = if (sim.timingAdvance != null) EmeraldSignal else TextSecondaryDark
                     )
                 }
             }

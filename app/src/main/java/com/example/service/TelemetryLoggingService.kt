@@ -280,13 +280,16 @@ class TelemetryLoggingService : Service() {
                             ChartPoint(
                                 timestampMs = now,
                                 rsrp = sim1.rsrp?.toFloat(),
+                                rsrpSim2 = sim2.rsrp?.toFloat(),
                                 speedKmh = gnss.speedKmh,
                                 satCount = gnss.satellitesUsedInFix,
                                 pingMs = cellular.pingRttMs?.toFloat(),
                                 accelMagnitude = motion.accelMagnitude,
                                 gyroZ = motion.gyroZ,
                                 compassAzimuth = motion.compassAzimuthDeg,
-                                batteryTempC = env.battery.temperatureC
+                                batteryTempC = env.battery.temperatureC,
+                                sim1Operator = sim1.displayName.ifBlank { "SIM 1" },
+                                sim2Operator = sim2.displayName.ifBlank { "SIM 2" }
                             )
                         )
 

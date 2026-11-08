@@ -3,7 +3,9 @@ package com.example
 import android.app.Application
 import android.content.Context
 import com.example.data.db.AppDatabase
+import com.example.model.ChartPoint
 import com.example.model.LoggingSettings
+import com.example.service.TelemetryLoggingService
 import com.example.telemetry.CellularTelemetryEngine
 import com.example.telemetry.DemoSimulationEngine
 import com.example.telemetry.EnvironmentSensorEngine
@@ -75,6 +77,35 @@ class SignalLoggerApp : Application() {
                     environmentEngine.updateDemoPressure(step.third.pressureHpa ?: 1013.25f, step.third.baseQnhHpa)
                     val m = step.third.motion
                     environmentEngine.updateDemoMotion(m.accelX, m.accelY, m.accelZ, m.gyroX, m.gyroY, m.gyroZ, m.compassAzimuthDeg)
+                }
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+
+        // Real-time chart ring buffer feed when service logging is idle
+        applicationScope.launch {
+            while (true) {
+                if (!TelemetryLoggingService.isLogging.value) {
+                    val c = cellularEngine.cellularState.value
+                    val g = gnssEngine.gnssState.value
+                    val e = environmentEngine.envState.value
+                    val now = System.currentTimeMillis()
+                    TelemetryLoggingService.addChartPoint(
+                        ChartPoint(
+                            timestampMs = now,
+                            rsrp = c.sim1.rsrp?.toFloat(),
+                            rsrpSim2 = c.sim2.rsrp?.toFloat(),
+                            speedKmh = g.speedKmh,
+                            satCount = g.satellitesUsedInFix,
+                            pingMs = c.pingRttMs?.toFloat(),
+                            accelMagnitude = e.motion.accelMagnitude,
+                            gyroZ = e.motion.gyroZ,
+                            compassAzimuth = e.motion.compassAzimuthDeg,
+                            batteryTempC = e.battery.temperatureC,
+                            sim1Operator = c.sim1.displayName.ifBlank { "SIM 1" },
+                            sim2Operator = c.sim2.displayName.ifBlank { "SIM 2" }
+                        )
+                    )
                 }
                 kotlinx.coroutines.delay(1000)
             }

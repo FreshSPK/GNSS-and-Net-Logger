@@ -15,8 +15,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.model.ChartPoint
+import com.example.ui.components.DualRealtimeSparklineChart
 import com.example.ui.components.RealtimeSparklineChart
 import com.example.ui.theme.*
+import java.util.Locale
 
 @Composable
 fun ChartsTab(
@@ -25,7 +27,8 @@ fun ChartsTab(
 ) {
     val isCs = lang != "EN"
 
-    val rsrpValues = chartPoints.map { it.rsrp }
+    val rsrpSim1Values = chartPoints.map { it.rsrp }
+    val rsrpSim2Values = chartPoints.map { it.rsrpSim2 }
     val speedValues = chartPoints.map { it.speedKmh }
     val satValues = chartPoints.map { it.satCount.toFloat() }
     val pingValues = chartPoints.map { it.pingMs }
@@ -33,7 +36,12 @@ fun ChartsTab(
     val gyroValues = chartPoints.map { it.gyroZ }
     val compassValues = chartPoints.map { it.compassAzimuth }
 
-    val lastRsrp = chartPoints.lastOrNull()?.rsrp?.let { String.format("%.0f", it) } ?: "—"
+    val lastPoint = chartPoints.lastOrNull()
+    val lastRsrp1 = lastPoint?.rsrp?.let { String.format(Locale.US, "%.0f", it) } ?: "—"
+    val lastRsrp2 = lastPoint?.rsrpSim2?.let { String.format(Locale.US, "%.0f", it) } ?: "—"
+    val sim1Label = lastPoint?.sim1Operator?.takeIf { it.isNotBlank() } ?: "SIM 1"
+    val sim2Label = lastPoint?.sim2Operator?.takeIf { it.isNotBlank() } ?: "SIM 2"
+
     val lastSpeed = chartPoints.lastOrNull()?.let { String.format("%.1f", it.speedKmh) } ?: "0.0"
     val lastSats = chartPoints.lastOrNull()?.satCount?.toString() ?: "0"
     val lastPing = chartPoints.lastOrNull()?.pingMs?.let { String.format("%.0f", it) } ?: "—"
@@ -56,13 +64,18 @@ fun ChartsTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 1. Serving RSRP Chart
-        RealtimeSparklineChart(
-            title = if (isCs) "RSRP signál základnové stanice v čase" else "Serving Base Station RSRP over Time",
-            currentValue = lastRsrp,
+        // 1. Serving RSRP Chart (Dual SIM: SIM 1 vs SIM 2)
+        DualRealtimeSparklineChart(
+            title = if (isCs) "RSRP signál v čase (SIM 1 vs SIM 2)" else "RSRP Signal over Time (SIM 1 vs SIM 2)",
+            label1 = "S1: $sim1Label",
+            currentValue1 = lastRsrp1,
+            values1 = rsrpSim1Values,
+            color1 = CyanTertiary,
+            label2 = "S2: $sim2Label",
+            currentValue2 = lastRsrp2,
+            values2 = rsrpSim2Values,
+            color2 = AmberWarning,
             unit = "dBm",
-            values = rsrpValues,
-            lineColor = CyanTertiary,
             minY = -125f,
             maxY = -65f
         )
