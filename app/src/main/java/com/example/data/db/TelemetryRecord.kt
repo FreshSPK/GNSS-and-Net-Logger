@@ -93,5 +93,18 @@ data class TelemetryRecord(
     val batteryTempC: Float? = null,
     val batteryLevelPct: Int? = null,
     val nmeaSentence: String? = null,
-    val rawDopplerHz: Float? = null
+    val rawDopplerHz: Float? = null,
+
+    // Full SIM 2 & Waypoint Telemetry (v1.3)
+    val sim2TacLac: String = "",
+    val sim2CellId: String = "",
+    val sim2EnbOrGnb: String = "",
+    val sim2SectorId: String = "",
+    val sim2Pci: Int = 0,
+    val sim2Arfcn: Int = 0,
+    val sim2Rsrq: Int? = null,
+    val sim2Rssi: Int? = null,
+    val sim2TimingAdvance: Int? = null,
+    val sim2EstimatedDistanceM: Double? = null,
+    val waypointNote: String? = null
 )

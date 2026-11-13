@@ -12,8 +12,8 @@ android {
     applicationId = "com.aistudio.signallogger.jkfekt"
     minSdk = 26
     targetSdk = 35
-    versionCode = 7
-    versionName = "1.2"
+    versionCode = 8
+    versionName = "1.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -39,7 +39,8 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.

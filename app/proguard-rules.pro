@@ -3,6 +3,7 @@
 # Preserve Room database entities and DAOs
 -keep class com.example.data.db.** { *; }
 -keepclassmembers class * extends androidx.room.RoomDatabase { *; }
+-dontwarn androidx.room.**
 
 # Preserve osmdroid OpenStreetMap classes
 -keep class org.osmdroid.** { *; }
@@ -10,3 +11,8 @@
 
 # Keep models for export and reflection
 -keep class com.example.model.** { *; }
+
+# Keep Coroutines & Service classes
+-keep class com.example.service.** { *; }
+-dontwarn kotlinx.coroutines.**
+

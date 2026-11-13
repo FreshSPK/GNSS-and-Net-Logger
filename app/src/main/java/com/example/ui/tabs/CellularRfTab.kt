@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,14 +24,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.AnomalySeverity
-import com.example.model.CellularAnomaly
 import com.example.model.CellularState
 import com.example.model.SimCellInfo
 import com.example.ui.theme.*
+import java.util.Locale
 
 @Composable
 fun CellularRfTab(
     cellular: CellularState,
+    handoverCount: Int = 0,
     lang: String
 ) {
     val isCs = lang != "EN"
@@ -48,18 +50,47 @@ fun CellularRfTab(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // Top Header
-        Text(
-            text = if (isCs) "● RF SÍŤ & OPERÁTOR" else "● CELLULAR RF & OPERATOR",
-            style = MaterialTheme.typography.titleMedium,
-            color = AmberWarning,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = if (isCs) "Rádiové parametry, vysílače a sousední buňky" else "Radio parameters, base stations & neighbor cells",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondaryDark
-        )
+        // Top Header with Handover Counter pill
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isCs) "● RF SÍŤ & OPERÁTOR" else "● CELLULAR RF & OPERATOR",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = AmberWarning,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (isCs) "Rádiové parametry, vysílače a sousední buňky" else "Radio parameters, base stations & neighbor cells",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondaryDark
+                )
+            }
+            if (handoverCount > 0) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = CyanSecondary.copy(alpha = 0.25f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.SwapHoriz, contentDescription = null, tint = CyanTertiary, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "HO: $handoverCount",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = CyanTertiary
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -80,7 +111,6 @@ fun CellularRfTab(
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                // SIM 1 Tab
                 Button(
                     onClick = { selectedSimTab = 0 },
                     modifier = Modifier.weight(1f),
@@ -100,7 +130,6 @@ fun CellularRfTab(
                     )
                 }
 
-                // SIM 2 Tab
                 Button(
                     onClick = { selectedSimTab = 1 },
                     modifier = Modifier.weight(1f),
@@ -120,7 +149,6 @@ fun CellularRfTab(
                     )
                 }
 
-                // Both SIMs Tab
                 Button(
                     onClick = { selectedSimTab = 2 },
                     modifier = Modifier.weight(1f),
@@ -146,79 +174,12 @@ fun CellularRfTab(
         // DSDS Explanatory Banner based on selected view
         when (selectedSimTab) {
             0 -> {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (cellular.sim1.isDataActive) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate800
-                    ),
-                    border = CardDefaults.outlinedCardBorder().copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(
-                            if (cellular.sim1.isDataActive) EmeraldSignal else CyanSecondary.copy(alpha = 0.5f)
-                        )
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = if (cellular.sim1.isDataActive) {
-                                if (isCs) "🟢 SIM 1: DATOVÉ PŘIPOJENÍ AKTIVNÍ (RRC Connected)" else "🟢 SIM 1: DATA ACTIVE (RRC Connected)"
-                            } else {
-                                if (isCs) "ℹ️ SIM 1: REŽIM PŘÍJMU (DSDS Standby / RRC Idle)" else "ℹ️ SIM 1: VOICE & SMS (DSDS Standby / RRC Idle)"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (cellular.sim1.isDataActive) EmeraldSignal else CyanTertiary
-                        )
-                        Text(
-                            text = if (cellular.sim1.isDataActive) {
-                                if (isCs) "Tato SIM karta přenáší mobilní data. Modem udržuje aktivní spojení a dekóduje plné ID buňky (eNodeB, TAC, PCI)." else "This SIM carries active mobile data. Modem maintains RRC Connected state with decoded tower details."
-                            } else {
-                                if (isCs) "SIM 1 je na příjmu pro hovory a SMS na síti ${cellular.sim1.displayName}. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "SIM 1 is idling on ${cellular.sim1.displayName} for incoming calls/SMS. Radio measures real-time RSRP and SNR."
-                            },
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = TextPrimaryDark
-                        )
-                    }
-                }
+                SimModeBanner(sim = cellular.sim1, simLabel = "SIM 1", accentColor = CyanSecondary, isCs = isCs)
             }
             1 -> {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (cellular.sim2.isDataActive) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate800
-                    ),
-                    border = CardDefaults.outlinedCardBorder().copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(
-                            if (cellular.sim2.isDataActive) EmeraldSignal else AmberWarning.copy(alpha = 0.5f)
-                        )
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            text = if (cellular.sim2.isDataActive) {
-                                if (isCs) "🟢 SIM 2: DATOVÉ PŘIPOJENÍ AKTIVNÍ (RRC Connected)" else "🟢 SIM 2: DATA ACTIVE (RRC Connected)"
-                            } else {
-                                if (isCs) "ℹ️ SIM 2: REŽIM PŘÍJMU (DSDS Standby / RRC Idle)" else "ℹ️ SIM 2: VOICE & SMS (DSDS Standby / RRC Idle)"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (cellular.sim2.isDataActive) EmeraldSignal else AmberWarning
-                        )
-                        Text(
-                            text = if (cellular.sim2.isDataActive) {
-                                if (isCs) "Tato SIM karta přenáší mobilní data na síti ${cellular.sim2.displayName}. Modem udržuje aktivní spojení s vysílačem." else "This SIM carries active mobile data on ${cellular.sim2.displayName}. Modem maintains RRC Connected state."
-                            } else {
-                                if (isCs) "SIM 2 je na příjmu pro hovory a SMS na síti ${cellular.sim2.displayName}. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "SIM 2 is idling on ${cellular.sim2.displayName} for incoming calls/SMS. Radio measures real-time RSRP and SNR."
-                            },
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = TextPrimaryDark
-                        )
-                    }
-                }
+                SimModeBanner(sim = cellular.sim2, simLabel = "SIM 2", accentColor = AmberWarning, isCs = isCs)
             }
             else -> {
-                // Dual SIM Parallel Banner + RF Delta Comparison
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -261,7 +222,7 @@ fun CellularRfTab(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // DETEKTOR SPOOFINGU A BEZPEČNOST RF SÍTĚ (Cellular Spoofing & Rogue BTS Monitor)
+        // DETEKTOR SPOOFINGU A BEZPEČNOST RF SÍTĚ
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -380,18 +341,10 @@ fun CellularRfTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Render SIM Card(s) based on selected tab
         when (selectedSimTab) {
-            0 -> {
-                // Focus on SIM 1 only
-                DetailedSimCard(sim = cellular.sim1, lang = lang)
-            }
-            1 -> {
-                // Focus on SIM 2 only
-                DetailedSimCard(sim = cellular.sim2, lang = lang)
-            }
+            0 -> DetailedSimCard(sim = cellular.sim1, lang = lang)
+            1 -> DetailedSimCard(sim = cellular.sim2, lang = lang)
             else -> {
-                // Both SIMs stacked
                 DetailedSimCard(sim = cellular.sim1, lang = lang)
                 Spacer(modifier = Modifier.height(14.dp))
                 DetailedSimCard(sim = cellular.sim2, lang = lang)
@@ -401,13 +354,28 @@ fun CellularRfTab(
         Spacer(modifier = Modifier.height(18.dp))
 
         // SOUSEDNÍ BUŇKY & RF PRŮZKUM
-        val neighbors = remember(selectedSimTab, cellular.sim1.neighbors, cellular.sim2.neighbors) {
+        val rawNeighbors = remember(selectedSimTab, cellular.sim1.neighbors, cellular.sim2.neighbors) {
             when (selectedSimTab) {
                 0 -> cellular.sim1.neighbors
-                1 -> if (cellular.sim2.neighbors.isNotEmpty()) cellular.sim2.neighbors else cellular.sim1.neighbors
+                1 -> cellular.sim2.neighbors
                 else -> (cellular.sim1.neighbors + cellular.sim2.neighbors).distinctBy { "${it.tech}_${it.pci}_${it.earfcn}" }
             }
         }
+        var neighborBandFilter by remember { mutableStateOf("ALL") }
+        val lteNeighborCount = remember(rawNeighbors) {
+            rawNeighbors.count { it.tech.contains("LTE", ignoreCase = true) || it.tech.contains("4G", ignoreCase = true) }
+        }
+        val nrNeighborCount = remember(rawNeighbors) {
+            rawNeighbors.count { it.tech.contains("5G", ignoreCase = true) || it.tech.contains("NR", ignoreCase = true) }
+        }
+        val neighbors = remember(rawNeighbors, neighborBandFilter) {
+            when (neighborBandFilter) {
+                "LTE" -> rawNeighbors.filter { it.tech.contains("LTE", ignoreCase = true) || it.tech.contains("4G", ignoreCase = true) }
+                "5G" -> rawNeighbors.filter { it.tech.contains("5G", ignoreCase = true) || it.tech.contains("NR", ignoreCase = true) }
+                else -> rawNeighbors
+            }
+        }
+
         Text(
             text = if (isCs) "SOUSEDNÍ BUŇKY & RF PRŮZKUM" else "NEIGHBOR CELLS & RF SURVEY",
             style = MaterialTheme.typography.titleSmall,
@@ -415,12 +383,35 @@ fun CellularRfTab(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = if (isCs) "${neighbors.size} viditelných sousedů" else "${neighbors.size} visible neighbors",
+            text = if (isCs) "${neighbors.size} z ${rawNeighbors.size} viditelných sousedů" else "${neighbors.size} of ${rawNeighbors.size} visible neighbors",
             style = MaterialTheme.typography.bodySmall,
             color = TextSecondaryDark
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = neighborBandFilter == "ALL",
+                onClick = { neighborBandFilter = "ALL" },
+                label = { Text(if (isCs) "Vše (${rawNeighbors.size})" else "All (${rawNeighbors.size})", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = neighborBandFilter == "LTE",
+                onClick = { neighborBandFilter = "LTE" },
+                label = { Text("4G LTE ($lteNeighborCount)", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = neighborBandFilter == "5G",
+                onClick = { neighborBandFilter = "5G" },
+                label = { Text("5G NR ($nrNeighborCount)", fontSize = 11.sp) }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         if (neighbors.isEmpty()) {
             Card(
@@ -430,7 +421,14 @@ fun CellularRfTab(
             ) {
                 Box(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = if (isCs) "V aktuálním kanálu nebyly detekovány žádné sousední buňky." else "No neighbor cells detected on current carrier channel.",
+                        text = when {
+                            rawNeighbors.isEmpty() && selectedSimTab == 1 && !cellular.sim2.isDataActive ->
+                                if (isCs) "Modem v režimu standby neposkytuje samostatný seznam sousedních buněk pro SIM 2." else "Modem in DSDS standby does not report independent neighbor list for SIM 2."
+                            rawNeighbors.isEmpty() ->
+                                if (isCs) "V aktuálním kanálu nebyly detekovány žádné sousední buňky." else "No neighbor cells detected on current carrier channel."
+                            else ->
+                                if (isCs) "Pro zvolený filtr pásma nejsou žádné sousední buňky." else "No neighbor cells match the selected band filter."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -521,19 +519,19 @@ fun CellularRfTab(
                             }
                         }
 
-                        if (n.dlFreqMhz != null) {
+                        if (n.dlFreqMhz != null && n.dlFreqMhz > 0.0) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "DL: ${String.format(java.util.Locale.US, "%.1f MHz", n.dlFreqMhz)}",
+                                    text = "DL: ${String.format(Locale.US, "%.1f MHz", n.dlFreqMhz)}",
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                                     color = CyanTertiary
                                 )
                                 Text(
-                                    text = "UL: ${String.format(java.util.Locale.US, "%.1f MHz", n.ulFreqMhz ?: n.dlFreqMhz)}",
+                                    text = "UL: ${String.format(Locale.US, "%.1f MHz", n.ulFreqMhz ?: n.dlFreqMhz)}",
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                                     color = TextSecondaryDark
                                 )
@@ -546,7 +544,6 @@ fun CellularRfTab(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Small VUT Logo at the bottom
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -650,6 +647,44 @@ fun CellularRfTab(
 }
 
 @Composable
+private fun SimModeBanner(sim: SimCellInfo, simLabel: String, accentColor: Color, isCs: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (sim.isDataActive) EmeraldSignal.copy(alpha = 0.15f) else DarkSlate800
+        ),
+        border = CardDefaults.outlinedCardBorder().copy(
+            brush = androidx.compose.ui.graphics.SolidColor(
+                if (sim.isDataActive) EmeraldSignal else accentColor.copy(alpha = 0.5f)
+            )
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = if (sim.isDataActive) {
+                    if (isCs) "🟢 $simLabel: DATOVÉ PŘIPOJENÍ AKTIVNÍ (RRC Connected)" else "🟢 $simLabel: DATA ACTIVE (RRC Connected)"
+                } else {
+                    if (isCs) "ℹ️ $simLabel: REŽIM PŘÍJMU (DSDS Standby / RRC Idle)" else "ℹ️ $simLabel: VOICE & SMS (DSDS Standby / RRC Idle)"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (sim.isDataActive) EmeraldSignal else accentColor
+            )
+            Text(
+                text = if (sim.isDataActive) {
+                    if (isCs) "Tato SIM karta přenáší mobilní data na síti ${sim.displayName}. Modem udržuje aktivní spojení s vysílačem." else "This SIM carries active mobile data on ${sim.displayName}. Modem maintains RRC Connected state."
+                } else {
+                    if (isCs) "$simLabel je na příjmu pro hovory a SMS na síti ${sim.displayName}. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "$simLabel is idling on ${sim.displayName} for incoming calls/SMS. Radio measures real-time RSRP and SNR."
+                },
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                color = TextPrimaryDark
+            )
+        }
+    }
+}
+
+@Composable
 fun DetailedSimCard(sim: SimCellInfo, lang: String) {
     val isCs = lang != "EN"
 
@@ -659,13 +694,11 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
         colors = CardDefaults.cardColors(containerColor = DarkSlate800)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Header: Responsive Top Row (Never squashes status badge)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: S1/S2 badge + SIM title with proper weight
                 Row(
                     modifier = Modifier.weight(1f, fill = false),
                     verticalAlignment = Alignment.CenterVertically
@@ -694,7 +727,6 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Right: Badges row (PLMN + DATA / VOICE)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -732,18 +764,39 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Subtitle on its own clear line
-            Text(
-                text = "${sim.networkGen} • ${sim.band}",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryDark,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${sim.networkGen} • ${sim.band}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondaryDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (!sim.carrierAggregationSummary.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(Purple5G.copy(alpha = 0.25f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = sim.carrierAggregationSummary,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Purple5G,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
 
-            // Inline Anomaly Warning if any
             if (sim.anomalies.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 sim.anomalies.forEach { a ->
@@ -763,10 +816,10 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // RSRP Signal Bargraph at top of SIM
             val rsrp = sim.rsrp ?: -120
             val normSignal = ((rsrp - (-125f)) / ((-65f) - (-125f))).coerceIn(0f, 1f)
             val barColor = when {
+                sim.rsrp == null -> TextSecondaryDark
                 rsrp >= -85 -> EmeraldSignal
                 rsrp >= -100 -> AmberWarning
                 else -> RoseCritical
@@ -783,7 +836,9 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                     color = TextSecondaryDark
                 )
                 Text(
-                    text = "${sim.rsrp ?: "N/A"} dBm (${if (rsrp >= -85) (if (isCs) "Dobrý" else "Good") else if (rsrp >= -100) (if (isCs) "Průměrný" else "Fair") else (if (isCs) "Slabý" else "Poor")})",
+                    text = if (sim.rsrp != null) {
+                        "${sim.rsrp} dBm (${if (rsrp >= -85) (if (isCs) "Dobrý" else "Good") else if (rsrp >= -100) (if (isCs) "Průměrný" else "Fair") else (if (isCs) "Slabý" else "Poor")})"
+                    } else "N/A",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -794,7 +849,7 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
             Spacer(modifier = Modifier.height(4.dp))
 
             LinearProgressIndicator(
-                progress = { normSignal },
+                progress = { if (sim.rsrp != null) normSignal else 0f },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp),
@@ -804,17 +859,16 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 4 Grid metrics: RSRQ, SINR, RSSI, CQI
+            // 4 Grid metrics: RSRQ, SINR, RSSI, CQI (no hardcoded fake CQI)
             Row(modifier = Modifier.fillMaxWidth()) {
                 MetricItem(label = if (isCs) "RSRQ (Kvalita)" else "RSRQ (Quality)", value = sim.rsrq?.let { "$it dB" } ?: "N/A", modifier = Modifier.weight(1f))
-                MetricItem(label = if (isCs) "SINR (Odstup)" else "SINR (Ratio)", value = sim.sinr?.let { String.format(java.util.Locale.US, "%.0f dB", it) } ?: "N/A", modifier = Modifier.weight(1f), color = EmeraldSignal)
+                MetricItem(label = if (isCs) "SINR (Odstup)" else "SINR (Ratio)", value = sim.sinr?.let { String.format(Locale.US, "%.0f dB", it) } ?: "N/A", modifier = Modifier.weight(1f), color = EmeraldSignal)
                 MetricItem(label = if (isCs) "RSSI (Výkon)" else "RSSI (Power)", value = sim.rssi?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f))
-                MetricItem(label = if (isCs) "CQI (Linka)" else "CQI (Link)", value = sim.cqi?.toString() ?: "13", modifier = Modifier.weight(1f), color = CyanTertiary)
+                MetricItem(label = if (isCs) "CQI (Linka)" else "CQI (Link)", value = sim.cqi?.toString() ?: "N/A", modifier = Modifier.weight(1f), color = CyanTertiary)
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Cell Identity: eNodeB / gNodeB, Sector, PCI, TAC
             Row(modifier = Modifier.fillMaxWidth()) {
                 MetricItem(label = "eNodeB / gNodeB", value = sim.enbOrGnbId, modifier = Modifier.weight(1f), color = CyanTertiary)
                 MetricItem(label = if (isCs) "Sektor / Buňka" else "Sector / Cell", value = sim.sectorId, modifier = Modifier.weight(1f), color = CyanTertiary)
@@ -822,7 +876,7 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                 MetricItem(label = if (isCs) "TAC (Oblast)" else "TAC (Area)", value = sim.tac, modifier = Modifier.weight(1f))
             }
 
-            // 5G specific SS & CSI split metrology (Preserved & Visible)
+            // 5G specific SS & CSI split metrology (honest N/A when modem doesn't report split CSI/SS)
             if (sim.networkGen.contains("5G") || sim.ssRsrp != null || sim.csiRsrp != null) {
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider(color = DarkSlate700)
@@ -835,16 +889,15 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    MetricItem(label = "SS-RSRP", value = sim.ssRsrp?.let { "$it dBm" } ?: "${(sim.rsrp ?: -91) - 3} dBm", modifier = Modifier.weight(1f))
-                    MetricItem(label = "SS-RSRQ", value = sim.ssRsrq?.let { "$it dB" } ?: "${(sim.rsrq ?: -11) - 1} dB", modifier = Modifier.weight(1f))
-                    MetricItem(label = "SS-SINR", value = sim.ssSinr?.let { "${String.format(java.util.Locale.US, "%.0f", it)} dB" } ?: "${String.format(java.util.Locale.US, "%.0f", (sim.sinr ?: 12f) - 1.5f)} dB", modifier = Modifier.weight(1f))
-                    MetricItem(label = "CSI-RSRP", value = sim.csiRsrp?.let { "$it dBm" } ?: "${sim.rsrp ?: -91} dBm", modifier = Modifier.weight(1f), color = CyanTertiary)
+                    MetricItem(label = "SS-RSRP", value = sim.ssRsrp?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f))
+                    MetricItem(label = "SS-RSRQ", value = sim.ssRsrq?.let { "$it dB" } ?: "N/A", modifier = Modifier.weight(1f))
+                    MetricItem(label = "SS-SINR", value = sim.ssSinr?.let { "${String.format(Locale.US, "%.0f", it)} dB" } ?: "N/A", modifier = Modifier.weight(1f))
+                    MetricItem(label = "CSI-RSRP", value = sim.csiRsrp?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f), color = CyanTertiary)
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Frequency, Channels & Timing Advance
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -857,10 +910,12 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         color = TextSecondaryDark
                     )
                     Text(
-                        text = if (sim.earfcnOrArfcn > 0 && sim.dlFreqMhz != null) {
-                            "EARFCN ${sim.earfcnOrArfcn} • DL: ${sim.dlFreqMhz} MHz • UL: ${sim.ulFreqMhz ?: sim.dlFreqMhz} MHz"
+                        text = if (sim.earfcnOrArfcn > 0 && sim.dlFreqMhz != null && sim.dlFreqMhz > 0.0) {
+                            val dlStr = String.format(Locale.US, "%.1f", sim.dlFreqMhz)
+                            val ulStr = String.format(Locale.US, "%.1f", sim.ulFreqMhz ?: sim.dlFreqMhz)
+                            "EARFCN ${sim.earfcnOrArfcn} • DL: $dlStr MHz • UL: $ulStr MHz"
                         } else if (sim.earfcnOrArfcn > 0) {
-                            "EARFCN ${sim.earfcnOrArfcn} • Frekvence: Dle přidělení"
+                            "EARFCN ${sim.earfcnOrArfcn} • ${if (isCs) "Frekvence dle přidělení" else "Band allocation"}"
                         } else {
                             if (isCs) "EARFCN: Na příjmu • Frekvence: Dynamická" else "EARFCN: Standby • Frequency: Dynamic"
                         },
@@ -868,10 +923,20 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimaryDark
                     )
+                    val bwText = sim.channelBandwidthKhz?.let { "${it / 1000} MHz" }
+                        ?: if (isCs) "Neznámá šířka" else "Unknown"
+                    val totalCaMhz = sim.totalAggregatedBandwidthKhz?.takeIf {
+                        it > (sim.channelBandwidthKhz ?: 0)
+                    }?.let { it / 1000 }
+                    val bwLine = if (isCs) {
+                        if (totalCaMhz != null) "Šířka kanálu: $bwText • Celkem CA: $totalCaMhz MHz" else "Šířka kanálu: $bwText"
+                    } else {
+                        if (totalCaMhz != null) "Bandwidth: $bwText • Total CA: $totalCaMhz MHz" else "Bandwidth: $bwText"
+                    }
                     Text(
-                        text = if (isCs) "Šířka kanálu: ${sim.channelBandwidthKhz?.let { "${it / 1000} MHz" } ?: "Neznámá šířka"}" else "Bandwidth: ${sim.channelBandwidthKhz?.let { "${it / 1000} MHz" } ?: "Unknown"}",
+                        text = bwLine,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        color = CyanSecondary
+                        color = if (totalCaMhz != null) Purple5G else CyanSecondary
                     )
                 }
 
@@ -883,7 +948,7 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                     )
                     Text(
                         text = if (sim.timingAdvance != null) {
-                            "${String.format(java.util.Locale.US, "%.0f m", sim.estimatedDistanceM ?: (sim.timingAdvance.toDouble() * 156.24))} (TA ${sim.timingAdvance})"
+                            "${String.format(Locale.US, "%.0f m", sim.estimatedDistanceM ?: (sim.timingAdvance.toDouble() * 156.24))} (TA ${sim.timingAdvance})"
                         } else {
                             if (isCs) "Na příjmu (TA v Idle neznámé)" else "Idle (TA unknown)"
                         },

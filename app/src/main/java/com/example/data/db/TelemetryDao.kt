@@ -23,6 +23,12 @@ interface TelemetryDao {
     @Query("SELECT * FROM log_sessions WHERE id = :sessionId LIMIT 1")
     suspend fun getSessionById(sessionId: Long): LogSession?
 
+    @Query("UPDATE log_sessions SET endTimeMs = :endTimeMs, pointCount = :pointCount, distanceMeters = :distanceMeters, maxSpeedKmh = :maxSpeedKmh WHERE id = :sessionId")
+    suspend fun updateSessionProgress(sessionId: Long, endTimeMs: Long, pointCount: Int, distanceMeters: Double, maxSpeedKmh: Double)
+
+    @Query("SELECT * FROM log_sessions ORDER BY startTimeMs DESC LIMIT 1")
+    suspend fun getLatestSession(): LogSession?
+
     @Update
     suspend fun updateRecord(record: TelemetryRecord)
 

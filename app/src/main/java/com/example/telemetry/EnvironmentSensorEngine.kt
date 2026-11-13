@@ -31,8 +31,16 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
 
     private val gravityValues = FloatArray(3)
     private val geomagneticValues = FloatArray(3)
+    private val rotationMatrix = FloatArray(9)
+    private val inclinationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
     private var hasGravity = false
     private var hasGeomagnetic = false
+    @Volatile
+    private var isStarted = false
+    private var lastEmitMs = 0L
+    private var sensorThread: android.os.HandlerThread? = null
+    private var sensorHandler: android.os.Handler? = null
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
@@ -61,27 +69,41 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
     private var isBatteryRegistered = false
 
     fun start() {
-        pressureSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-        accelSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-        gyroSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
-        magSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI) }
+        if (isStarted) return
+        isStarted = true
+        val thread = android.os.HandlerThread("SensorWorker").apply { start() }
+        val handler = android.os.Handler(thread.looper)
+        sensorThread = thread
+        sensorHandler = handler
+
+        pressureSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler) }
+        accelSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler) }
+        gyroSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler) }
+        magSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler) }
 
         try {
             if (!isBatteryRegistered) {
                 context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
                 isBatteryRegistered = true
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
     }
 
     fun stop() {
+        if (!isStarted) return
+        isStarted = false
         sensorManager?.unregisterListener(this)
+        try {
+            sensorThread?.quitSafely()
+        } catch (_: Exception) {}
+        sensorThread = null
+        sensorHandler = null
         try {
             if (isBatteryRegistered) {
                 context.unregisterReceiver(batteryReceiver)
                 isBatteryRegistered = false
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
     }
 
     fun setQnh(qnhHpa: Float) {
@@ -92,7 +114,6 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
 
     fun updateDemoPressure(pressureHpa: Float, qnhHpa: Float) {
         val alt = calculateBarometricAltitude(pressureHpa, qnhHpa)
-        val curMotion = _envState.value.motion
         val curBattery = _envState.value.battery
         _envState.value = _envState.value.copy(
             pressureHpa = pressureHpa,
@@ -124,10 +145,20 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         )
     }
 
+    private var latestAx = 0f
+    private var latestAy = 0f
+    private var latestAz = 9.81f
+    private var latestMag = 9.81f
+    private var latestGx = 0f
+    private var latestGy = 0f
+    private var latestGz = 0f
+    private var latestAzimuth = 0f
+
     override fun onSensorChanged(event: SensorEvent?) {
         val e = event ?: return
         when (e.sensor.type) {
             Sensor.TYPE_PRESSURE -> {
+                if (e.values.isEmpty()) return
                 val pressure = e.values[0]
                 val qnh = _envState.value.baseQnhHpa
                 val relativeAlt = calculateBarometricAltitude(pressure, qnh)
@@ -137,60 +168,62 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 )
             }
             Sensor.TYPE_ACCELEROMETER -> {
+                if (e.values.size < 3) return
                 System.arraycopy(e.values, 0, gravityValues, 0, 3)
                 hasGravity = true
-                val ax = e.values[0]
-                val ay = e.values[1]
-                val az = e.values[2]
-                val mag = sqrt(ax * ax + ay * ay + az * az)
-                val curMotion = _envState.value.motion
-                _envState.value = _envState.value.copy(
-                    motion = curMotion.copy(
-                        accelX = ax,
-                        accelY = ay,
-                        accelZ = az,
-                        accelMagnitude = mag
-                    )
-                )
-                computeOrientation()
+                latestAx = e.values[0]
+                latestAy = e.values[1]
+                latestAz = e.values[2]
+                latestMag = sqrt(latestAx * latestAx + latestAy * latestAy + latestAz * latestAz)
+                computeOrientationInternal()
+                maybeEmitMotionState()
             }
             Sensor.TYPE_GYROSCOPE -> {
-                val gx = e.values[0]
-                val gy = e.values[1]
-                val gz = e.values[2]
-                val curMotion = _envState.value.motion
-                _envState.value = _envState.value.copy(
-                    motion = curMotion.copy(
-                        gyroX = gx,
-                        gyroY = gy,
-                        gyroZ = gz
-                    )
-                )
+                if (e.values.size < 3) return
+                latestGx = e.values[0]
+                latestGy = e.values[1]
+                latestGz = e.values[2]
+                maybeEmitMotionState()
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
+                if (e.values.size < 3) return
                 System.arraycopy(e.values, 0, geomagneticValues, 0, 3)
                 hasGeomagnetic = true
-                computeOrientation()
+                computeOrientationInternal()
+                maybeEmitMotionState()
             }
         }
     }
 
-    private fun computeOrientation() {
+    private fun computeOrientationInternal() {
         if (hasGravity && hasGeomagnetic) {
-            val r = FloatArray(9)
-            val i = FloatArray(9)
-            if (SensorManager.getRotationMatrix(r, i, gravityValues, geomagneticValues)) {
-                val orientation = FloatArray(3)
-                SensorManager.getOrientation(r, orientation)
-                // Azimuth in degrees 0..360
-                var azimuth = Math.toDegrees(orientation[0].toDouble()).toFloat()
-                if (azimuth < 0) azimuth += 360f
-                val curMotion = _envState.value.motion
-                _envState.value = _envState.value.copy(
-                    motion = curMotion.copy(compassAzimuthDeg = azimuth)
-                )
+            if (SensorManager.getRotationMatrix(rotationMatrix, inclinationMatrix, gravityValues, geomagneticValues)) {
+                SensorManager.getOrientation(rotationMatrix, orientationAngles)
+                var azimuth = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+                if (azimuth < 0f) azimuth += 360f
+                latestAzimuth = azimuth
             }
         }
+    }
+
+    private fun maybeEmitMotionState() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastEmitMs < 100L) return // Max 10 Hz state emissions to reduce Compose recomposition overhead
+        lastEmitMs = now
+
+        val cur = _envState.value
+        _envState.value = cur.copy(
+            motion = cur.motion.copy(
+                accelX = latestAx,
+                accelY = latestAy,
+                accelZ = latestAz,
+                accelMagnitude = latestMag,
+                gyroX = latestGx,
+                gyroY = latestGy,
+                gyroZ = latestGz,
+                compassAzimuthDeg = latestAzimuth
+            )
+        )
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}

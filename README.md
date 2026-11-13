@@ -6,7 +6,7 @@
 [![Room](https://img.shields.io/badge/Database-Room%20(SQLite)-FFA000.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OSMDroid%20(OpenStreetMap)-7EBC6F.svg?style=flat&logo=openstreetmap)](https://github.com/osmdroid/osmdroid)
 [![Zero API Keys](https://img.shields.io/badge/Architecture-Zero%20External%20Keys-06B6D4.svg?style=flat)](#zero-external-api-keys-architecture-100-standalone)
-[![Release](https://img.shields.io/badge/Release-v1.2%20Stable-10B981.svg?style=flat)](APK/)
+[![Release](https://img.shields.io/badge/Release-v1.3%20Stable-10B981.svg?style=flat)](APK/)
 [![VUT FEKT](https://img.shields.io/badge/VUT-FEKT%20Brno-E4002B.svg?style=flat)](https://www.fekt.vut.cz/)
 
 Advanced native Android application for **scientific field measurements, radiofrequency drive-test analysis, and long-term recording of multi-constellation GNSS satellite telemetry and cellular mobile network parameters (LTE 4G & 5G NR)**. Designed for telecommunications researchers, RF drive-test engineers, university students, and radio enthusiasts.
@@ -31,9 +31,10 @@ The application functions completely autonomously without dependence on paid clo
 ### User Guide: How to Use the Application
 
 #### 1. Starting and Controlling a Measurement Session
-* **Start Recording:** On the initial **Overview** (Měření) tab, tap the prominent **„START MEASUREMENT RECORDING“** button. The application spawns a foreground service with a persistent system notification and a CPU `WakeLock`, ensuring continuous background logging even when the screen is locked.
-* **Pause Recording (Pause):** During active logging, tap **Pause**. Telemetry collection is temporarily suspended (e.g., while idling in traffic or taking a break) without splitting the session into multiple disconnected records.
-* **Resume & Stop:** Tap **Resume** to continue logging, or tap **Stop** to conclude the session and commit all points to the local database.
+* **Start Recording:** On the initial **Overview** (Měření) tab, tap the prominent **„START MEASUREMENT RECORDING“** button. The application spawns a `START_REDELIVER_INTENT` foreground service with a persistent system notification, crash-safe periodic database checkpoints, and a continuous CPU `WakeLock` to keep background logging running reliably while the screen is locked.
+* **Live Chronometer, Distance & Waypoints (`+ Mark`):** Track elapsed recording duration, odometer distance, and handover count (`HO`) live. Tap **`+ Mark`** to attach custom waypoints (e.g., *Tunnel*, *Interference*, *Indoor*, *BTS Sight*) directly to the recorded sample.
+* **Pause Recording (Pause):** Temporarily suspends telemetry capture without splitting the session.
+* **Resume, Stop & Power Exit:** Resume or stop recording, or use the **Power Exit** button in the top app bar for clean, immediate termination of all foreground/background engines and services.
 
 #### 2. Selecting Logging Fields (Matrix Button „Fields / Položky“)
 Tap the **Fields** button in the logging banner to open the selective logging matrix. You can independently toggle which telemetry sets are captured with each recorded sample:
@@ -81,8 +82,8 @@ Tap the blue **(i)** icon in the top-right corner to open the technical referenc
 * **5G NR Dual Metrology (SS vs. CSI):**
   * Synchronization Signal Block: `SS-RSRP`, `SS-RSRQ`, `SS-SINR`
   * Channel State Information: `CSI-RSRP`, `CSI-RSRQ`, `CSI-SINR`
-* **Carrier Frequencies & Channel Bandwidth:** Downlink (DL) and Uplink (UL) carrier frequencies in MHz calculated from EARFCN/NR-ARFCN, alongside channel bandwidth (10, 15, 20, 40 MHz).
-* **Neighbor Cells & Handover Analysis:** Table of all detected neighbor cells with delta signal computation ($\Delta\text{RSRP} = \text{RSRP}_{\text{serving}} - \text{RSRP}_{\text{neighbor}}$), highlighting handover candidates when $\Delta \le 3\text{ dB}$.
+* **Carrier Frequencies, CA & Channel Bandwidth:** Downlink (DL) and Uplink (UL) carrier frequencies in MHz calculated from EARFCN/NR-ARFCN, channel bandwidth (e.g., 10, 15, 20, 40, 100 MHz), and total aggregated **Carrier Aggregation (`Total CA: XX MHz`)** bandwidth across LTE-A / 5G NR (`PhysicalChannelConfig` & `ServiceState`).
+* **Neighbor Cells, Band Filter & Handover Analysis:** Strictly isolated neighbor tables per SIM slot with **`All` / `4G LTE` / `5G NR`** filter chips and delta signal computation ($\Delta\text{RSRP} = \text{RSRP}_{\text{serving}} - \text{RSRP}_{\text{neighbor}}$), highlighting handover candidates when $\Delta \le 3\text{ dB}$.
 * **Cellular Security & Anomaly / Spoofing Detector:**
   * **2G Downgrade Attack (CRITICAL):** Alerts when phone is forced onto 2G GSM without mutual authentication (IMSI Catcher / Stingray signature).
   * **Isolated Cell / Fake BTS (WARNING):** Detects strong cells with zero SIB neighbor relations.
@@ -103,13 +104,13 @@ Tap the blue **(i)** icon in the top-right corner to open the technical referenc
 * **Raw GNSS Measurements & NMEA Stream:** Raw Doppler shift (Hz), Accumulated Delta Range (ADR) phase measurements, and live sentence stream (`$GNGGA`, `$GNRMC`).
 
 #### 4. „Map“ Tab (Spatial Drive-Test Trajectory)
-* **Interactive OpenStreetMap Plaid:** Continuous hardware Canvas rendering of logged breadcrumb coordinates.
-* **Dynamic Layer Coloring:**
-  * **RSRP Signal:** Green ($> -80\text{ dBm}$), Light Green, Amber, Red ($< -105\text{ dBm}$).
+* **Continuous Background Trail & Interactive OpenStreetMap:** Automatically collects live GNSS breadcrumbs in the background from app startup (even while viewing other tabs) and renders color-coded polylines identically in both **Live** and **Replay** modes.
+* **Dynamic Layer Coloring & S1/S2 Switcher:**
+  * **RSRP Signal (`S1` / `S2` toggle):** Green ($> -80\text{ dBm}$), Light Green, Amber, Red ($< -105\text{ dBm}$).
   * **Speed:** Blue ($< 10\text{ km/h}$), Cyan, Green, Red ($> 90\text{ km/h}$).
   * **Satellites:** Red ($< 5$), Yellow ($5–10$), Green ($11–25$), Blue ($> 25$).
   * **PDOP:** Green ($< 1.5$), Cyan, Amber, Red ($> 5.0$).
-* **Floating Legend & Controls:** Responsive legend adapting to active mode, zoom controls (+/-), and cyan recentering FAB.
+* **Dark Night Mode, Auto-Follow & Markers:** Quick dark/light OSM tile toggle, GPS auto-follow lock, clickable waypoint/point inspector cards, clear live trail button, zoom controls (+/-), and cyan recentering FAB.
 
 #### 5. „Charts“ Tab (Real-Time Sparklines)
 Hardware Canvas graphs with live Min, Average, and Max statistics:
@@ -125,14 +126,18 @@ Hardware Canvas graphs with live Min, Average, and Max statistics:
 #### 6. „History“ Tab (Session Inspection, Direct Device Download & Exporters)
 * **Search & Filter:** Instant multi-parameter search across stored sessions.
 * **Session Renaming:** Pencil button to assign custom descriptive titles.
-* **Point-by-Point Sample Inspector:** Inspect every recorded sample `#1 • 19:01:21.043` with coordinates, satellites, DOP, cellular parameters, Doppler, and battery telemetry. Includes single-point deletion.
+* **Point-by-Point Sample Inspector & Map Jump:** Inspect every recorded sample `#1 • 19:01:21.043` with coordinates, satellites, DOP, cellular parameters, Doppler, and battery telemetry. Tap any sample card or its pin icon to jump straight to that exact point centered and highlighted on the **Map** tab. Includes single-point deletion.
 * **Direct Storage Download & Sharing:**
   * **💾 Save to Device (Downloads):** Saves the file directly to `/storage/emulated/0/Download/GNSS_Net_Logger/` via Android MediaStore for immediate offline access from your device's file manager without requiring cloud sync.
   * **📤 System Share:** Opens the standard Android share sheet to send recordings via Email, WhatsApp, Google Drive, or Bluetooth.
-* **Exporters:**
-  * **CSV:** Full raw spreadsheet matrix (including PLMN, Doppler, dual-SIM RSRP, NMEA strings, and battery metrics).
-  * **3D KML:** Extruded 3D trajectory for Google Earth.
-  * **GeoJSON:** Standards-compliant geospatial layer for QGIS and ArcGIS.
+* **Interactive Exporters & Analytics:**
+  * **Session Analytics Card:** Automatic Min / Avg / Max RSRP, average PDOP, 5G/4G technology distribution, and dual-SIM RF summary.
+  * **Charts Inspection:** Re-open any historical session directly inside the **Charts** tab to scrub recorded waveforms.
+  * **Memory-Safe Streaming Exporters:**
+    * **CSV:** Full raw spreadsheet matrix (including full SIM 2 TAC/Cell ID/eNodeB/PCI/ARFCN/RSRQ/RSSI/TA/Distance columns, `WaypointNote`, PLMN, Doppler, NMEA strings, and battery metrics).
+    * **Multi-Color 3D KML:** Color-coded RF coverage segments + named `<Placemark>` pins for Google Earth.
+    * **GPX 1.1:** Standard `<trkpt>` trackpoints, `<wpt>` waypoints, and RF telemetry `<extensions>`.
+    * **GeoJSON:** Standards-compliant geospatial layer for QGIS and ArcGIS.
 
 ---
 
@@ -140,13 +145,13 @@ Hardware Canvas graphs with live Min, Average, and Max statistics:
 
 The application adheres strictly to the principle of least privilege:
 - **`ACCESS_FINE_LOCATION` & `ACCESS_COARSE_LOCATION`:** Required by the Android OS to access GNSS satellites and raw cellular base station metrics.
-- **`ACCESS_BACKGROUND_LOCATION`:** Allows drive-test logging to continue when the screen turns off.
-- **`BODY_SENSORS` / Hardware Sensors:** Access to barometer, accelerometer, and gyroscope.
-- **`FOREGROUND_SERVICE_LOCATION`:** Ensures the background measurement engine is not prematurely killed by Android power management.
-- **`INTERNET` & `ACCESS_NETWORK_STATE`:** Required strictly for loading OpenStreetMap tiles and dispatching socket ping probes to 8.8.8.8.
+- **`READ_PHONE_STATE`:** Used solely to identify Dual-SIM subscription carrier names across slots (zero access to phone calls, contacts, SMS content, or IMEI).
+- **`FOREGROUND_SERVICE` & `FOREGROUND_SERVICE_LOCATION`:** Ensures the background measurement engine is not prematurely killed by Android power management.
+- **`POST_NOTIFICATIONS`:** Displays persistent active-recording status controls.
+- **`INTERNET` & `ACCESS_NETWORK_STATE`:** Required strictly for loading OpenStreetMap tiles and dispatching DNS-free socket ping probes to `8.8.8.8:53`.
 
-> **🛡️ Privacy Assurance (Zero Phone Call / Identity Permissions):**  
-> The application **never requests or requires** `READ_PHONE_STATE`. All physical cell identifiers (eNodeB, PCI, TAC, RSRP, SINR, PLMN) are delivered through location-bound telephony APIs. The application has zero access to your phone calls, contacts, SMS, phone number, or IMEI.
+> **🛡️ Privacy Assurance (100% Local-First Architecture):**  
+> All telemetry remains strictly on your device in local Room/SQLite storage. Zero analytics, telemetry uploads, or third-party cloud APIs are used.
 
 ---
 
@@ -176,9 +181,9 @@ Aplikace funguje naprosto autonomně bez závislosti na placených cloudových s
 ### Návod k použití aplikace (Uživatelská příručka)
 
 #### 1. Spuštění a řízení měřicí relace
-* **Zahájení záznamu:** Na úvodní záložce **Měření** stiskněte velké tlačítko **„ZAHÁJIT ZÁZNAM MĚŘENÍ“**. Aplikace spustí foreground službu s trvalou notifikací a zámkem WakeLock, takže měření běží spolehlivě i při vypnuté obrazovce telefonu.
-* **Pozastavení měření (Pause):** Během měření můžete klepnout na tlačítko **Pozastavit**. Záznam se dočasně uspí (např. při čekání na semaforu nebo zastávce), aniž by se relace rozdělila na dvě samostatná měření.
-* **Obnovení (Resume) a Ukončení (Stop):** Tlačítkem **Pokračovat** měření opět aktivujete, tlačítkem **Ukončit** relaci uzavřete a automaticky uložíte do databáze.
+* **Zahájení záznamu:** Na úvodní záložce **Měření** stiskněte velké tlačítko **„ZAHÁJIT ZÁZNAM MĚŘENÍ“**. Aplikace spustí foreground službu (`START_REDELIVER_INTENT`) s průběžným ukládáním relace do databáze a nepřetržitým zámkem `WakeLock`, takže záznam spolehlivě běží i při vypnuté obrazovce telefonu.
+* **Stopky, ujetá vzdálenost a Značky (`+ Značka`):** Sledujte aktuální dobu měření, vzdálenost i počítadlo handoverů (`HO`). Tlačítkem **`+ Značka`** lze během jízdy uložit poznámku/waypoint přímo k bodu v terénu (např. *Tunel*, *Rušení*, *Budova*).
+* **Pozastavení, Obnovení & Tlačítko Ukončit:** Záznam lze pozastavit a obnovit bez rozdělení relace; ikonou napájení **Ukončit** v horní liště lze celou aplikaci včetně služeb na pozadí bezpečně a okamžitě ukončit.
 
 #### 2. Výběr logovaných položek (Tlačítko „Položky“)
 V horním panelu řízení měření klepněte na tlačítko **Položky**. Otevře se matice, kde lze zaškrtnout přesně ty datové skupiny, které chcete při každém vzorku ukládat:
@@ -226,8 +231,8 @@ Kliknutím na modré tlačítko **(i)** v pravém horním rohu aplikace se otev�
 * **Kompletní metrologie 5G NR (SS vs. CSI):**
   * Synchronizační blok: `SS-RSRP`, `SS-RSRQ`, `SS-SINR`
   * Datový kanál: `CSI-RSRP`, `CSI-RSRQ`, `CSI-SINR`
-* **Frekvenční spektrum a kanály:** Výpočet přesné nosné frekvence downlinku (DL) a uplinku (UL) v MHz z kanálových čísel EARFCN a NR-ARFCN včetně šířky kanálu (10, 15, 20, 40 MHz).
-* **Průzkum sousedních buněk (Neighbor Cells):** Tabulka všech viditelných sousedních buněk s výpočtem odstupu signálu $\Delta\text{RSRP}$. Automatické označení kandidátů na handover při $\Delta \le 3\text{ dB}$.
+* **Frekvenční spektrum, 5G šířka a agregace (CA):** Výpočet přesné nosné frekvence downlinku (DL) a uplinku (UL) v MHz z kanálových čísel EARFCN a NR-ARFCN včetně šířky primárního kanálu a celkové agregované šířky pásma **`Celkem CA: XX MHz`** (`PhysicalChannelConfig` a `ServiceState`).
+* **Průzkum sousedních buněk a filtr pásem:** Striktně oddělené seznamy sousedních buněk pro SIM 1 a SIM 2 s přepínačem **`Vše` | `4G LTE` | `5G NR`** a výpočtem odstupu signálu $\Delta\text{RSRP}$. Automatické označení kandidátů na handover při $\Delta \le 3\text{ dB}$.
 * **Detektor anomálií a spoofingu mobilní sítě:**
   * Detekce 2G Downgrade útoků (vynucení GSM sítě typické pro IMSI Catchery).
   * Detekce izolovaných buněk s vysokým výkonem bez sousedů v SIB tabulce (falešné vysílače).
@@ -247,15 +252,14 @@ Kliknutím na modré tlačítko **(i)** v pravém horním rohu aplikace se otev�
 * **Monitor RF rušení (AGC Jamming Detector):** Sledování automatického řízení zisku (AGC) z událostí `GnssMeasurementsEvent`. Varuje před náhlým propadem zisku způsobeným záměrným rušením či silným parazitním signálem.
 * **Surová měření a NMEA proud:** Čtení Dopplerova posuvu satelitů (Hz), čítač fázových měření ADR a živý náhled vět `$GNGGA`/`$GNRMC`.
 
-#### 4. Záložka „Mapa“ (Trajektorie a prostorové vrstvy)
-* **Interaktivní OpenStreetMap:** Zobrazení projeté trasy s barevným odlišením jednotlivých měřených bodů.
-* **Přepínatelné vizuální vrstvy:**
+#### 4. Záložka „Mapa“ (Živá i historická barevná trajektorie)
+* **Průběžný sběr živé trasy & OpenStreetMap:** Živá trasa se sbírá na pozadí od spuštění aplikace napříč všemi kartami a barevně se vykresluje stejným enginem živě i při přehrávání z Historie.
+* **Přepínatelné vizuální vrstvy + přepínač `S1`/`S2`:**
   * **RSRP Signál:** Zelená ($> -80\text{ dBm}$), Světle zelená, Oranžová, Červená ($< -105\text{ dBm}$).
   * **Rychlost pohybu:** Modrá ($< 10\text{ km/h}$), Tyrkysová, Zelená, Červená ($> 90\text{ km/h}$).
   * **Množství satelitů:** Červená ($< 5$), Žlutá ($5–10$), Zelená ($11–25$), Modrá ($> 25$).
   * **PDOP přesnost:** Zelená ($< 1,5$), Tyrkysová, Oranžová, Červená ($> 5,0$).
-* **Plovoucí dynamická legenda:** Automaticky zobrazuje vysvětlivky a prahové hodnoty pro aktuálně vybranou vrstvu.
-* **Ovládací prvky:** Tlačítka pro přiblížení/oddálení (+/-) a plovoucí tyrkysové tlačítko pro vycentrování mapy na aktuální polohu.
+* **Tmavý režim, Auto-Follow & Ovládání:** Přepínač tmavého/světlého filtru mapy, automatické sledování polohy, klikatelné značky s detailem bodu, smazání živé stopy, tlačítka přiblížení (+/-) a vycentrování.
 
 #### 5. Záložka „Grafy“ (Časové průběhy v reálném čase)
 Hardwarově vykreslované spojité grafy (Canvas sparklines) s ukazateli minimální, průměrné a maximální hodnoty pro:
@@ -271,15 +275,19 @@ Hardwarově vykreslované spojité grafy (Canvas sparklines) s ukazateli minimá
 #### 6. Záložka „Historie“ (Správa relací, přímé stažení do zařízení a bodový inspektor)
 * **Vyhledávání a filtrace:** Okamžité vyhledávání mezi uloženými měřeními.
 * **Přejmenování relace:** Možnost klepnout na ikonu tužky a relaci libovolně pojmenovat.
-* **Detailní prohlížení bod po bodu:** Otevření relace s možností procházet každý uložený vzorek `#1 • 19:01:21.043` s přesnými souřadnicemi, satelity, DOP, operátorem, frekvenčním pásmem, Dopplerem i teplotou baterie.
+* **Detailní prohlížení bod po bodu & skok na mapu:** Otevření relace s možností procházet každý uložený vzorek `#1 • 19:01:21.043` (souřadnice, satelity, DOP, operátor, frekvence, Doppler, teplota baterie). Klepnutím na kartu bodu nebo ikonu špendlíku se bod ihned otevře a vycentruje přímo na **Mapě**.
 * **Mazání nechtěných bodů:** Ikona koše u jednotlivých vzorků pro odstranění chybného měření.
 * **Přímé stažení do zařízení & Sdílení souborů:**
   * **💾 Stáhnout do zařízení (Downloads):** Soubor se okamžitě zapíše přímo do interního úložiště telefonu do složky `Download/GNSS_Net_Logger/` přes standardní Android MediaStore bez nutnosti externích cloudů.
   * **📤 Sdílet soubor (Systémový dialog):** Otevře systémové okno sdílení pro odeslání přes E-mail, WhatsApp, Disk Google nebo Bluetooth.
-* **Tři formáty exportu dat:**
-  * **CSV:** Kompletní tabulka všech parametrů (včetně PLMN, Dopplerova posuvu, obou RSRP signálů, NMEA vět a baterie) pro Excel, MATLAB nebo Python pandas.
-  * **3D KML:** Záznam pro Google Earth s 3D trajektorií a barevným kódováním.
-  * **GeoJSON:** Standardizovaný formát pro geografické informační systémy (QGIS, ArcGIS).
+* **Analytika & streamovaný export dat:**
+  * **Statistické shrnutí relace:** Automatický souhrn min/prům/max RSRP, průměrného PDOP, podílu sítí 5G/4G a rychlosti.
+  * **Prohlížení v grafech:** Libovolnou uloženou relaci lze otevřít přímo v záložce **Grafy** a dotykovým posuvníkem detailně odečítat průběhy.
+  * **Čtyři streamované formáty exportu (šetrné k RAM i při 50 000+ bodech):**
+    * **CSV:** Kompletní tabulka všech parametrů (včetně plných sloupců pro SIM 2, sloupce `WaypointNote`, PLMN, Dopplerova posuvu, NMEA vět a baterie) pro Excel, MATLAB nebo Python pandas.
+    * **Vícebarevné 3D KML:** Záznam pro Google Earth s barevným kódováním trasy podle RSRP a špendlíky pro uložené značky.
+    * **GPX 1.1:** Standardní formát `<trkpt>`, `<wpt>` a RF rozšíření `<extensions>`.
+    * **GeoJSON:** Standardizovaný formát pro geografické informační systémy (QGIS, ArcGIS).
 
 ---
 
@@ -287,13 +295,13 @@ Hardwarově vykreslované spojité grafy (Canvas sparklines) s ukazateli minimá
 
 Aplikace striktně dodržuje zásadu minimálních nutných oprávnění:
 - **`ACCESS_FINE_LOCATION` & `ACCESS_COARSE_LOCATION`:** Nezbytné pro čtení GNSS souřadnic, satelitů a fyzických parametrů rádiových buněk v Androidu.
-- **`ACCESS_BACKGROUND_LOCATION`:** Umožňuje pokračovat v záznamu trasy i po zhasnutí obrazovky nebo při přechodu do jiné aplikace.
-- **`BODY_SENSORS` / Senzory:** Přístup k barometru, akcelerometru a gyroskopu.
-- **`FOREGROUND_SERVICE_LOCATION`:** Zajišťuje nepřetržitý běh měřicí služby na pozadí.
-- **`INTERNET` & `ACCESS_NETWORK_STATE`:** Pouze pro stahování mapových dlaždic OpenStreetMap a odesílání socket ping sondy na adresu 8.8.8.8.
+- **`READ_PHONE_STATE`:** Využívá se výhradně k rozlišení názvů operátorů u Dual-SIM slotů (žádný přístup k telefonním hovorům, kontaktům, zprávám SMS ani IMEI).
+- **`FOREGROUND_SERVICE` & `FOREGROUND_SERVICE_LOCATION`:** Zajišťuje nepřetržitý běh měřicí služby na pozadí.
+- **`POST_NOTIFICATIONS`:** Zobrazuje stavovou notifikaci při aktivním logování v terénu.
+- **`INTERNET` & `ACCESS_NETWORK_STATE`:** Pouze pro stahování mapových dlaždic OpenStreetMap a odesílání socket ping sondy bez DNS na adresu `8.8.8.8:53`.
 
-> **🛡️ Ochrana soukromí (Žádné oprávnění k telefonním hovorům):**  
-> Aplikace **nikdy nevyžaduje** invazivní oprávnění `READ_PHONE_STATE`. Všechna data o mobilních vysílačích (eNodeB, PCI, TAC, RSRP, SINR, PLMN) jsou v moderním Androidu bezpečnostně svázána s polohou, nikoliv s telefonními hovory či kontakty. Aplikace nemá přístup k vašemu telefonnímu číslu, kontaktům, hovorům ani IMEI.
+> **🛡️ Ochrana soukromí (100% lokální zpracování):**  
+> Veškerá naměřená data zůstávají výhradně v lokální databázi zařízení bez jakéhokoli cloudu či analytických SDK.
 
 ---
 

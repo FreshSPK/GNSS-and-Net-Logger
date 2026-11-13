@@ -3,12 +3,15 @@ package com.example.ui.tabs
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.model.LogTriggerMode
 import com.example.model.LoggingSettings
 import com.example.ui.theme.*
@@ -18,6 +21,7 @@ fun SettingsDialog(
     settings: LoggingSettings,
     lang: String,
     onDismiss: () -> Unit,
+    onOpenBatterySettings: () -> Unit = {},
     onSaveSettings: (LoggingSettings) -> Unit
 ) {
     var isDemo by remember { mutableStateOf(settings.isDemoMode) }
@@ -27,8 +31,9 @@ fun SettingsDialog(
     var distThreshold by remember { mutableStateOf(settings.distanceThresholdMeters) }
     var qnhText by remember { mutableStateOf(settings.qnhHpa.toString()) }
     var taMultiplier by remember { mutableStateOf(settings.taMultiplierMode) }
+    var darkMap by remember { mutableStateOf(settings.darkMapMode) }
+    var audioAlerts by remember { mutableStateOf(settings.audioAnomalyAlerts) }
 
-    // Dynamically evaluate language for Settings Dialog based on selected tab or active setting
     val effectiveIsCs = remember(selectedLang, lang) {
         if (selectedLang == "SYSTEM") {
             val defaultLang = java.util.Locale.getDefault().language
@@ -53,6 +58,44 @@ fun SettingsDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
+                // Quick Presets
+                Text(
+                    text = if (effectiveIsCs) "Rychlé profily měření" else "Quick Measurement Presets",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = CyanTertiary,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AssistChip(
+                        onClick = {
+                            triggerMode = LogTriggerMode.HYBRID
+                            interval = 2
+                            distThreshold = 5f
+                        },
+                        label = { Text(if (effectiveIsCs) "Chůze (2s/5m)" else "Walk (2s/5m)", fontSize = 11.sp) }
+                    )
+                    AssistChip(
+                        onClick = {
+                            triggerMode = LogTriggerMode.HYBRID
+                            interval = 1
+                            distThreshold = 15f
+                        },
+                        label = { Text(if (effectiveIsCs) "Auto (1s/15m)" else "Drive (1s/15m)", fontSize = 11.sp) }
+                    )
+                    AssistChip(
+                        onClick = {
+                            triggerMode = LogTriggerMode.TIME
+                            interval = 5
+                        },
+                        label = { Text(if (effectiveIsCs) "Stativ (5s)" else "Static (5s)", fontSize = 11.sp) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = DarkSlate700)
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // Language Switch
                 Text(
                     text = if (effectiveIsCs) "Jazyk aplikace" else "App Language",
@@ -79,9 +122,9 @@ fun SettingsDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = DarkSlate700)
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Simulation / Demo Mode Toggle
                 Row(
@@ -97,9 +140,9 @@ fun SettingsDialog(
                         )
                         Text(
                             text = if (effectiveIsCs) {
-                                "Generuje syntetický pohyb kolem FEKT VUT a kolísání signálu pro testování bez chození venku"
+                                "Generuje syntetický pohyb kolem FEKT VUT pro testování bez chození venku"
                             } else {
-                                "Generates synthetic GNSS track around BUT FEKT and fluctuating RF signals for indoor testing"
+                                "Generates synthetic GNSS track around BUT FEKT for indoor testing"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -108,9 +151,63 @@ fun SettingsDialog(
                     Switch(checked = isDemo, onCheckedChange = { isDemo = it })
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Dark Map Tiles Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (effectiveIsCs) "Tmavý styl mapy (Noční režim)" else "Dark Map Tiles (Night Mode)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (effectiveIsCs) {
+                                "Barevně invertuje dlaždice OSM pro čitelnost v noci a v autě"
+                            } else {
+                                "Inverts OpenStreetMap tiles for night/cockpit readability"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = darkMap, onCheckedChange = { darkMap = it })
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Acoustic Anomaly Alerts Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (effectiveIsCs) "Akustické varování při anomálii" else "Audio Alert on Anomaly",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (effectiveIsCs) {
+                                "Krátké pípnutí při GNSS jammingu nebo vynuceném 2G downgradu"
+                            } else {
+                                "Short beep during GNSS jamming or forced 2G downgrade"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = audioAlerts, onCheckedChange = { audioAlerts = it })
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = DarkSlate700)
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Timing Advance (TA) Distance Multiplier Setting
                 Text(
@@ -118,15 +215,6 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.titleSmall,
                     color = CyanTertiary,
                     fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = if (effectiveIsCs) {
-                        "Zvolte konstantu pro krok TA dle kalibrace Vašeho zařízení:"
-                    } else {
-                        "Select TA step multiplier calibrated for your mobile device:"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -142,9 +230,9 @@ fun SettingsDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = DarkSlate700)
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Log Trigger Mode
                 Text(
@@ -197,7 +285,7 @@ fun SettingsDialog(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf(5f, 10f, 25f, 50f).forEach { meters ->
+                        listOf(5f, 10f, 15f, 25f, 50f).forEach { meters ->
                             FilterChip(
                                 selected = distThreshold == meters,
                                 onClick = { distThreshold = meters },
@@ -210,7 +298,6 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // QNH Setting
                 OutlinedTextField(
                     value = qnhText,
                     onValueChange = { qnhText = it },
@@ -218,6 +305,20 @@ fun SettingsDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = onOpenBatterySettings,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(imageVector = Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp), tint = AmberWarning)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (effectiveIsCs) "Nastavení optimalizace baterie (dlouhý běh)" else "Battery Optimization Settings (Background Run)",
+                        fontSize = 11.sp
+                    )
+                }
             }
         },
         confirmButton = {
@@ -232,7 +333,9 @@ fun SettingsDialog(
                             timeIntervalSeconds = interval,
                             distanceThresholdMeters = distThreshold,
                             qnhHpa = qnh,
-                            taMultiplierMode = taMultiplier
+                            taMultiplierMode = taMultiplier,
+                            darkMapMode = darkMap,
+                            audioAnomalyAlerts = audioAlerts
                         )
                     )
                     onDismiss()

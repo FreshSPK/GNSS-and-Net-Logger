@@ -40,7 +40,10 @@ data class GnssState(
     val l5Count: Int = 0,
     val latestNmeaSentence: String? = null,
     val rawDopplerHz: Float? = null,
-    val adrValidCount: Int = 0
+    val adrValidCount: Int = 0,
+    val speedAccuracyKmh: Float? = null,
+    val geoidSeparationM: Double? = null,
+    val ttffSeconds: Float? = null
 )
 
 data class CellNeighbor(
@@ -108,7 +111,9 @@ data class SimCellInfo(
     val timingAdvance: Int? = null,
     val estimatedDistanceM: Double? = null,
     val neighbors: List<CellNeighbor> = emptyList(),
-    val anomalies: List<CellularAnomaly> = emptyList()
+    val anomalies: List<CellularAnomaly> = emptyList(),
+    val carrierAggregationSummary: String? = null,
+    val totalAggregatedBandwidthKhz: Int? = null
 )
 
 data class CellularState(
@@ -160,7 +165,22 @@ data class ChartPoint(
     val compassAzimuth: Float = 0f,
     val batteryTempC: Float? = null,
     val sim1Operator: String = "SIM 1",
-    val sim2Operator: String = "SIM 2"
+    val sim2Operator: String = "SIM 2",
+    val sinrSim1: Float? = null,
+    val sinrSim2: Float? = null,
+    val pdop: Float? = null,
+    val agcScore: Float = 0f
+)
+
+data class MapTrailPoint(
+    val latitude: Double,
+    val longitude: Double,
+    val sim1Rsrp: Int?,
+    val sim2Rsrp: Int?,
+    val speedKmh: Float,
+    val satellitesUsed: Int,
+    val pdop: Float,
+    val timestampMs: Long
 )
 
 enum class LogTriggerMode {
@@ -188,5 +208,7 @@ data class LoggingSettings(
     val isDarkMode: Boolean? = null, // null = system default
     val qnhHpa: Float = 1013.25f,
     val fieldsSelection: LoggedFieldsSelection = LoggedFieldsSelection(),
-    val taMultiplierMode: Int = 2 // 1 = standard 78m, 2 = 156m (calibrated for user mobile)
+    val taMultiplierMode: Int = 2, // 1 = standard 78m, 2 = 156m (calibrated for user mobile)
+    val darkMapMode: Boolean = true,
+    val audioAnomalyAlerts: Boolean = false
 )

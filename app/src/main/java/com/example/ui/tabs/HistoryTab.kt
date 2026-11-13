@@ -5,12 +5,14 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,8 +34,10 @@ import com.example.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -42,6 +46,8 @@ fun HistoryTab(
     sessions: List<LogSession>,
     lang: String,
     onSelectSessionForReplay: (Long) -> Unit,
+    onSelectSessionForCharts: (LogSession) -> Unit = {},
+    onSelectPointOnMap: (List<TelemetryRecord>, TelemetryRecord) -> Unit = { _, _ -> },
     onRenameSession: (Long, String) -> Unit,
     onDeleteSession: (LogSession) -> Unit,
     onDeleteRecord: (TelemetryRecord) -> Unit,
@@ -79,9 +85,21 @@ fun HistoryTab(
                 sessionForExportDialog = inspectedSession
                 selectedExportFormat = "CSV"
             },
+            onOpenCharts = {
+                val target = inspectedSession!!
+                inspectedSession = null
+                inspectedRecords = null
+                onSelectSessionForCharts(target)
+            },
             onDeletePoint = { record ->
                 onDeleteRecord(record)
                 inspectedRecords = inspectedRecords?.filter { it.id != record.id }
+            },
+            onOpenPointOnMap = { record ->
+                val list = inspectedRecords ?: emptyList()
+                inspectedSession = null
+                inspectedRecords = null
+                onSelectPointOnMap(list, record)
             }
         )
         return
@@ -91,9 +109,9 @@ fun HistoryTab(
         if (searchQuery.isBlank()) sessions
         else sessions.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
-            it.operatorSummary.contains(searchQuery, ignoreCase = true) ||
-            it.primaryTech.contains(searchQuery, ignoreCase = true) ||
-            it.primaryBand.contains(searchQuery, ignoreCase = true)
+                it.operatorSummary.contains(searchQuery, ignoreCase = true) ||
+                it.primaryTech.contains(searchQuery, ignoreCase = true) ||
+                it.primaryBand.contains(searchQuery, ignoreCase = true)
         }
     }
 
@@ -102,29 +120,22 @@ fun HistoryTab(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = if (isCs) "HISTORIE MĚŘICÍCH RELACÍ" else "MEASUREMENT SESSIONS HISTORY",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = CyanTertiary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = if (isCs) "Lokální SQLite databáze bez cloudových závislostí" else "Local SQLite Room database without external cloud keys",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondaryDark
-                )
-            }
+        Column {
+            Text(
+                text = if (isCs) "HISTORIE MĚŘICÍCH RELACÍ" else "MEASUREMENT SESSIONS HISTORY",
+                style = MaterialTheme.typography.titleMedium,
+                color = CyanTertiary,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = if (isCs) "Lokální SQLite databáze • Export CSV / 3D KML / GPX / GeoJSON" else "Local SQLite Room DB • Export CSV / 3D KML / GPX / GeoJSON",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondaryDark
+            )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Search Bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
@@ -171,6 +182,7 @@ fun HistoryTab(
                             renameText = session.title
                         },
                         onReplay = { onSelectSessionForReplay(session.id) },
+                        onCharts = { onSelectSessionForCharts(session) },
                         onDelete = { onDeleteSession(session) },
                         onExport = { format ->
                             sessionForExportDialog = session
@@ -262,9 +274,9 @@ fun HistoryTab(
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        listOf("CSV", "KML", "GEOJSON").forEach { fmt ->
+                        listOf("CSV", "KML", "GPX", "GEOJSON").forEach { fmt ->
                             val isSel = selectedExportFormat == fmt
                             OutlinedButton(
                                 onClick = { selectedExportFormat = fmt },
@@ -274,13 +286,14 @@ fun HistoryTab(
                                     containerColor = if (isSel) CyanTertiary.copy(alpha = 0.2f) else DarkSlate700
                                 ),
                                 border = if (isSel) ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(CyanTertiary)) else null,
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = fmt,
-                                    fontSize = 11.sp,
+                                    text = if (fmt == "GEOJSON") "JSON" else fmt,
+                                    fontSize = 10.sp,
                                     fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSel) CyanTertiary else TextSecondaryDark
+                                    color = if (isSel) CyanTertiary else TextSecondaryDark,
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -288,7 +301,6 @@ fun HistoryTab(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 1. Download directly to device storage (Downloads folder)
                     Button(
                         onClick = {
                             val fmt = selectedExportFormat
@@ -312,7 +324,6 @@ fun HistoryTab(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // 2. Share via App / Intent
                     OutlinedButton(
                         onClick = {
                             val fmt = selectedExportFormat
@@ -350,6 +361,7 @@ fun SessionCard(
     onOpenInspector: () -> Unit,
     onRename: () -> Unit,
     onReplay: () -> Unit,
+    onCharts: () -> Unit,
     onDelete: () -> Unit,
     onExport: (String) -> Unit
 ) {
@@ -370,7 +382,10 @@ fun SessionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = session.title,
                         style = MaterialTheme.typography.titleSmall,
@@ -392,77 +407,75 @@ fun SessionCard(
 
             Row(modifier = Modifier.fillMaxWidth()) {
                 HistoryMetricItem(label = if (isCs) "Vzorků" else "Samples", value = session.pointCount.toString(), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = if (isCs) "Vzdálenost" else "Distance", value = String.format("%.1f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = if (isCs) "Max rychlost" else "Max Speed", value = String.format("%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = if (isCs) "Síť & Operátor" else "Net & Operator", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.5f))
+                HistoryMetricItem(label = if (isCs) "Vzdálenost" else "Distance", value = String.format(Locale.US, "%.2f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = if (isCs) "Max rychlost" else "Max Speed", value = String.format(Locale.US, "%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
+                HistoryMetricItem(label = if (isCs) "Síť" else "Net", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.4f))
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row {
-                    FilledTonalButton(
-                        onClick = onOpenInspector,
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = if (isCs) "Procházet body" else "Inspect Points", fontSize = 11.sp)
-                    }
+                FilledTonalButton(
+                    onClick = onOpenInspector,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.List, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(text = if (isCs) "Body" else "Points", fontSize = 11.sp)
+                }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                OutlinedButton(
+                    onClick = onReplay,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Map, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(text = if (isCs) "Mapa" else "Map", fontSize = 11.sp)
+                }
 
+                OutlinedButton(
+                    onClick = onCharts,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.ShowChart, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(text = if (isCs) "Grafy" else "Charts", fontSize = 11.sp)
+                }
+
+                var showMenu by remember { mutableStateOf(false) }
+                Box {
                     OutlinedButton(
-                        onClick = onReplay,
+                        onClick = { showMenu = true },
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Map, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = if (isCs) "Mapa" else "Map", fontSize = 11.sp)
+                        Icon(imageVector = Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(text = "Export", fontSize = 11.sp)
                     }
 
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    var showMenu by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedButton(
-                            onClick = { showMenu = true },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Export", fontSize = 11.sp)
-                        }
-
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Export CSV") },
-                                onClick = { showMenu = false; onExport("CSV") }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Export 3D KML") },
-                                onClick = { showMenu = false; onExport("KML") }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Export GeoJSON") },
-                                onClick = { showMenu = false; onExport("GEOJSON") }
-                            )
-                        }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(text = { Text("Export CSV") }, onClick = { showMenu = false; onExport("CSV") })
+                        DropdownMenuItem(text = { Text("Export 3D KML") }, onClick = { showMenu = false; onExport("KML") })
+                        DropdownMenuItem(text = { Text("Export GPX 1.1") }, onClick = { showMenu = false; onExport("GPX") })
+                        DropdownMenuItem(text = { Text("Export GeoJSON") }, onClick = { showMenu = false; onExport("GEOJSON") })
                     }
                 }
 
-                IconButton(onClick = onDelete) {
-                    Icon(imageVector = Icons.Default.Delete, contentDescription = if (isCs) "Smazat" else "Delete", tint = RoseCritical)
+                Spacer(modifier = Modifier.weight(1f))
+
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = if (isCs) "Smazat" else "Delete", tint = RoseCritical, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -476,10 +489,34 @@ fun SessionDetailInspector(
     lang: String,
     onBack: () -> Unit,
     onExportCsv: () -> Unit,
-    onDeletePoint: (TelemetryRecord) -> Unit
+    onOpenCharts: () -> Unit,
+    onDeletePoint: (TelemetryRecord) -> Unit,
+    onOpenPointOnMap: (TelemetryRecord) -> Unit = {}
 ) {
     val isCs = lang != "EN"
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS", Locale.getDefault()) }
+
+    // Computed session analytics summary
+    val stats = remember(records) {
+        val r1Vals = records.mapNotNull { it.sim1Rsrp }
+        val r2Vals = records.mapNotNull { it.sim2Rsrp }
+        val pdopVals = records.filter { it.satellitesUsedInFix >= 4 && it.pdop > 0f && it.pdop < 9f }.map { it.pdop }
+        val waypoints = records.count { !it.waypointNote.isNullOrBlank() }
+        val nrCount = records.count { it.sim1NetworkGen.contains("5G") }
+        val lteCount = records.count { it.sim1NetworkGen.contains("4G") || it.sim1NetworkGen.contains("LTE") }
+        val totalRec = records.size.coerceAtLeast(1)
+
+        mapOf(
+            "r1Avg" to r1Vals.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+            "r1Min" to r1Vals.minOrNull(),
+            "r1Max" to r1Vals.maxOrNull(),
+            "r2Avg" to r2Vals.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+            "pdopAvg" to pdopVals.takeIf { it.isNotEmpty() }?.average(),
+            "waypoints" to waypoints,
+            "pct5g" to (nrCount * 100 / totalRec),
+            "pct4g" to (lteCount * 100 / totalRec)
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -491,9 +528,12 @@ fun SessionDetailInspector(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(onClick = onBack) {
-                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = if (isCs) "Zpět" else "Back", tint = TextPrimaryDark)
+                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = if (isCs) "Zpět" else "Back", tint = TextPrimaryDark)
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
@@ -504,26 +544,93 @@ fun SessionDetailInspector(
                         color = TextPrimaryDark
                     )
                     Text(
-                        text = if (isCs) "Editace a inspekce ${records.size} z ${session.pointCount} záznamů" else "Inspection of ${records.size} of ${session.pointCount} records",
+                        text = if (isCs) "Inspekce ${records.size} záznamů" else "Inspection of ${records.size} records",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryDark
                     )
                 }
             }
 
-            Button(
-                onClick = onExportCsv,
-                colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = DarkSlate900)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Export CSV", fontWeight = FontWeight.Bold, color = DarkSlate900, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = onOpenCharts,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp), tint = CyanTertiary)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = if (isCs) "Grafy" else "Charts", fontSize = 12.sp)
+                }
+                Button(
+                    onClick = onExportCsv,
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = DarkSlate900)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Export", fontWeight = FontWeight.Bold, color = DarkSlate900, fontSize = 12.sp)
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Session Analytics Summary Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSlate800)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = if (isCs) "SOUHRNNÁ STATISTIKA RELACE" else "SESSION ANALYTICS SUMMARY",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = CyanTertiary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    HistoryMetricItem(
+                        label = "SIM 1 RSRP",
+                        value = (stats["r1Avg"] as? Int)?.let { "$it dBm" } ?: "—",
+                        modifier = Modifier.weight(1f)
+                    )
+                    HistoryMetricItem(
+                        label = "SIM 2 RSRP",
+                        value = (stats["r2Avg"] as? Int)?.let { "$it dBm" } ?: "—",
+                        modifier = Modifier.weight(1f)
+                    )
+                    HistoryMetricItem(
+                        label = if (isCs) "Prům. PDOP" else "Avg PDOP",
+                        value = (stats["pdopAvg"] as? Double)?.let { String.format(Locale.US, "%.2f", it) } ?: "—",
+                        modifier = Modifier.weight(1f)
+                    )
+                    HistoryMetricItem(
+                        label = if (isCs) "Podíl 5G/4G" else "5G/4G Mix",
+                        value = "${stats["pct5g"]}%/${stats["pct4g"]}%",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                val r1Min = stats["r1Min"] as? Int
+                val r1Max = stats["r1Max"] as? Int
+                val wpCount = stats["waypoints"] as? Int ?: 0
+                if (r1Min != null || wpCount > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isCs) {
+                            "SIM1 rozsah: ${r1Min ?: "—"} až ${r1Max ?: "—"} dBm • Značky (Waypoints): $wpCount"
+                        } else {
+                            "SIM1 range: ${r1Min ?: "—"} to ${r1Max ?: "—"} dBm • Waypoints: $wpCount"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -531,8 +638,12 @@ fun SessionDetailInspector(
         ) {
             items(records, key = { it.id }) { r ->
                 val timeStr = timeFormat.format(Date(r.timestampMs))
+                val hasDop = r.satellitesUsedInFix >= 4 && r.pdop > 0f && r.pdop < 9.0f
+                val hasCoords = r.latitude != 0.0 || r.longitude != 0.0
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = hasCoords) { onOpenPointOnMap(r) },
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkSlate800)
                 ) {
@@ -542,14 +653,52 @@ fun SessionDetailInspector(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "#${r.id} • $timeStr",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimaryDark
-                            )
-                            IconButton(onClick = { onDeletePoint(r) }, modifier = Modifier.size(24.dp)) {
-                                Icon(imageVector = Icons.Default.Delete, contentDescription = if (isCs) "Smazat bod" else "Delete Point", tint = RoseCritical, modifier = Modifier.size(16.dp))
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "#${r.id} • $timeStr",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimaryDark
+                                )
+                                if (!r.waypointNote.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .background(AmberWarning.copy(alpha = 0.25f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "★ ${r.waypointNote}",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AmberWarning
+                                        )
+                                    }
+                                }
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (hasCoords) {
+                                    IconButton(
+                                        onClick = { onOpenPointOnMap(r) },
+                                        modifier = Modifier.size(26.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PinDrop,
+                                            contentDescription = if (isCs) "Zobrazit bod na mapě" else "Show point on map",
+                                            tint = CyanTertiary,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { onDeletePoint(r) }, modifier = Modifier.size(26.dp)) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = if (isCs) "Smazat bod" else "Delete Point", tint = RoseCritical, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
 
@@ -560,7 +709,7 @@ fun SessionDetailInspector(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "GNSS: ${String.format("%.5f", r.latitude)}, ${String.format("%.5f", r.longitude)} (±${String.format("%.1f", r.horizontalAccuracyM)}m)",
+                                text = "GNSS: ${String.format(Locale.US, "%.5f", r.latitude)}, ${String.format(Locale.US, "%.5f", r.longitude)} (±${String.format(Locale.US, "%.1f", r.horizontalAccuracyM)}m)",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = CyanTertiary
                             )
@@ -578,8 +727,11 @@ fun SessionDetailInspector(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            val dopText = if (hasDop) {
+                                "HDOP: ${String.format(Locale.US, "%.2f", r.hdop)} • VDOP: ${String.format(Locale.US, "%.2f", r.vdop)} • PDOP: ${String.format(Locale.US, "%.2f", r.pdop)}"
+                            } else "HDOP: — • VDOP: — • PDOP: —"
                             Text(
-                                text = "HDOP: ${String.format(Locale.US, "%.2f", r.hdop)} • VDOP: ${String.format(Locale.US, "%.2f", r.vdop)} • PDOP: ${String.format(Locale.US, "%.2f", r.pdop)}",
+                                text = dopText,
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                                 color = TextSecondaryDark
                             )
@@ -651,6 +803,17 @@ private fun HistoryMetricItem(label: String, value: String, modifier: Modifier =
     }
 }
 
+private fun writeSessionStream(format: String, session: LogSession, records: List<TelemetryRecord>, out: OutputStream) {
+    BufferedOutputStream(out, 32 * 1024).use { bos ->
+        when (format) {
+            "CSV" -> Exporter.writeCsvToStream(session, records, bos)
+            "KML" -> Exporter.writeKmlToStream(session, records, bos)
+            "GPX" -> Exporter.writeGpxToStream(session, records, bos)
+            else -> Exporter.writeGeoJsonToStream(session, records, bos)
+        }
+    }
+}
+
 private suspend fun exportSessionFile(
     context: Context,
     session: LogSession,
@@ -667,20 +830,15 @@ private suspend fun exportSessionFile(
         }
 
         val exportDir = File(context.cacheDir, "exports").apply { if (!exists()) mkdirs() }
-        val filename = when (format) {
-            "CSV" -> "${session.title.replace(" ", "_")}_${session.id}.csv"
-            "KML" -> "${session.title.replace(" ", "_")}_${session.id}.kml"
-            else -> "${session.title.replace(" ", "_")}_${session.id}.geojson"
+        val cleanTitle = session.title.replace("[^a-zA-Z0-9_.-]".toRegex(), "_")
+        val ext = when (format) {
+            "CSV" -> "csv"
+            "KML" -> "kml"
+            "GPX" -> "gpx"
+            else -> "geojson"
         }
-        val file = File(exportDir, filename)
-
-        val content = when (format) {
-            "CSV" -> Exporter.exportToCsv(session, records)
-            "KML" -> Exporter.exportToKml(session, records)
-            else -> Exporter.exportToGeoJson(session, records)
-        }
-
-        FileOutputStream(file).use { it.write(content.toByteArray()) }
+        val file = File(exportDir, "${cleanTitle}_${session.id}.$ext")
+        FileOutputStream(file).use { fos -> writeSessionStream(format, session, records, fos) }
 
         withContext(Dispatchers.Main) {
             try {
@@ -689,6 +847,7 @@ private suspend fun exportSessionFile(
                     type = when (format) {
                         "CSV" -> "text/csv"
                         "KML" -> "application/vnd.google-earth.kml+xml"
+                        "GPX" -> "application/gpx+xml"
                         else -> "application/geo+json"
                     }
                     putExtra(Intent.EXTRA_STREAM, uri)
@@ -719,21 +878,18 @@ private suspend fun saveSessionFileToDownloads(
         }
 
         val cleanTitle = session.title.replace("[^a-zA-Z0-9_.-]".toRegex(), "_")
-        val filename = when (format) {
-            "CSV" -> "${cleanTitle}_${session.id}.csv"
-            "KML" -> "${cleanTitle}_${session.id}.kml"
-            else -> "${cleanTitle}_${session.id}.geojson"
+        val ext = when (format) {
+            "CSV" -> "csv"
+            "KML" -> "kml"
+            "GPX" -> "gpx"
+            else -> "geojson"
         }
+        val filename = "${cleanTitle}_${session.id}.$ext"
         val mimeType = when (format) {
             "CSV" -> "text/csv"
             "KML" -> "application/vnd.google-earth.kml+xml"
+            "GPX" -> "application/gpx+xml"
             else -> "application/geo+json"
-        }
-
-        val content = when (format) {
-            "CSV" -> Exporter.exportToCsv(session, records)
-            "KML" -> Exporter.exportToKml(session, records)
-            else -> Exporter.exportToGeoJson(session, records)
         }
 
         var savedPath = ""
@@ -751,7 +907,7 @@ private suspend fun saveSessionFileToDownloads(
                 val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                 if (uri != null) {
                     resolver.openOutputStream(uri)?.use { os ->
-                        os.write(content.toByteArray(Charsets.UTF_8))
+                        writeSessionStream(format, session, records, os)
                     }
                     values.clear()
                     values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
@@ -765,11 +921,11 @@ private suspend fun saveSessionFileToDownloads(
                 val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
                 val appFolder = File(downloadsDir, "GNSS_Net_Logger").apply { if (!exists()) mkdirs() }
                 val targetFile = File(appFolder, filename)
-                FileOutputStream(targetFile).use { it.write(content.toByteArray(Charsets.UTF_8)) }
+                FileOutputStream(targetFile).use { fos -> writeSessionStream(format, session, records, fos) }
                 success = true
                 savedPath = targetFile.absolutePath
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             success = false
         }
 

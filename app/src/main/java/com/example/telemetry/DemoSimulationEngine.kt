@@ -35,8 +35,8 @@ class DemoSimulationEngine {
         val constellations = listOf(
             Triple(1, "GPS", "L1/L5"),
             Triple(6, "Galileo", "E1/E5a"),
-            Triple(3, "GLONASS", "G1"),
-            Triple(5, "BeiDou", "B1/B2")
+            Triple(3, "GLONASS", "G1/G2"),
+            Triple(5, "BeiDou", "B1/B2a")
         )
 
         var l1Count = 0
@@ -47,9 +47,15 @@ class DemoSimulationEngine {
             val az = ((i * 360f / satTotal) + (tick * 1.2f)) % 360f
             val el = (18f + ((i * 47) % 68)).toFloat()
             val cn0 = 32f + (16f * sin((i + tick) * 0.3)).toFloat().coerceIn(-4f, 18f)
-            val hasL5 = (i % 2 == 0) && (constInfo.first == 1 || constInfo.first == 6)
-            val bandLabel = if (hasL5) "L5/E5a" else "L1/E1"
-            if (hasL5) l5Count++ else l1Count++
+            val isDualBand = (i % 2 == 0)
+            val bandLabel = when (constInfo.first) {
+                1 -> if (isDualBand) "L5 (1176.45 MHz)" else "L1 (1575.42 MHz)"
+                6 -> if (isDualBand) "E5a (1176.45 MHz)" else "E1 (1575.42 MHz)"
+                3 -> if (isDualBand) "G2 (~1246 MHz)" else "G1 (~1602 MHz)"
+                else -> if (isDualBand) "B2a (1176.45 MHz)" else "B1C (1575.42 MHz)"
+            }
+            val isSecondBand = isDualBand && (constInfo.first == 1 || constInfo.first == 6 || constInfo.first == 5)
+            if (isSecondBand) l5Count++ else l1Count++
 
             satList.add(
                 SatelliteInfo(
@@ -60,7 +66,12 @@ class DemoSimulationEngine {
                     elevationDegrees = el,
                     azimuthDegrees = az,
                     hasCarrierFrequency = true,
-                    carrierFrequencyHz = if (hasL5) 1176450000f else 1575420000f,
+                    carrierFrequencyHz = when {
+                        constInfo.first == 3 && isDualBand -> 1246000000f
+                        constInfo.first == 3 -> 1602000000f
+                        isDualBand -> 1176450000f
+                        else -> 1575420000f
+                    },
                     bandLabel = bandLabel,
                     usedInFix = i <= satUsed
                 )
@@ -116,8 +127,11 @@ class DemoSimulationEngine {
             displayName = "SIM 1: T-Mobile CZ",
             operatorAlpha = "T-Mobile CZ",
             networkGen = "4G LTE Advanced",
+            carrierAggregationSummary = "LTE-A 3CA: B20+B3+B7 (45 MHz)",
+            totalAggregatedBandwidthKhz = 45000,
             isServing = true,
-            plmn = "230-01",
+            isDataActive = true,
+            plmn = "23001",
             tac = "51200",
             ci = "25840897",
             enbOrGnbId = "100941",
@@ -152,8 +166,11 @@ class DemoSimulationEngine {
             displayName = "SIM 2: O2 - CZ",
             operatorAlpha = "O2 - CZ",
             networkGen = "5G NR NSA",
+            carrierAggregationSummary = "5G NSA EN-DC: B20+n78 (50 MHz)",
+            totalAggregatedBandwidthKhz = 50000,
             isServing = true,
-            plmn = "230-02",
+            isDataActive = false,
+            plmn = "23002",
             tac = "51201",
             ci = "18941952",
             enbOrGnbId = "73992",
@@ -168,12 +185,16 @@ class DemoSimulationEngine {
             rsrq = -11,
             rssi = -64,
             sinr = 12.0f,
-            cqi = 10,
+            cqi = null,
+            ssRsrp = sim2Rsrp,
+            ssRsrq = -11,
+            ssSinr = 12.0f,
+            csiRsrp = sim2Rsrp - 2,
             timingAdvance = sim2Ta,
             estimatedDistanceM = BandMapper.calculateLteDistanceMeters(sim2Ta, taMultiplierMode),
             neighbors = listOf(
-                CellNeighbor("LTE", 428, 6300, "B20 (800 MHz FDD)", sim2Rsrp - 4, 4),
-                CellNeighbor("5G NR", 342, 641666, "n78 (3500 MHz C-Band)", sim2Rsrp - 6, 6)
+                CellNeighbor("LTE", 428, 6300, "B20 (800 MHz FDD)", sim2Rsrp - 4, 4, 791.0, 832.0),
+                CellNeighbor("5G NR", 342, 641666, "n78 (3500 MHz C-Band)", sim2Rsrp - 6, 6, 3624.9, 3624.9)
             ),
             anomalies = BandMapper.detectCellularAnomalies("5G NR NSA", "51201", "73992", "151", sim2Rsrp, 12.0f, 2, true)
         )

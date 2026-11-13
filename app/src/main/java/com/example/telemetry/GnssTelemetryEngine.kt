@@ -33,6 +33,13 @@ class GnssTelemetryEngine(
     private var lastValidGpsLocation: Location? = null
     private var agcBaselineDb: Double? = null
     private var isNmeaDopAvailable = false
+    @Volatile
+    private var isStarted = false
+    private var startElapsedMs: Long = 0L
+    private var measuredTtffSec: Float? = null
+    private var latestGeoidSepM: Double? = null
+    private var gnssThread: android.os.HandlerThread? = null
+    private var gnssHandler: android.os.Handler? = null
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -66,9 +73,18 @@ class GnssTelemetryEngine(
     } else null
 
     fun start() {
+        if (isStarted) return
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return
         }
+        isStarted = true
+        startElapsedMs = android.os.SystemClock.elapsedRealtime()
+        measuredTtffSec = null
+
+        val thread = android.os.HandlerThread("GnssTelemetryWorker").apply { start() }
+        val handler = android.os.Handler(thread.looper)
+        gnssThread = thread
+        gnssHandler = handler
 
         try {
             val lm = locationManager ?: return
@@ -76,35 +92,31 @@ class GnssTelemetryEngine(
             // CRITICAL: Listen EXCLUSIVELY to GPS_PROVIDER. Do NOT listen to NETWORK_PROVIDER
             // which injects distant cell-tower/Wi-Fi locations and creates zig-zag spikes.
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener)
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener, thread.looper)
             }
 
-            // Register GnssStatus callback
-            lm.registerGnssStatusCallback(gnssStatusCallback, null)
+            // Register GnssStatus callback on background worker handler
+            lm.registerGnssStatusCallback(gnssStatusCallback, handler)
 
             // Register GnssMeasurements callback for AGC Jamming & Raw Doppler/ADR
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 try {
-                    lm.registerGnssMeasurementsCallback(gnssMeasurementsCallback, null)
-                } catch (e: Exception) {
-                    // Safe catch
-                }
+                    lm.registerGnssMeasurementsCallback(gnssMeasurementsCallback, handler)
+                } catch (_: Exception) {}
 
-                // Register NMEA message listener
+                // Register NMEA message listener on background worker handler
                 try {
-                    nmeaListener?.let { lm.addNmeaListener(it, null) }
-                } catch (e: Exception) {
-                    // Safe catch
-                }
+                    nmeaListener?.let { lm.addNmeaListener(it, handler) }
+                } catch (_: Exception) {}
             }
-        } catch (e: SecurityException) {
-            // Permission missing
-        } catch (e: Exception) {
-            // Location manager error
+        } catch (_: SecurityException) {
+        } catch (_: Exception) {
         }
     }
 
     fun stop() {
+        if (!isStarted) return
+        isStarted = false
         try {
             locationManager?.removeUpdates(locationListener)
             locationManager?.unregisterGnssStatusCallback(gnssStatusCallback)
@@ -112,9 +124,18 @@ class GnssTelemetryEngine(
                 locationManager?.unregisterGnssMeasurementsCallback(gnssMeasurementsCallback)
                 nmeaListener?.let { locationManager?.removeNmeaListener(it) }
             }
-        } catch (e: Exception) {
-            // Safe teardown
-        }
+        } catch (_: Exception) {}
+        try {
+            gnssThread?.quitSafely()
+        } catch (_: Exception) {}
+        gnssThread = null
+        gnssHandler = null
+    }
+
+    fun resetAgcBaseline() {
+        agcBaselineDb = null
+        val cur = _gnssState.value
+        _gnssState.value = cur.copy(agcInterferenceScore = 0f, jammingAlert = false)
     }
 
     fun updateDemoState(state: GnssState) {
@@ -154,12 +175,23 @@ class GnssTelemetryEngine(
     }
 
     private fun updateLocationState(loc: Location) {
+        if (measuredTtffSec == null && startElapsedMs > 0L) {
+            measuredTtffSec = ((android.os.SystemClock.elapsedRealtime() - startElapsedMs) / 1000f).coerceAtLeast(0.1f)
+        }
+
         val speedMs = if (loc.hasSpeed()) loc.speed else 0f
         val speedKmh = speedMs * 3.6f
+        val speedAccKmh = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && loc.hasSpeedAccuracy()) {
+            loc.speedAccuracyMetersPerSecond * 3.6f
+        } else null
+
         val hAcc = if (loc.hasAccuracy()) loc.accuracy else 0f
         val vAcc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && loc.hasVerticalAccuracy()) {
             loc.verticalAccuracyMeters
         } else hAcc * 1.5f
+
+        val geoid = latestGeoidSepM
+        val wgsAlt = if (geoid != null) loc.altitude + geoid else loc.altitude
 
         val current = _gnssState.value
         _gnssState.value = current.copy(
@@ -167,9 +199,12 @@ class GnssTelemetryEngine(
             latitude = loc.latitude,
             longitude = loc.longitude,
             altitudeMsl = loc.altitude,
-            altitudeWgs84 = loc.altitude,
+            altitudeWgs84 = wgsAlt,
             speedKmh = speedKmh,
             speedMs = speedMs,
+            speedAccuracyKmh = speedAccKmh,
+            geoidSeparationM = geoid,
+            ttffSeconds = measuredTtffSec,
             bearingDeg = if (loc.hasBearing()) loc.bearing else current.bearingDeg,
             horizontalAccuracyM = hAcc,
             verticalAccuracyM = vAcc
@@ -178,7 +213,7 @@ class GnssTelemetryEngine(
 
     /**
      * NMEA parser directly matching standard GNSS specification (and GPSTest):
-     * Parses real hardware PDOP, HDOP, VDOP from GSA sentences, and HDOP from GGA.
+     * Parses real hardware PDOP, HDOP, VDOP from GSA sentences, and HDOP + Geoid Sep from GGA.
      */
     private fun processNmeaSentence(sentence: String) {
         if (sentence.isEmpty()) return
@@ -216,13 +251,18 @@ class GnssTelemetryEngine(
         } else if (cleanSentence.startsWith("\$GNGGA") || cleanSentence.startsWith("\$GPGGA")) {
             val body = cleanSentence.substringBefore('*')
             val tokens = body.split(',')
-            if (tokens.size > 8) {
+            if (tokens.size > 11) {
                 val hdopVal = tokens[8].toFloatOrNull()
+                val geoidSep = tokens[11].toDoubleOrNull()
+                if (geoidSep != null) {
+                    latestGeoidSepM = geoidSep
+                }
                 if (hdopVal != null && hdopVal > 0f) {
-                    val p = _gnssState.value.pdop
-                    _gnssState.value = _gnssState.value.copy(
+                    val c = _gnssState.value
+                    _gnssState.value = c.copy(
                         hdop = hdopVal,
-                        pdop = if (p <= 0f) hdopVal * 1.4f else p
+                        pdop = if (c.pdop <= 0f) hdopVal * 1.4f else c.pdop,
+                        geoidSeparationM = geoidSep ?: c.geoidSeparationM
                     )
                 }
             }
@@ -233,7 +273,8 @@ class GnssTelemetryEngine(
         val satCount = status.satelliteCount
         val satList = mutableListOf<SatelliteInfo>()
         var usedCount = 0
-        var dualFreqCount = 0
+        var dualFreqUsedCount = 0
+        var dualFreqViewCount = 0
 
         val constellationMap = mutableMapOf<String, Pair<Int, Int>>() // Constellation -> (used, total)
 
@@ -256,7 +297,8 @@ class GnssTelemetryEngine(
                 carrierHz = status.getCarrierFrequencyHz(i)
                 bandLabel = getCarrierBandLabel(constType, carrierHz)
                 if (bandLabel.contains("L5") || bandLabel.contains("E5") || bandLabel.contains("B2")) {
-                    dualFreqCount++
+                    dualFreqViewCount++
+                    if (used) dualFreqUsedCount++
                 }
             }
 
@@ -322,7 +364,16 @@ class GnssTelemetryEngine(
             }
         }
 
-        val dualRatio = if (usedCount > 0) (dualFreqCount.toFloat() / usedCount.toFloat() * 100f).coerceAtMost(100f) else 0f
+        val dualRatio = if (usedCount > 0) {
+            (dualFreqUsedCount.toFloat() / usedCount.toFloat() * 100f).coerceAtMost(100f)
+        } else 0f
+
+        val effectiveL5Count = if (usedCount > 0) dualFreqUsedCount else dualFreqViewCount
+        val effectiveL1Count = if (usedCount > 0) {
+            (usedCount - dualFreqUsedCount).coerceAtLeast(0)
+        } else {
+            (satCount - dualFreqViewCount).coerceAtLeast(0)
+        }
 
         val current = _gnssState.value
         _gnssState.value = current.copy(
@@ -332,8 +383,8 @@ class GnssTelemetryEngine(
             hdop = currentHdop,
             vdop = currentVdop,
             pdop = currentPdop,
-            l1Count = usedCount - dualFreqCount,
-            l5Count = dualFreqCount,
+            l1Count = effectiveL1Count,
+            l5Count = effectiveL5Count,
             dualFrequencyRatioPct = dualRatio,
             constellationCountMap = constellationMap
         )

@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,9 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.GnssState
-import com.example.model.SatelliteInfo
 import com.example.ui.components.SkyPlotView
 import com.example.ui.theme.*
+import java.util.Locale
 
 enum class GnssSubTab {
     SKYPLOT_RADAR,
@@ -34,10 +35,11 @@ enum class GnssSubTab {
 @Composable
 fun GnssTab(
     gnss: GnssState,
-    lang: String
+    lang: String,
+    onResetAgcBaseline: () -> Unit = {}
 ) {
     val isCs = lang != "EN"
-    var selectedFilter by remember { mutableStateOf("ALL") } // "ALL", "L5", "GPS", "GALILEO", "GLONASS", "BEIDOU"
+    var selectedFilter by remember { mutableStateOf("ALL") }
     var activeSubTab by remember { mutableStateOf(GnssSubTab.SKYPLOT_RADAR) }
     var showDopInfoDialog by remember { mutableStateOf(false) }
 
@@ -58,7 +60,7 @@ fun GnssTab(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // Top Header matching image_ca27dc1f.png
+        // Top Header with TTFF badge
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -85,9 +87,16 @@ fun GnssTab(
                         color = TextPrimaryDark
                     )
                 }
+                val ttffText = gnss.ttffSeconds?.let { "TTFF: ${String.format(Locale.US, "%.1f s", it)}" }
+                    ?: if (isCs) "TTFF: čeká na první fix..." else "TTFF: waiting for first fix..."
+                Text(
+                    text = ttffText,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                    color = if (gnss.ttffSeconds != null) EmeraldSignal else TextSecondaryDark,
+                    fontFamily = FontFamily.Monospace
+                )
             }
 
-            // Dual-band Badge Box
             Card(
                 shape = RoundedCornerShape(10.dp),
                 colors = CardDefaults.cardColors(containerColor = EmeraldSignal.copy(alpha = 0.15f)),
@@ -98,14 +107,14 @@ fun GnssTab(
                     horizontalAlignment = Alignment.End
                 ) {
                     Text(
-                        text = "DUAL-BAND L1+L5",
+                        text = "DUAL-BAND L1+L5/E5a",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = EmeraldSignal
                     )
                     Text(
-                        text = "L1: ${gnss.l1Count} | L5: ${gnss.l5Count}",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        text = "Base: ${gnss.l1Count} | L5/E5a/B2a: ${gnss.l5Count}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextPrimaryDark,
                         fontWeight = FontWeight.Bold
                     )
@@ -115,7 +124,7 @@ fun GnssTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Constellation / Band Filter Pills (Všechny, Pouze L5/E5a, GPS, Galileo, GLONASS, BeiDou)
+        // Constellation / Band Filter Pills
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -128,7 +137,7 @@ fun GnssTab(
             FilterChip(
                 selected = selectedFilter == "L5",
                 onClick = { selectedFilter = "L5" },
-                label = { Text(if (isCs) "Pouze L5 / E5a (${gnss.l5Count})" else "L5 / E5a Only (${gnss.l5Count})") }
+                label = { Text(if (isCs) "L5 / E5a / B2a (${gnss.l5Count})" else "L5 / E5a / B2a (${gnss.l5Count})") }
             )
             FilterChip(
                 selected = selectedFilter == "GPS",
@@ -162,7 +171,6 @@ fun GnssTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Subtabs: Skyplot Radar | Signály C/N0 | Podrobná tabulka
         TabRow(
             selectedTabIndex = activeSubTab.ordinal,
             containerColor = DarkSlate800,
@@ -171,7 +179,7 @@ fun GnssTab(
             Tab(
                 selected = activeSubTab == GnssSubTab.SKYPLOT_RADAR,
                 onClick = { activeSubTab = GnssSubTab.SKYPLOT_RADAR },
-                text = { Text(if (isCs) "Skyplot Radar" else "Skyplot Radar", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                text = { Text("Skyplot Radar", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             )
             Tab(
                 selected = activeSubTab == GnssSubTab.SIGNALY_CN0,
@@ -213,7 +221,7 @@ fun GnssTab(
                                 Text(
                                     text = "${sat.constellationName} #${sat.svid}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.width(90.dp),
+                                    modifier = Modifier.width(96.dp),
                                     fontWeight = FontWeight.Bold,
                                     color = if (sat.usedInFix) TextPrimaryDark else Color.Gray
                                 )
@@ -227,10 +235,10 @@ fun GnssTab(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = String.format("%.0f dB", sat.cn0DbHz),
+                                    text = String.format(Locale.US, "%.0f dB", sat.cn0DbHz),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.width(44.dp),
+                                    modifier = Modifier.width(46.dp),
                                     color = TextPrimaryDark
                                 )
                             }
@@ -264,8 +272,8 @@ fun GnssTab(
                             ) {
                                 Text(text = "#${sat.svid}", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
                                 Text(text = sat.constellationName, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1.5f))
-                                Text(text = sat.bandLabel, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1.2f), color = if (sat.bandLabel.contains("L5") || sat.bandLabel.contains("E5")) EmeraldSignal else TextPrimaryDark)
-                                Text(text = String.format("%.0f", sat.cn0DbHz), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
+                                Text(text = sat.bandLabel, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1.2f), color = if (sat.bandLabel.contains("L5") || sat.bandLabel.contains("E5") || sat.bandLabel.contains("B2")) EmeraldSignal else TextPrimaryDark)
+                                Text(text = String.format(Locale.US, "%.0f", sat.cn0DbHz), style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), fontFamily = FontFamily.Monospace)
                                 Text(text = "${sat.elevationDegrees.toInt()}°/${sat.azimuthDegrees.toInt()}°", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1.2f))
                                 Text(
                                     text = if (sat.usedInFix) (if (isCs) "ANO" else "YES") else (if (isCs) "NE" else "NO"),
@@ -283,7 +291,7 @@ fun GnssTab(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // DOP Card with Info Explanation Dialog Trigger
+        // DOP & Vertical Reference (MSL vs WGS84 + Geoid Separation)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -310,7 +318,7 @@ fun GnssTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "HDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
                         Text(
-                            text = if (hasValidDop && gnss.hdop > 0f) String.format("%.2f", gnss.hdop) else "—",
+                            text = if (hasValidDop && gnss.hdop > 0f) String.format(Locale.US, "%.2f", gnss.hdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (hasValidDop) EmeraldSignal else TextSecondaryDark
@@ -320,7 +328,7 @@ fun GnssTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "VDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
                         Text(
-                            text = if (hasValidDop && gnss.vdop > 0f) String.format("%.2f", gnss.vdop) else "—",
+                            text = if (hasValidDop && gnss.vdop > 0f) String.format(Locale.US, "%.2f", gnss.vdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (hasValidDop) TextPrimaryDark else TextSecondaryDark
@@ -330,7 +338,7 @@ fun GnssTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "PDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
                         Text(
-                            text = if (hasValidDop) String.format("%.2f", gnss.pdop) else "—",
+                            text = if (hasValidDop) String.format(Locale.US, "%.2f", gnss.pdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (hasValidDop) CyanTertiary else TextSecondaryDark
@@ -338,12 +346,39 @@ fun GnssTab(
                         Text(text = if (isCs) "Prostorový 3D" else "Spatial 3D", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = DarkSlate700)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (gnss.hasFix) "MSL: ${String.format(Locale.US, "%.1f m", gnss.altitudeMsl)}" else "MSL: —",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = TextPrimaryDark
+                    )
+                    Text(
+                        text = if (gnss.hasFix) "WGS84: ${String.format(Locale.US, "%.1f m", gnss.altitudeWgs84)}" else "WGS84: —",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = CyanTertiary
+                    )
+                    Text(
+                        text = gnss.geoidSeparationM?.let { "Geoid N: ${String.format(Locale.US, "%+.1f m", it)}" } ?: "Geoid N: —",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = TextSecondaryDark
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // AGC JAMMING & INTERFERENCE MONITOR (RESTORED & PROMINENT)
+        // AGC JAMMING & INTERFERENCE MONITOR with Baseline Reset Button
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -358,7 +393,14 @@ fun GnssTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (gnss.jammingAlert) {
+                            Icon(imageVector = Icons.Default.Warning, contentDescription = "Jamming Alert", tint = RoseCritical, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
                         Text(
                             text = if (isCs) "DETEKCE RUŠENÍ & AGC MONITOR" else "AGC JAMMING & INTERFERENCE MONITOR",
                             style = MaterialTheme.typography.titleSmall,
@@ -366,12 +408,13 @@ fun GnssTab(
                             color = if (gnss.jammingAlert) RoseCritical else AmberWarning
                         )
                     }
-                    if (gnss.jammingAlert) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Jamming Alert",
-                            tint = RoseCritical
-                        )
+                    TextButton(
+                        onClick = onResetAgcBaseline,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = CyanTertiary)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = if (isCs) "Kalibrovat" else "Reset AGC", fontSize = 11.sp, color = CyanTertiary)
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -399,7 +442,7 @@ fun GnssTab(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (isCs) "Interferenční index: ${String.format("%.1f", gnss.agcInterferenceScore)}%" else "Interference index: ${String.format("%.1f", gnss.agcInterferenceScore)}%",
+                        text = if (isCs) "Interferenční index: ${String.format(Locale.US, "%.1f", gnss.agcInterferenceScore)}%" else "Interference index: ${String.format(Locale.US, "%.1f", gnss.agcInterferenceScore)}%",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
@@ -414,7 +457,7 @@ fun GnssTab(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // RAW GNSS MEASUREMENTS & NMEA STREAM (Release v1.1 enhancement)
+        // RAW GNSS MEASUREMENTS & NMEA STREAM
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -439,7 +482,7 @@ fun GnssTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "Dopplerův posuv" else "Doppler Shift", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = gnss.rawDopplerHz?.let { "${String.format("%.1f", it)} Hz" } ?: "N/A",
+                            text = gnss.rawDopplerHz?.let { "${String.format(Locale.US, "%.1f", it)} Hz" } ?: "N/A",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -449,7 +492,7 @@ fun GnssTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "ADR fázový stav" else "ADR Phase Fixes", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${gnss.adrValidCount} satelitů",
+                            text = if (isCs) "${gnss.adrValidCount} satelitů" else "${gnss.adrValidCount} sats",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -484,7 +527,6 @@ fun GnssTab(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Small VUT Logo at the bottom
         Box(
             modifier = Modifier
                 .fillMaxWidth()

@@ -30,15 +30,54 @@ class CellularTelemetryEngine(
 
     private var pingJob: Job? = null
     private var scanJob: Job? = null
+    @Volatile
     private var isRunning = false
+    @Volatile
+    private var pingEnabled = true
+    @Volatile
+    private var taMultiplierMode = 2
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val rfDispatcher = Dispatchers.IO.limitedParallelism(1)
+    @Volatile
+    private var lastReadMs = 0L
+
+    private data class ActiveCarrierChannel(
+        val networkType: Int,
+        val band: Int,
+        val bandwidthKhz: Int
+    )
+
+    @Volatile
+    private var lastOverrideNetworkType: Int = 0
+    @Volatile
+    private var activeCarrierChannels: List<ActiveCarrierChannel> = emptyList()
 
     private var telephonyCallback: Any? = null
     private var phoneStateListener: PhoneStateListener? = null
 
+    fun setPingEnabled(enabled: Boolean) {
+        if (pingEnabled == enabled) return
+        pingEnabled = enabled
+        if (enabled && isRunning && pingJob?.isActive != true) {
+            startPingMonitor()
+        } else if (!enabled) {
+            pingJob?.cancel()
+            pingJob = null
+            _cellularState.value = _cellularState.value.copy(pingRttMs = null, pingPacketLoss = false)
+        }
+    }
+
+    fun setTaMultiplierMode(mode: Int) {
+        taMultiplierMode = mode
+    }
+
     fun start() {
         if (isRunning) return
         isRunning = true
-        startPingMonitor()
+        if (pingEnabled) {
+            startPingMonitor()
+        }
         registerTelephonyListeners()
         startCellScanning()
     }
@@ -46,15 +85,17 @@ class CellularTelemetryEngine(
     fun stop() {
         isRunning = false
         pingJob?.cancel()
+        pingJob = null
         scanJob?.cancel()
+        scanJob = null
         unregisterTelephonyListeners()
     }
 
     private fun startPingMonitor() {
         pingJob?.cancel()
         pingJob = scope.launch(Dispatchers.IO) {
-            while (isActive && isRunning) {
-                val pingResult = measureSocketPing("8.8.8.8", 53, 2000)
+            while (isActive && isRunning && pingEnabled) {
+                val pingResult = measureSocketPing(byteArrayOf(8, 8, 8, 8), 53, 2000)
                 _cellularState.value = _cellularState.value.copy(
                     pingRttMs = pingResult.first,
                     pingPacketLoss = pingResult.second
@@ -64,13 +105,14 @@ class CellularTelemetryEngine(
         }
     }
 
-    private fun measureSocketPing(host: String, port: Int, timeoutMs: Int): Pair<Long?, Boolean> {
+    private fun measureSocketPing(ipBytes: ByteArray, port: Int, timeoutMs: Int): Pair<Long?, Boolean> {
         return try {
+            val addr = InetAddress.getByAddress(ipBytes)
             val startTime = SystemClock.elapsedRealtime()
-            val socket = Socket()
-            socket.connect(InetSocketAddress(InetAddress.getByName(host), port), timeoutMs)
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(addr, port), timeoutMs)
+            }
             val rtt = SystemClock.elapsedRealtime() - startTime
-            socket.close()
             Pair(rtt, false)
         } catch (e: Exception) {
             Pair(null, true)
@@ -85,16 +127,33 @@ class CellularTelemetryEngine(
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val cb = object : TelephonyCallback(), TelephonyCallback.CellInfoListener, TelephonyCallback.SignalStrengthsListener {
+                val cb = object : TelephonyCallback(),
+                    TelephonyCallback.CellInfoListener,
+                    TelephonyCallback.SignalStrengthsListener,
+                    TelephonyCallback.DisplayInfoListener,
+                    TelephonyCallback.PhysicalChannelConfigListener {
                     override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>) {
-                        scope.launch(Dispatchers.Default) {
-                            readCellularTelemetry(cellInfo)
-                        }
+                        scheduleRead(cellInfo, force = false)
                     }
 
                     override fun onSignalStrengthsChanged(signalStrength: SignalStrength) {
-                        scope.launch(Dispatchers.Default) {
-                            readCellularTelemetry()
+                        scheduleRead(null, force = false)
+                    }
+
+                    override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
+                        lastOverrideNetworkType = telephonyDisplayInfo.overrideNetworkType
+                    }
+
+                    override fun onPhysicalChannelConfigChanged(configs: MutableList<PhysicalChannelConfig>) {
+                        activeCarrierChannels = configs.mapNotNull { cfg ->
+                            val bw = cfg.cellBandwidthDownlinkKhz
+                            if (bw > 0) {
+                                ActiveCarrierChannel(
+                                    networkType = cfg.networkType,
+                                    band = cfg.band,
+                                    bandwidthKhz = bw
+                                )
+                            } else null
                         }
                     }
                 }
@@ -105,16 +164,12 @@ class CellularTelemetryEngine(
                 val listener = object : PhoneStateListener() {
                     @Deprecated("Deprecated in Java")
                     override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>?) {
-                        scope.launch(Dispatchers.Default) {
-                            readCellularTelemetry(cellInfo)
-                        }
+                        scheduleRead(cellInfo, force = false)
                     }
 
                     @Deprecated("Deprecated in Java")
                     override fun onSignalStrengthsChanged(signalStrength: SignalStrength?) {
-                        scope.launch(Dispatchers.Default) {
-                            readCellularTelemetry()
-                        }
+                        scheduleRead(null, force = false)
                     }
                 }
                 @Suppress("DEPRECATION")
@@ -144,12 +199,21 @@ class CellularTelemetryEngine(
 
     private fun startCellScanning() {
         scanJob?.cancel()
-        scanJob = scope.launch(Dispatchers.IO) {
+        scanJob = scope.launch(rfDispatcher) {
             while (isActive && isRunning) {
                 triggerFreshCellUpdate()
-                readCellularTelemetry()
+                readCellularTelemetry(providedCells = null, force = true)
                 delay(1000)
             }
+        }
+    }
+
+    private fun scheduleRead(providedCells: List<CellInfo>? = null, force: Boolean = false) {
+        if (!isRunning) return
+        val nowMs = SystemClock.elapsedRealtime()
+        if (!force && nowMs - lastReadMs < 450L) return
+        scope.launch(rfDispatcher) {
+            readCellularTelemetry(providedCells, force)
         }
     }
 
@@ -183,9 +247,7 @@ class CellularTelemetryEngine(
                 try {
                     mgr.requestCellInfoUpdate(context.mainExecutor, object : TelephonyManager.CellInfoCallback() {
                         override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
-                            scope.launch(Dispatchers.Default) {
-                                readCellularTelemetry(cellInfo)
-                            }
+                            scheduleRead(cellInfo, force = false)
                         }
                     })
                 } catch (e: Exception) {
@@ -205,11 +267,17 @@ class CellularTelemetryEngine(
     }
 
     @Suppress("DEPRECATION")
-    private fun readCellularTelemetry(providedCells: List<CellInfo>? = null) {
+    private fun readCellularTelemetry(providedCells: List<CellInfo>? = null, force: Boolean = false) {
         val tm = telephonyManager ?: return
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return
         }
+
+        val nowMs = SystemClock.elapsedRealtime()
+        if (!force && nowMs - lastReadMs < 450L) {
+            return
+        }
+        lastReadMs = nowMs
 
         try {
             val allCellInfo = providedCells ?: tm.allCellInfo ?: emptyList()
@@ -407,6 +475,7 @@ class CellularTelemetryEngine(
         var rsrq: Int? = null
         var rssi: Int? = null
         var sinr: Float? = null
+        var cqi: Int? = null
         var ssRsrp: Int? = null
         var ssRsrq: Int? = null
         var ssSinr: Float? = null
@@ -449,8 +518,9 @@ class CellularTelemetryEngine(
                     val ss = servingCell.cellSignalStrength
                     rsrp = BandMapper.sanitizeMetric(ss.rsrp)
                     rsrq = BandMapper.sanitizeMetric(ss.rsrq)
-                    rssi = BandMapper.sanitizeMetric(ss.rssi)
+                    rssi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) BandMapper.sanitizeMetric(ss.rssi) else null
                     sinr = BandMapper.sanitizeSinr(ss.rssnr.toDouble())
+                    cqi = ss.cqi.takeIf { it in 1..15 }
                     ta = if (ss.timingAdvance in 0..1282) ss.timingAdvance else null
                     servingRsrp = rsrp
                 }
@@ -526,8 +596,13 @@ class CellularTelemetryEngine(
             }
         } else {
             // Secondary SIM or active data SIM where modem hasn't reported CellInfo in allCellInfo:
+            val canReadPhoneState = ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.READ_PHONE_STATE
+            ) == PackageManager.PERMISSION_GRANTED
+
             // 1. Try resolving CellIdentity from ServiceState (API 30+ / Android 11+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && canReadPhoneState) {
                 try {
                     val sState = tm.serviceState
                     val regList = sState?.networkRegistrationInfoList ?: emptyList()
@@ -590,7 +665,7 @@ class CellularTelemetryEngine(
 
             // 2. Extract hardware SignalStrength directly from subTm
             try {
-                val ss = tm.signalStrength
+                val ss = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) tm.signalStrength else null
                 if (ss != null) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         for (css in ss.cellSignalStrengths) {
@@ -622,11 +697,8 @@ class CellularTelemetryEngine(
                         }
                     }
                 }
-                if (tech == "Searching") {
+                if (tech == "Searching" && canReadPhoneState) {
                     tech = getNetworkTypeDescription(tm.dataNetworkType.takeIf { it != TelephonyManager.NETWORK_TYPE_UNKNOWN } ?: tm.voiceNetworkType)
-                }
-                if (rsrp == null) {
-                    rsrp = -92
                 }
                 servingRsrp = rsrp
 
@@ -657,7 +729,7 @@ class CellularTelemetryEngine(
 
         // Instant 1 Hz hardware SignalStrength enrichment from subTm
         try {
-            val instantSs = tm.signalStrength
+            val instantSs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) tm.signalStrength else null
             if (instantSs != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 for (css in instantSs.cellSignalStrengths) {
                     if (css is CellSignalStrengthLte) {
@@ -665,10 +737,12 @@ class CellularTelemetryEngine(
                         val freshRsrq = BandMapper.sanitizeMetric(css.rsrq)
                         val freshRssi = BandMapper.sanitizeMetric(css.rssi)
                         val freshSinr = BandMapper.sanitizeSinr(css.rssnr.toDouble())
+                        val freshCqi = css.cqi.takeIf { it in 1..15 }
                         if (freshRsrp != null) rsrp = freshRsrp
                         if (freshRsrq != null) rsrq = freshRsrq
                         if (freshRssi != null) rssi = freshRssi
                         if (freshSinr != null) sinr = freshSinr
+                        if (freshCqi != null && cqi == null) cqi = freshCqi
                         break
                     } else if (css is CellSignalStrengthNr) {
                         val freshSsRsrp = BandMapper.sanitizeMetric(css.ssRsrp)
@@ -685,9 +759,13 @@ class CellularTelemetryEngine(
             // Signal strength query fallback
         }
 
-        // Parse neighbors
+        // Parse neighbors strictly avoiding cells assigned to serving slots or belonging to the other operator's PLMN
         for (cell in cellList) {
-            if (cell == servingCell || cell.isRegistered) continue
+            if (cell == servingCell || cell.isRegistered || cell in assignedCells) continue
+            val cellPlmn = getCellPlmn(cell)
+            if (cellPlmn.isNotEmpty() && !isCellCompatible(cell, targetPlmn, knownTargetMnc, targetCarrier)) {
+                continue
+            }
             var nTech = "LTE"
             var nPci = 0
             var nArfcn = 0
@@ -738,7 +816,82 @@ class CellularTelemetryEngine(
         }
 
         // Distance from Timing Advance
-        val estimatedDist = ta?.let { BandMapper.calculateLteDistanceMeters(it, multiplierMode = 2) }
+        val estimatedDist = ta?.let { BandMapper.calculateLteDistanceMeters(it, multiplierMode = taMultiplierMode) }
+
+        // Bandwidth & Aggregated CA Bandwidth (5G NR + LTE-A via ServiceState.cellBandwidths & PhysicalChannelConfig)
+        val hasPhoneStatePerm = ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.READ_PHONE_STATE
+        ) == PackageManager.PERMISSION_GRANTED
+        val serviceStateBandwidthsKhz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && hasPhoneStatePerm) {
+            try {
+                tm.serviceState?.cellBandwidths?.filter { it > 0 } ?: emptyList()
+            } catch (_: Exception) { emptyList() }
+        } else emptyList()
+
+        val channelsSnapshot = if (isDataActive) activeCarrierChannels else emptyList()
+        if (bandwidthKhz == null) {
+            bandwidthKhz = when {
+                tech.contains("5G") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                    channelsSnapshot.firstOrNull { it.networkType == TelephonyManager.NETWORK_TYPE_NR }?.bandwidthKhz
+                        ?: serviceStateBandwidthsKhz.maxOrNull()
+                else -> channelsSnapshot.firstOrNull()?.bandwidthKhz ?: serviceStateBandwidthsKhz.firstOrNull()
+            }
+        }
+
+        val totalAggregatedBwKhz: Int? = when {
+            channelsSnapshot.size > 1 -> channelsSnapshot.sumOf { it.bandwidthKhz }
+            serviceStateBandwidthsKhz.size > 1 -> serviceStateBandwidthsKhz.sum()
+            else -> null
+        }
+
+        // Carrier Aggregation / 5G EN-DC summary
+        val registeredCompatibleBands = cellList
+            .filter { it.isRegistered && isCellCompatible(it, targetPlmn, knownTargetMnc, targetCarrier) }
+            .mapNotNull { c ->
+                when (c) {
+                    is CellInfoLte -> BandMapper.lteEarfcnToBand(c.cellIdentity.earfcn).substringBefore(" ").takeIf { it.startsWith("B") }
+                    else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && c is CellInfoNr) {
+                        val id = c.cellIdentity as? CellIdentityNr
+                        id?.let { BandMapper.nrArfcnToBand(it.nrarfcn).substringBefore(" ") }
+                    } else null
+                }
+            }.distinct()
+
+        val caPhysicalLabels = channelsSnapshot.mapNotNull { ch ->
+            if (ch.band > 0) {
+                val isNrChannel = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ch.networkType == TelephonyManager.NETWORK_TYPE_NR
+                val prefix = if (isNrChannel) "n" else "B"
+                "$prefix${ch.band} (${ch.bandwidthKhz / 1000}M)"
+            } else null
+        }.distinct()
+
+        val combinedCaBands = if (caPhysicalLabels.size > 1) caPhysicalLabels else registeredCompatibleBands
+        val totalBwSuffix = totalAggregatedBwKhz?.let { " • ${it / 1000} MHz" } ?: ""
+
+        val caSummary: String? = when {
+            isDataActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                lastOverrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA -> {
+                val anchor = band.substringBefore(" ")
+                if (combinedCaBands.size > 1) "5G NSA EN-DC (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
+                else "5G NSA EN-DC ($anchor$totalBwSuffix)"
+            }
+            isDataActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                lastOverrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED -> {
+                if (combinedCaBands.size > 1) "5G+ NR CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
+                else "5G+ NR Carrier Aggregation$totalBwSuffix"
+            }
+            isDataActive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                lastOverrideNetworkType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA -> {
+                if (combinedCaBands.size > 1) "LTE-A ${combinedCaBands.size}CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
+                else "LTE-A Carrier Aggregation$totalBwSuffix"
+            }
+            combinedCaBands.size > 1 -> {
+                "${combinedCaBands.size}CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
+            }
+            totalAggregatedBwKhz != null -> "CA Aggregated (${totalAggregatedBwKhz / 1000} MHz)"
+            else -> null
+        }
 
         // Anomaly & Rogue BTS detector
         val detectedAnomalies = BandMapper.detectCellularAnomalies(
@@ -760,6 +913,8 @@ class CellularTelemetryEngine(
             displayName = operatorName,
             operatorAlpha = operatorName,
             networkGen = tech,
+            carrierAggregationSummary = caSummary,
+            totalAggregatedBandwidthKhz = totalAggregatedBwKhz,
             isServing = servingCell != null || (rsrp != null && rsrp > -140),
             isDataActive = isDataActive,
             plmn = plmn,
@@ -777,6 +932,7 @@ class CellularTelemetryEngine(
             rsrq = rsrq,
             rssi = rssi,
             sinr = sinr,
+            cqi = cqi,
             ssRsrp = ssRsrp,
             ssRsrq = ssRsrq,
             ssSinr = ssSinr,

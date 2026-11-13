@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -86,7 +85,7 @@ fun AboutAndHelpDialog(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Release v1.2",
+                                    text = "Release v1.3",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldSignal
@@ -137,7 +136,7 @@ fun AboutAndHelpDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Release v1.2 New Features Box
+                // Release v1.3 New Features Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -146,7 +145,7 @@ fun AboutAndHelpDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = if (isCs) "✨ Novinky verze 1.2 (Release v1.2)" else "✨ What's New in Release v1.2",
+                            text = if (isCs) "✨ Novinky verze 1.3 (Release v1.3)" else "✨ What's New in Release v1.3",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
@@ -154,9 +153,9 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "• Skyplot Radar: nový přepínač režimů [Podle konstelace] (GPS, Galileo, GLONASS, BeiDou) a [Podle síly C/N₀] se synchronizovanou legendou, září fixu a L5/E5a kroužky\n• Korekce DOP: při absenci 3D fixu (< 4 satelity) se zobrazuje pomlčka „—“ (v CSV „-“) namísto degradované hodnoty 9\n• Dual SIM & DSDS: přesné rozlišení datové SIM (RRC Connected) vs. pohotovostního režimu pro hovory (DSDS Standby / RRC Idle) a přepínač zobrazení SIM 1 / SIM 2 / Obě SIM\n• Grafy: současné real-time vykreslování RSRP křivek pro SIM 1 i SIM 2 vedle sebe na společné škále\n• Historie: přímé uložení do složky Stažené (Downloads) bez cloudu i systémové sdílení\n• Android 14/15: optimalizace prediktivního gesta zpět (OnBackInvokedCallback)"
+                                "• Stabilita & Výdrž baterie: chytré pozastavení GPS/senzorů na pozadí bez aktivního záznamu, průběžné ukládání relace proti pádu, neomezený WakeLock, filtr GPS driftu v režimu Vzdálenost a živá změna nastavení za běhu\n• Waypointy & Stopky: tlačítko [+ Značka] pro označení bodu zájmu v terénu + stopky, ujetá vzdálenost a počítadlo handoverů (HO)\n• Měřič RF bez falešných hodnot: reálné CQI z modemu, detekce Carrier Aggregation (CA / 5G EN-DC), TTFF (doba prvního fixu), geoid N (WGS84 vs MSL) a kalibrace AGC\n• Interaktivní SkyPlot & Grafy: klepnutím na satelit zobrazíte detail, grafy s dotykovým odečtem hodnot, automatickou osou Y (60+ satelitů) a novými grafy SINR, PDOP a AGC\n• Profily & Tmavá mapa: tmavý noční filtr OpenStreetMap, opravený zoom při přehrávání, klikatelné značky, souhrnná statistika relace, GPX 1.1 a vícebarevné RSRP KML streamované do Downloads\n• Tlačítko Ukončit: v horní liště pro kompletní bezpečné ukončení aplikace i služeb"
                             } else {
-                                "• Skyplot Radar: mode switcher [By Constellation] (GPS, Galileo, GLONASS, BeiDou) vs [By C/N₀ Signal] with synchronized legend, fix glow, and L5/E5a ring highlights\n• DOP Correction: shows dash '—' (in CSV '-') when 3D fix is unavailable (< 4 satellites) instead of degraded value 9\n• Dual SIM & DSDS: accurate distinction of active data SIM (RRC Connected) vs standby voice SIM (DSDS Standby / RRC Idle) with dedicated SIM 1 / SIM 2 / Both selector\n• Charts: simultaneous real-time RSRP curves for both SIM 1 & SIM 2 side-by-side\n• History: direct offline download to device Downloads folder and system share sheet\n• Android 14/15: OnBackInvokedCallback predictive back optimization"
+                                "• Stability & Battery Endurance: smart lifecycle pause when backgrounded without logging, crash-safe progress checkpoints, continuous WakeLock, distance static drift filter, and live settings reload\n• Field Waypoints & HUD Timer: [+ Mark] waypoint tagging button, live chronometer, distance counter, and handover (HO) tracking\n• Honest RF/GNSS Telemetry: real modem LTE CQI, Carrier Aggregation (CA / 5G EN-DC) badges, GNSS TTFF timer, Geoid separation N (WGS84 vs MSL), and Reset AGC baseline\n• Interactive SkyPlot & Charts: tap satellites on radar to inspect, touch-drag crosshair scrubbing, dynamic Y-scaling (60+ sats), plus SINR, PDOP, and AGC waveforms\n• Night Map & Streaming Export: Dark OSM tile filter, fixed zoom stability during replay, clickable markers, session analytics card, GPX 1.1 & multi-color RSRP KML\n• Power Exit Button: clean shutdown action in the top app bar"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark
@@ -166,7 +165,6 @@ fun AboutAndHelpDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Detailní nápověda co jak funguje a k čemu slouží
                 Text(
                     text = if (isCs) "Struktura aplikace a popis funkcí" else "Application Features & Architecture",
                     style = MaterialTheme.typography.titleSmall,
@@ -177,62 +175,62 @@ fun AboutAndHelpDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 HelpSection(
-                    title = if (isCs) "1. Měření (Přehled)" else "1. Measurement (Overview HUD)",
+                    title = if (isCs) "1. Měření (Přehled HUD & Waypointy)" else "1. Measurement (Overview HUD & Waypoints)",
                     body = if (isCs) {
-                        "Centrální přístrojový štít (HUD). Umožňuje spustit, pozastavit a zastavit ukládání telemetrických vzorků s WakeLock zámkem na pozadí. Tlačítkem „Položky“ můžete zvolit přesnou matici parametrů (GNSS, RF, Sousedé, Senzory, Ping). Zobrazuje okamžitou rychlost, přesnost, výšku, azimut, DOP geometrii (s pomlčkou „—“ při absenci fixu) a stav obou SIM karet s barevnými bargrafy síly signálu."
+                        "Centrální přístrojový štít. Spouští, pozastavuje a zastavuje záznam na pozadí, zobrazuje stopky relace, ujetou vzdálenost a počet handoverů (HO). Během měření umožňuje tlačítkem „Značka“ vložit bod zájmu (tunel, rušení, BTS). Upozorní na systémovou optimalizaci baterie."
                     } else {
-                        "Main instrument telemetry HUD. Allows you to Start, Pause, Resume, and Stop logging telemetry samples with background CPU WakeLock. The 'Fields' button lets you configure which parameter groups are recorded (GNSS, RF, Neighbors, Sensors, Ping). Shows speed, accuracy, altitude, azimuth, DOP geometry (with '—' dash when fix is lost), and stacked Dual-SIM cards with live signal bargraphs."
+                        "Main telemetry cockpit. Starts, pauses, and stops foreground recording with session chronometer, distance counter, and handover counter. Insert custom terrain waypoints on the fly and configure exact recorded telemetry fields."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "2. Mobily (RF parametry & 5G/LTE)" else "2. Cellular RF (LTE & 5G NR)",
+                    title = if (isCs) "2. Mobily (RF parametry, CA & Spoofing)" else "2. Cellular RF (LTE, 5G & CA)",
                     body = if (isCs) {
-                        "Detailní analýza obsluhujících a sousedních buněk s horním přepínačem [SIM 1], [SIM 2] a [Obě SIM]. Rozlišuje aktivní datové spojení od pohotovostního režimu DSDS Standby. Rozpad Cell ID na eNodeB ID a Sektor ID (LTE) a gNodeB ID a Sektor ID (5G). Zobrazení nosných v MHz, šířky kanálu a rozpadu 5G NR metrik (SS vs. CSI). Výpočet vzdálenosti k BTS věži přes Timing Advance (TA) s volitelnou 1× (78m) i 2× (156m) kalibrací a detektor anomálií / IMSI Catcheru."
+                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Rozpoznává Carrier Aggregation (LTE-A CA, 5G NSA EN-DC), reálné CQI, rozpad ECI/NCI na eNodeB/gNodeB + sektor, Timing Advance vzdálenost k BTS (kalibrace 1× nebo 2×) a detekuje 2G downgrade či anomálie IMSI Catcheru."
                     } else {
-                        "In-depth serving and neighbor cell monitor with top switcher [SIM 1], [SIM 2], and [Both SIMs]. Clearly distinguishes active data connection from DSDS Standby mode. Decodes Cell IDs into eNodeB/gNodeB and Sector IDs. Calculates Downlink/Uplink frequencies in MHz, channel bandwidth, and split 5G NR metrology (SS vs. CSI). Timing Advance (TA) BTS distance calculation and cell spoofing/anomaly detector."
+                        "Dual-SIM radio analyzer displaying Carrier Aggregation (LTE-A CA, 5G NSA EN-DC), real modem CQI, decoded eNodeB/gNodeB + Sector IDs, Timing Advance BTS distance, and IMSI Catcher / 2G downgrade anomaly alerts."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "3. Satelity (GNSS, SkyPlot & AGC Jamming)" else "3. Satellites (GNSS, SkyPlot & AGC Jamming)",
+                    title = if (isCs) "3. Satelity (SkyPlot, TTFF & AGC Monitor)" else "3. Satellites (SkyPlot, TTFF & AGC Monitor)",
                     body = if (isCs) {
-                        "Multi-systémový příjem (GPS, Galileo, GLONASS, BeiDou, QZSS). Tři podzáložky: Skyplot radar s přepínáním zobrazení [Podle konstelace] vs. [Podle síly C/N₀] se synchronizovanou legendou, Signály C/N0 (sloupcové grafy v dB-Hz) a Podrobná tabulka se všemi satelity. Zahrnuje filtry (Všechny, Pouze L5, GPS, Galileo) a AGC Jamming Monitor detekující rušení a propad zisku předzesilovače."
+                        "Multi-konstelační příjem (GPS, Galileo, GLONASS, BeiDou) s pásmy L1/E1 i L5/E5a. Klepnutím na satelit na radaru zobrazíte detail C/N0 a azimutu/elevace. Měří dobu prvního fixu (TTFF), geoidní separaci N a hladinu rušení AGC s tlačítkem Kalibrovat."
                     } else {
-                        "Multi-constellation tracking (GPS, Galileo, GLONASS, BeiDou, QZSS). Three sub-tabs: Skyplot radar with color mode switcher [By Constellation] vs [By C/N₀ Signal] and dynamic synchronized legend, C/N0 signals (dB-Hz bar charts), and Detailed satellite table. Includes constellation filters and AGC Jamming Monitor detecting receiver gain drops."
+                        "Multi-constellation L1+L5 receiver monitor. Tap any satellite dot on the radar for detailed C/N0, elevation, and azimuth. Tracks TTFF, Geoid separation, DOP factors, NMEA/Doppler raw data, and AGC jamming index with baseline calibration."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "4. Mapa (OpenStreetMap)" else "4. Map (OpenStreetMap)",
+                    title = if (isCs) "4. Mapa (OpenStreetMap & Živá barevná trasa)" else "4. Map (OpenStreetMap & Live Heatmap)",
                     body = if (isCs) {
-                        "Offline OpenStreetMap zobrazení bez jakýchkoliv externích API klíčů s optimalizovanými tlačítky zoomu (+/-). Horní přepínač umožňuje filtrovat a obarvovat trasu podle: RSRP signálu, Rychlosti, Počtu satelitů nebo PDOP. Obsahuje plovoucí legendu a azurové tlačítko vycentrování."
+                        "OpenStreetMap bez API klíčů s tmavým/světlým režimem a auto-sledováním. Živá trasa se sbírá průběžně na pozadí i při prohlížení jiných karet a barevně se vykresluje podle RSRP (S1/S2), rychlosti, satelitů i PDOP stejně jako záznamy z Historie."
                     } else {
-                        "Offline OpenStreetMap view without any proprietary API keys with optimized zoom controls (+/-). Top switcher allows track color-coding by: RSRP Signal, Speed, Satellite count, or PDOP. Includes dynamic floating legend and recenter FAB."
+                        "OpenStreetMap view with dark night-mode filter and auto-follow. Records live trail continuously in background across tabs and renders color-coded tracks by RSRP (S1/S2), Speed, Satellites, or PDOP both live and in replay."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "5. Grafy (Časové řady & IMU)" else "5. Charts (Time Series & IMU)",
+                    title = if (isCs) "5. Grafy (Živé i Historické křivky)" else "5. Charts (Live & Historical Waveforms)",
                     body = if (isCs) {
-                        "Průběhy v reálném čase: současné srovnání RSRP signálu obou operátorů pro SIM 1 (tyrkysová) i SIM 2 (oranžová) vedle sebe, rychlost, počet satelitů ve fixu, Socket Ping odezva na 8.8.8.8 a pohybové senzory (Akcelerometr v m/s², Gyroskop v rad/s a Magnetický kompas 0–360°)."
+                        "Interaktivní grafy s dotykovým odečtem hodnot a dynamickou osou Y: RSRP (SIM 1 vs SIM 2), SINR (SIM 1 vs SIM 2), rychlost, satelity, PDOP, AGC rušení, Ping RTT, IMU senzory a teplota baterie. Lze otevřít i pro libovolnou uloženou relaci z Historie."
                     } else {
-                        "Real-time waveforms: simultaneous comparative RSRP signal curves for SIM 1 (cyan) and SIM 2 (amber) side-by-side, speed, satellites in fix, Socket ping latency to 8.8.8.8, and hardware motion sensors (Accelerometer m/s², Gyroscope rad/s, and Magnetic compass 0–360°)."
+                        "Interactive touch-scrubbing charts with dynamic Y-axis scaling: dual-SIM RSRP & SINR, speed, satellites, PDOP, AGC interference, ping latency, IMU motion, and battery temperature. Available both live and for past sessions."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "6. Historie (Přejmenování, Inspekce & Export)" else "6. History (Rename, Point Inspector & Export)",
+                    title = if (isCs) "6. Historie (Analytika, Skok na bod & Export)" else "6. History (Analytics, Point Jump & Export)",
                     body = if (isCs) {
-                        "Správce relací v lokální SQLite databázi. Umožňuje přejmenovat měření, otevřít detailní prohlížeč pro procházení a mazání bod po bodu, zobrazit stopu na mapě, uložit přímo do složky Stažené (Downloads) v telefonu bez cloudu nebo exportovat a sdílet přes CSV, 3D KML (Google Earth) a GeoJSON (QGIS)."
+                        "Lokální databáze relací se souhrnnou statistikou (min/prům/max RSRP, podíl 5G/4G, průměrný PDOP), bodovým prohlížečem (klepnutím na konkrétní bod jej ihned vycentrujete na Mapě) a streamovaným exportem do CSV (plné sloupce SIM 2), 3D KML, GPX 1.1 a GeoJSON do Downloads."
                     } else {
-                        "Session manager in local SQLite Room database. Rename sessions, open the point-by-point sample inspector to view or delete samples, replay tracks on the map, save files directly to device Downloads folder without cloud, or export and share via CSV, 3D KML (Google Earth), and GeoJSON (QGIS)."
+                        "Local session manager with analytics summary, point-by-point inspector (tap any point to jump directly to its location on the Map), and memory-safe streaming export to CSV (full SIM 2 & waypoint columns), 3D KML, GPX 1.1, and GeoJSON directly to Downloads."
                     }
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Security & Play Protect Note
+                // Security & Privacy Note
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -243,7 +241,7 @@ fun AboutAndHelpDialog(
                             Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = EmeraldSignal, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isCs) "Bezpečnost & Google Play Protect" else "Security & Google Play Protect",
+                                text = if (isCs) "Ochrana soukromí & Lokální uložení" else "Privacy & Local-First Design",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = EmeraldSignal
@@ -252,9 +250,9 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "Aplikace nevyžaduje ani nevyužívá invazivní oprávnění READ_PHONE_STATE (žádný přístup k hovorům, kontaktům ani IMEI). Všechna data o BTS buňkách jsou v Androidu navázána na geolokaci (ACCESS_FINE_LOCATION) a ukládají se výhradně na Vašem zařízení."
+                                "Veškerá naměřená data zůstávají výhradně v lokální databázi zařízení bez cloudu a analytik. Oprávnění READ_PHONE_STATE se využívá pouze ke čtení názvu operátora u Dual SIM slotů (žádný přístup k hovorům, SMS ani kontaktům); RF buňky jsou vázány na polohu (ACCESS_FINE_LOCATION)."
                             } else {
-                                "The app does not require or request sensitive READ_PHONE_STATE permission (zero access to calls, contacts, or IMEI). All cellular cell tower parameters are tied to Android geocoding (ACCESS_FINE_LOCATION) and stored locally on your device."
+                                "All telemetry stays strictly in your local SQLite database with zero cloud uploads or analytics. READ_PHONE_STATE is used solely to resolve Dual-SIM carrier labels (zero access to calls, SMS, or contacts); cell tower metrics rely on ACCESS_FINE_LOCATION."
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark

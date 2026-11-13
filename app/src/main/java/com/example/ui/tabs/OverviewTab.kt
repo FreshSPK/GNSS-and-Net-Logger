@@ -1,5 +1,7 @@
 package com.example.ui.tabs
 
+import android.content.Context
+import android.os.PowerManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -7,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -16,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
@@ -26,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.*
 import com.example.ui.theme.*
+import kotlinx.coroutines.delay
+import java.util.Locale
 
 @Composable
 fun OverviewTab(
@@ -35,16 +42,46 @@ fun OverviewTab(
     isLogging: Boolean,
     isPaused: Boolean,
     loggedPoints: Int,
+    sessionStartTimeMs: Long? = null,
+    sessionDistanceMeters: Double = 0.0,
+    handoverCount: Int = 0,
     fieldsSelection: LoggedFieldsSelection,
     lang: String,
     onStartLogging: () -> Unit,
     onPauseLogging: () -> Unit,
     onResumeLogging: () -> Unit,
     onStopLogging: () -> Unit,
+    onAddWaypoint: (String) -> Unit = {},
+    onOpenBatterySettings: () -> Unit = {},
     onUpdateFieldsSelection: (LoggedFieldsSelection) -> Unit
 ) {
     val isCs = lang != "EN"
+    val context = LocalContext.current
     var showFieldsDialog by remember { mutableStateOf(false) }
+    var showWaypointDialog by remember { mutableStateOf(false) }
+    var waypointNoteInput by remember { mutableStateOf("") }
+
+    // Live session chronometer
+    var elapsedSec by remember { mutableStateOf(0L) }
+    LaunchedEffect(isLogging, sessionStartTimeMs) {
+        if (isLogging && sessionStartTimeMs != null) {
+            while (true) {
+                elapsedSec = ((System.currentTimeMillis() - sessionStartTimeMs) / 1000L).coerceAtLeast(0L)
+                delay(1000L)
+            }
+        } else {
+            elapsedSec = 0L
+        }
+    }
+
+    val isBatteryOptIgnored = remember {
+        try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true
+        } catch (_: Exception) {
+            true
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -52,7 +89,7 @@ fun OverviewTab(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        // Logging Control Banner (Start, Pause, Resume, Stop + Log Fields selector)
+        // Logging Control Banner (Start, Pause, Resume, Stop, Waypoint + Chronometer)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -75,7 +112,7 @@ fun OverviewTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
@@ -106,11 +143,21 @@ fun OverviewTab(
                             )
                         }
                         if (isLogging) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            val hrs = elapsedSec / 3600
+                            val mins = (elapsedSec % 3600) / 60
+                            val secs = elapsedSec % 60
+                            val timerStr = String.format(Locale.US, "%02d:%02d:%02d", hrs, mins, secs)
+                            val distStr = String.format(Locale.US, "%.2f km", sessionDistanceMeters / 1000.0)
                             Text(
-                                text = if (isCs) "Uloženo vzorků: $loggedPoints" else "Recorded samples: $loggedPoints",
+                                text = if (isCs) {
+                                    "$timerStr  •  Vzorků: $loggedPoints  •  $distStr  •  HO: $handoverCount"
+                                } else {
+                                    "$timerStr  •  Samples: $loggedPoints  •  $distStr  •  HO: $handoverCount"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontFamily = FontFamily.Monospace,
+                                color = TextPrimaryDark
                             )
                         }
                     }
@@ -127,29 +174,57 @@ fun OverviewTab(
                     }
                 }
 
+                if (!isBatteryOptIgnored) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        onClick = onOpenBatterySettings,
+                        modifier = Modifier.fillMaxWidth().testTag("battery_opt_button"),
+                        shape = RoundedCornerShape(10.dp),
+                        color = AmberWarning.copy(alpha = 0.14f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(imageVector = Icons.Default.BatteryAlert, contentDescription = null, tint = AmberWarning, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isCs) {
+                                    "Optimalizace baterie může ukončit logování na pozadí • Klepněte pro povolení"
+                                } else {
+                                    "Battery optimization may kill background logging • Tap to allow unrestricted"
+                                },
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = AmberWarning,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Control Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (!isLogging) {
-                        Button(
-                            onClick = onStartLogging,
-                            modifier = Modifier.fillMaxWidth().testTag("start_logging_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp), tint = DarkSlate900)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isCs) "ZAHÁJIT ZÁZNAM MĚŘENÍ" else "START FIELD LOGGING",
-                                fontWeight = FontWeight.Bold,
-                                color = DarkSlate900
-                            )
-                        }
-                    } else {
+                if (!isLogging) {
+                    Button(
+                        onClick = onStartLogging,
+                        modifier = Modifier.fillMaxWidth().testTag("start_logging_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp), tint = DarkSlate900)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isCs) "ZAHÁJIT ZÁZNAM MĚŘENÍ" else "START FIELD LOGGING",
+                            fontWeight = FontWeight.Bold,
+                            color = DarkSlate900
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         // Pause / Resume
                         Button(
                             onClick = if (isPaused) onResumeLogging else onPauseLogging,
@@ -167,8 +242,24 @@ fun OverviewTab(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (isPaused) (if (isCs) "Pokračovat" else "Resume") else (if (isCs) "Pozastavit" else "Pause"),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
                             )
+                        }
+
+                        // Waypoint Marker
+                        FilledTonalButton(
+                            onClick = {
+                                waypointNoteInput = ""
+                                showWaypointDialog = true
+                            },
+                            modifier = Modifier.testTag("add_waypoint_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.AddLocationAlt, contentDescription = if (isCs) "Přidat značku" else "Add Waypoint", tint = CyanTertiary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = if (isCs) "Značka" else "Mark", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         // Stop
@@ -189,7 +280,7 @@ fun OverviewTab(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // GNSS POLOHA & RYCHLOST (Style exactly as in User screenshot image_5dc8b95e.png)
+        // GNSS POLOHA & RYCHLOST
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
@@ -201,14 +292,12 @@ fun OverviewTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isCs) "GNSS POLOHA & RYCHLOST" else "GNSS POSITION & SPEED",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = CyanTertiary
-                        )
-                    }
+                    Text(
+                        text = if (isCs) "GNSS POLOHA & RYCHLOST" else "GNSS POSITION & SPEED",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = CyanTertiary
+                    )
                     Text(
                         text = if (gnss.hasFix) (if (isCs) "3D GNSS Fix Aktivní" else "3D GNSS Fix Active") else (if (isCs) "Vyhledávání..." else "Searching..."),
                         style = MaterialTheme.typography.bodySmall,
@@ -221,9 +310,9 @@ fun OverviewTab(
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = if (isCs) "ZEMĚPÍSNÁ ŠÍŘKA" else "LATITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "ZEMĚPISNÁ ŠÍŘKA" else "LATITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = String.format("%.6f°", gnss.latitude),
+                            text = if (gnss.hasFix || gnss.latitude != 0.0) String.format(Locale.US, "%.6f°", gnss.latitude) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -231,9 +320,9 @@ fun OverviewTab(
                         )
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = if (isCs) "ZEMĚPÍSNÁ DÉLKA" else "LONGITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "ZEMĚPISNÁ DÉLKA" else "LONGITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = String.format("%.6f°", gnss.longitude),
+                            text = if (gnss.hasFix || gnss.longitude != 0.0) String.format(Locale.US, "%.6f°", gnss.longitude) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -246,42 +335,47 @@ fun OverviewTab(
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = if (isCs) "RYCHLOST (PŘESNOST)" else "SPEED (ACCURACY)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "RYCHLOST" else "SPEED", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${String.format("%.1f", gnss.speedKmh)} km/h",
+                            text = "${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             color = CyanTertiary
                         )
-                        Text(text = "±0.7 km/h", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        val spdAccStr = gnss.speedAccuracyKmh?.let { "±${String.format(Locale.US, "%.1f", it)} km/h" } ?: "—"
+                        Text(text = spdAccStr, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "HORIZ. PŘESNOST" else "HORIZ. ACCURACY", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
-                            text = "±${String.format("%.1f", gnss.horizontalAccuracyM)} m",
+                            text = if (gnss.hasFix) "±${String.format(Locale.US, "%.1f", gnss.horizontalAccuracyM)} m" else "—",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = EmeraldSignal
+                            color = if (gnss.hasFix) EmeraldSignal else TextSecondaryDark
                         )
                         Text(text = "68% interval", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = if (isCs) "VÝŠKA" else "ALTITUDE", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "VÝŠKA (MSL)" else "ALTITUDE (MSL)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${String.format("%.1f", gnss.altitudeMsl)} m",
+                            text = if (gnss.hasFix) "${String.format(Locale.US, "%.1f", gnss.altitudeMsl)} m" else "—",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             color = TextPrimaryDark
                         )
-                        Text(text = "±${String.format("%.1f", gnss.verticalAccuracyM)} m", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(
+                            text = if (gnss.hasFix && gnss.verticalAccuracyM > 0f) "±${String.format(Locale.US, "%.1f", gnss.verticalAccuracyM)} m" else "—",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                            color = TextSecondaryDark
+                        )
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = if (isCs) "AZIMUT (SMĚR)" else "AZIMUTH (BEARING)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "AZIMUT (SMĚR)" else "AZIMUTH", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${String.format("%.0f", gnss.bearingDeg)}°",
+                            text = "${String.format(Locale.US, "%.0f", gnss.bearingDeg)}°",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -321,7 +415,7 @@ fun OverviewTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "HDOP (Horizontální)" else "HDOP (Horizontal)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = if (hasValidDop && gnss.hdop > 0f) String.format("%.2f", gnss.hdop) else "—",
+                            text = if (hasValidDop && gnss.hdop > 0f) String.format(Locale.US, "%.2f", gnss.hdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -332,7 +426,7 @@ fun OverviewTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "VDOP (Vertikální)" else "VDOP (Vertical)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = if (hasValidDop && gnss.vdop > 0f) String.format("%.2f", gnss.vdop) else "—",
+                            text = if (hasValidDop && gnss.vdop > 0f) String.format(Locale.US, "%.2f", gnss.vdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -343,7 +437,7 @@ fun OverviewTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "PDOP (Prostorový 3D)" else "PDOP (Spatial 3D)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = if (hasValidDop) String.format("%.2f", gnss.pdop) else "—",
+                            text = if (hasValidDop) String.format(Locale.US, "%.2f", gnss.pdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
@@ -387,14 +481,14 @@ fun OverviewTab(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (gnss.l5Count > 0) (if (isCs) "DVOUFREKVENČNÍ PŘÍJEM L1+L5" else "DUAL-FREQUENCY FIX L1+L5") else (if (isCs) "JEDNOFREKVENČNÍ PŘÍJEM L1" else "SINGLE-FREQUENCY FIX L1"),
+                        text = if (gnss.l5Count > 0) (if (isCs) "DVOUFREKVENČNÍ PŘÍJEM (L1+L5/E5a)" else "DUAL-BAND FIX (L1+L5/E5a)") else (if (isCs) "JEDNOFREKVENČNÍ PŘÍJEM" else "SINGLE-BAND FIX"),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = if (gnss.l5Count > 0) EmeraldSignal else TextSecondaryDark
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
-                        text = "L1: ${gnss.l1Count} • L5: ${gnss.l5Count}",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        text = "L1/E1/B1/G1: ${gnss.l1Count} • L5/E5a/B2a: ${gnss.l5Count}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         fontWeight = FontWeight.Bold,
                         color = TextPrimaryDark
                     )
@@ -403,10 +497,10 @@ fun OverviewTab(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ConstellationMiniBox("GPS", gnss.constellationCountMap["GPS"], modifier = Modifier.weight(1f))
-                    ConstellationMiniBox("GLONASS", gnss.constellationCountMap["GLONASS"], modifier = Modifier.weight(1f))
-                    ConstellationMiniBox("BeiDou", gnss.constellationCountMap["BeiDou"], modifier = Modifier.weight(1f))
-                    ConstellationMiniBox("Galileo", gnss.constellationCountMap["Galileo"], modifier = Modifier.weight(1f))
+                    ConstellationMiniBox("GPS", "L1/L5", gnss.constellationCountMap["GPS"], modifier = Modifier.weight(1f))
+                    ConstellationMiniBox("GLONASS", "G1/G2", gnss.constellationCountMap["GLONASS"], modifier = Modifier.weight(1f))
+                    ConstellationMiniBox("BeiDou", "B1/B2a", gnss.constellationCountMap["BeiDou"], modifier = Modifier.weight(1f))
+                    ConstellationMiniBox("Galileo", "E1/E5a", gnss.constellationCountMap["Galileo"], modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -439,7 +533,7 @@ fun OverviewTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // SENZORY & HARDWAROVÁ TELEMETRIE (V1.1: Barometer MSL, Battery Temp, Ping)
+        // SENZORY & HARDWAROVÁ TELEMETRIE
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(14.dp),
@@ -456,37 +550,59 @@ fun OverviewTab(
 
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = if (isCs) "Tlak (QNH)" else "Baro (QNH)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        Text(text = if (isCs) "Barometr (QNH)" else "Baro (QNH)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${String.format("%.1f", env.pressureHpa ?: 1013.2f)} hPa",
+                            text = env.pressureHpa?.let { "${String.format(Locale.US, "%.1f", it)} hPa" } ?: "—",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             color = TextPrimaryDark
                         )
-                        Text(text = if (isCs) "MSL: ${String.format("%.1f", env.seaLevelPressureHpa ?: 1021.5f)} hPa" else "MSL: ${String.format("%.1f", env.seaLevelPressureHpa ?: 1021.5f)} hPa", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        Text(
+                            text = env.seaLevelPressureHpa?.let { "MSL: ${String.format(Locale.US, "%.1f", it)} hPa" }
+                                ?: (if (isCs) "Senzor nedostupný" else "Unavailable"),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                            color = TextSecondaryDark
+                        )
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "Baterie & Teplota" else "Battery & Thermal", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
                         val bTemp = env.battery.temperatureC
-                        val bColor = if (bTemp != null && bTemp >= 38f) AmberWarning else EmeraldSignal
+                        val bColor = when {
+                            bTemp == null -> TextSecondaryDark
+                            bTemp >= 38f -> AmberWarning
+                            else -> EmeraldSignal
+                        }
                         Text(
-                            text = bTemp?.let { "${String.format("%.1f", it)} °C" } ?: "30.4 °C",
+                            text = bTemp?.let { "${String.format(Locale.US, "%.1f", it)} °C" } ?: "—",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
                             color = bColor
                         )
-                        Text(text = "${env.battery.levelPct ?: 85}% • ${env.battery.voltageMv ?: 4050} mV", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
+                        val pctStr = env.battery.levelPct?.let { "$it%" } ?: "—"
+                        val voltStr = env.battery.voltageMv?.let { "$it mV" } ?: "—"
+                        Text(text = "$pctStr • $voltStr", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "Odezva (Ping)" else "Ping RTT (8.8.8.8)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                        val pingText = when {
+                            !fieldsSelection.logPing -> if (isCs) "Vypnuto" else "Off"
+                            cellular.pingRttMs != null -> "${cellular.pingRttMs} ms"
+                            cellular.pingPacketLoss -> if (isCs) "ZTRÁTA" else "LOSS"
+                            else -> "—"
+                        }
                         Text(
-                            text = cellular.pingRttMs?.let { "$it ms" } ?: (if (cellular.pingPacketLoss) "ZTRÁTA" else "28 ms"),
+                            text = pingText,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = if (cellular.pingPacketLoss) RoseCritical else EmeraldSignal
+                            color = when {
+                                !fieldsSelection.logPing -> TextSecondaryDark
+                                cellular.pingPacketLoss -> RoseCritical
+                                cellular.pingRttMs != null -> EmeraldSignal
+                                else -> TextSecondaryDark
+                            }
                         )
                         Text(text = "Socket probe :53", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -511,6 +627,61 @@ fun OverviewTab(
                     .width(100.dp)
             )
         }
+    }
+
+    // Waypoint creation dialog
+    if (showWaypointDialog) {
+        val presets = if (isCs) {
+            listOf("Ztráta signálu / Stín", "Tunel / Podjezd", "Věž BTS / Vysílač", "Rušení / Anomálie", "Kontrolní bod")
+        } else {
+            listOf("Signal Drop / Shadow", "Tunnel / Underpass", "BTS Tower", "RF Interference", "Checkpoint")
+        }
+        AlertDialog(
+            onDismissRequest = { showWaypointDialog = false },
+            title = { Text(text = if (isCs) "Vložit značku (Waypoint)" else "Insert Field Waypoint", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        text = if (isCs) "Zvolte rychlý štítek nebo napište vlastní poznámku k aktuálním souřadnicím:" else "Select a quick preset or type a custom note for the current point:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondaryDark
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    presets.chunked(2).forEach { rowPresets ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            rowPresets.forEach { preset ->
+                                AssistChip(
+                                    onClick = { waypointNoteInput = preset },
+                                    label = { Text(preset, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = waypointNoteInput,
+                        onValueChange = { waypointNoteInput = it },
+                        label = { Text(if (isCs) "Poznámka ke značce" else "Waypoint note") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onAddWaypoint(waypointNoteInput.ifBlank { if (isCs) "Značka v terénu" else "Field Waypoint" })
+                    showWaypointDialog = false
+                }) {
+                    Text(if (isCs) "Uložit značku" else "Save Mark")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWaypointDialog = false }) {
+                    Text(if (isCs) "Zrušit" else "Cancel")
+                }
+            }
+        )
     }
 
     // Modal bottom sheet / dialog for selective logging fields
@@ -574,7 +745,7 @@ fun OverviewTab(
 }
 
 @Composable
-private fun ConstellationMiniBox(name: String, counts: Pair<Int, Int>?, modifier: Modifier = Modifier) {
+private fun ConstellationMiniBox(name: String, bandCaption: String, counts: Pair<Int, Int>?, modifier: Modifier = Modifier) {
     val used = counts?.first ?: 0
     val total = counts?.second ?: 0
     Card(
@@ -594,7 +765,7 @@ private fun ConstellationMiniBox(name: String, counts: Pair<Int, Int>?, modifier
                 fontFamily = FontFamily.Monospace,
                 color = if (used > 0) EmeraldSignal else Color.Gray
             )
-            Text(text = "L1/L5", style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp), color = TextSecondaryDark)
+            Text(text = bandCaption, style = MaterialTheme.typography.bodySmall.copy(fontSize = 8.sp), color = TextSecondaryDark)
         }
     }
 }
@@ -653,10 +824,10 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Signal strength bargraph
         val rsrp = sim.rsrp ?: -120
         val normSignal = ((rsrp - (-125f)) / ((-65f) - (-125f))).coerceIn(0f, 1f)
         val barColor = when {
+            sim.rsrp == null -> TextSecondaryDark
             rsrp >= -85 -> EmeraldSignal
             rsrp >= -100 -> AmberWarning
             else -> RoseCritical
@@ -668,7 +839,7 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${sim.band} (PCI ${sim.pci})",
+                text = "${sim.band} (PCI ${if (sim.pci > 0) sim.pci else "N/A"})",
                 style = MaterialTheme.typography.bodySmall,
                 color = TextSecondaryDark
             )
@@ -684,7 +855,7 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
         Spacer(modifier = Modifier.height(4.dp))
 
         LinearProgressIndicator(
-            progress = { normSignal },
+            progress = { if (sim.rsrp != null) normSignal else 0f },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp),
@@ -699,15 +870,15 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "SINR: ${sim.sinr?.let { String.format(java.util.Locale.US, "%.0f dB", it) } ?: "N/A"}",
+                text = "SINR: ${sim.sinr?.let { String.format(Locale.US, "%.0f dB", it) } ?: "N/A"}",
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                 color = TextSecondaryDark
             )
             Text(
                 text = if (isCs) {
-                    "Vzdálenost: ${sim.estimatedDistanceM?.let { String.format(java.util.Locale.US, "%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
+                    "Vzdálenost: ${sim.estimatedDistanceM?.let { String.format(Locale.US, "%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
                 } else {
-                    "Distance: ${sim.estimatedDistanceM?.let { String.format(java.util.Locale.US, "%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
+                    "Distance: ${sim.estimatedDistanceM?.let { String.format(Locale.US, "%.0f m (TA %d)", it, sim.timingAdvance ?: 0) } ?: "N/A"}"
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                 color = TextSecondaryDark
