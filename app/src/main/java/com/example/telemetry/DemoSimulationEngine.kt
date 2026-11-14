@@ -87,6 +87,9 @@ class DemoSimulationEngine {
 
         val agcScore = (10f + 4f * sin(tick * 0.2f).toFloat()).coerceIn(0f, 100f)
 
+        val uniqueInView = satList.map { "${it.constellationType}_${it.svid}" }.distinct().size
+        val uniqueUsed = satList.filter { it.usedInFix }.map { "${it.constellationType}_${it.svid}" }.distinct().size
+
         val gnss = GnssState(
             hasFix = true,
             latitude = curLat,
@@ -100,6 +103,8 @@ class DemoSimulationEngine {
             verticalAccuracyM = 2.0f,
             satellitesInView = satTotal,
             satellitesUsedInFix = satUsed,
+            uniqueSatellitesInView = uniqueInView,
+            uniqueSatellitesUsedInFix = uniqueUsed,
             pdop = pdop,
             hdop = hdop,
             vdop = vdop,
@@ -110,6 +115,7 @@ class DemoSimulationEngine {
             constellationCountMap = constCounts,
             l1Count = l1Count,
             l5Count = l5Count,
+            l5InViewCount = l5Count,
             latestNmeaSentence = "\$GNGGA,100800.00,4913.823,N,01634.731,E,1,18,0.94,286.9,M,44.1,M,,*47",
             rawDopplerHz = -1240.5f + (80f * sin(tick * 0.15f)).toFloat(),
             adrValidCount = (satUsed * 0.75).toInt()
@@ -129,6 +135,11 @@ class DemoSimulationEngine {
             networkGen = "4G LTE Advanced",
             carrierAggregationSummary = "LTE-A 3CA: B20+B3+B7 (45 MHz)",
             totalAggregatedBandwidthKhz = 45000,
+            aggregatedCarriers = listOf(
+                "PCC: B20 • 796.0 MHz (800 MHz) • 10 MHz",
+                "SCC1: B3 • 1845.0 MHz (1800 MHz) • 20 MHz",
+                "SCC2: B7 • 2655.0 MHz (2600 MHz) • 15 MHz"
+            ),
             isServing = true,
             isDataActive = true,
             plmn = "23001",
@@ -165,9 +176,18 @@ class DemoSimulationEngine {
             subscriptionId = 2,
             displayName = "SIM 2: O2 - CZ",
             operatorAlpha = "O2 - CZ",
-            networkGen = "5G NR NSA",
+            networkGen = "5G NSA",
             carrierAggregationSummary = "5G NSA EN-DC: B20+n78 (50 MHz)",
             totalAggregatedBandwidthKhz = 50000,
+            aggregatedCarriers = listOf(
+                "PCC: B20 • 806.0 MHz (800 MHz) • 10 MHz",
+                "SCC1: n78 • 3550.0 MHz (3500 MHz C-Band) • 40 MHz"
+            ),
+            nrStateLabel = "EN-DC NR Aktivní",
+            nrBand = "n78 (3500 MHz C-Band)",
+            nrArfcn = 641666,
+            nrPci = 342,
+            nrDlFreqMhz = 3550.0,
             isServing = true,
             isDataActive = false,
             plmn = "23002",
@@ -176,27 +196,27 @@ class DemoSimulationEngine {
             enbOrGnbId = "73992",
             sectorId = "151",
             pci = 342,
-            earfcnOrArfcn = 641666,
-            band = "n78 (3500 MHz C-Band)",
-            channelBandwidthKhz = 40000,
-            dlFreqMhz = 3550.0,
-            ulFreqMhz = 3550.0,
+            earfcnOrArfcn = 6300,
+            band = "B20 (800 MHz FDD)",
+            channelBandwidthKhz = 10000,
+            dlFreqMhz = 806.0,
+            ulFreqMhz = 847.0,
             rsrp = sim2Rsrp,
             rsrq = -11,
             rssi = -64,
             sinr = 12.0f,
             cqi = null,
-            ssRsrp = sim2Rsrp,
-            ssRsrq = -11,
-            ssSinr = 12.0f,
-            csiRsrp = sim2Rsrp - 2,
+            ssRsrp = sim2Rsrp + 2,
+            ssRsrq = -10,
+            ssSinr = 14.0f,
+            csiRsrp = sim2Rsrp - 1,
             timingAdvance = sim2Ta,
             estimatedDistanceM = BandMapper.calculateLteDistanceMeters(sim2Ta, taMultiplierMode),
             neighbors = listOf(
                 CellNeighbor("LTE", 428, 6300, "B20 (800 MHz FDD)", sim2Rsrp - 4, 4, 791.0, 832.0),
                 CellNeighbor("5G NR", 342, 641666, "n78 (3500 MHz C-Band)", sim2Rsrp - 6, 6, 3624.9, 3624.9)
             ),
-            anomalies = BandMapper.detectCellularAnomalies("5G NR NSA", "51201", "73992", "151", sim2Rsrp, 12.0f, 2, true)
+            anomalies = BandMapper.detectCellularAnomalies("5G NSA", "51201", "73992", "151", sim2Rsrp, 12.0f, 2, true)
         )
 
         val pingMs = (28L + (8 * sin(tick * 0.2)).toLong()).coerceAtLeast(18L)

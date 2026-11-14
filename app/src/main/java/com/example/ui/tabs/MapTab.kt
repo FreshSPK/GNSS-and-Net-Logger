@@ -82,17 +82,18 @@ private fun computeSegmentColor(
         MapVisualizationMode.SATELLITES -> {
             when {
                 satellitesUsed < 5 -> AndroidColor.parseColor("#F43F5E")
-                satellitesUsed <= 10 -> AndroidColor.parseColor("#F59E0B")
-                satellitesUsed <= 25 -> AndroidColor.parseColor("#10B981")
+                satellitesUsed <= 20 -> AndroidColor.parseColor("#F59E0B")
+                satellitesUsed <= 30 -> AndroidColor.parseColor("#06B6D4")
+                satellitesUsed <= 50 -> AndroidColor.parseColor("#10B981")
                 else -> AndroidColor.parseColor("#3B82F6")
             }
         }
         MapVisualizationMode.PDOP -> {
             when {
                 satellitesUsed < 4 || pdop <= 0f || pdop >= 9.0f -> AndroidColor.parseColor("#64748B")
-                pdop < 1.5f -> AndroidColor.parseColor("#10B981")
-                pdop <= 3.0f -> AndroidColor.parseColor("#06B6D4")
-                pdop <= 5.0f -> AndroidColor.parseColor("#F59E0B")
+                pdop < 1.0f -> AndroidColor.parseColor("#10B981")
+                pdop < 2.0f -> AndroidColor.parseColor("#06B6D4")
+                pdop < 4.0f -> AndroidColor.parseColor("#F59E0B")
                 else -> AndroidColor.parseColor("#F43F5E")
             }
         }
@@ -482,20 +483,21 @@ fun MapTab(
                         LegendRow(color = RoseCritical, text = if (isCs) "> 90 km/h (Dálnice)" else "> 90 km/h (Highway)")
                     }
                     MapVisualizationMode.SATELLITES -> {
-                        Text(text = if (isCs) "LEGENDA SATELITY" else "SATELLITES LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
+                        Text(text = if (isCs) "LEGENDA SATELITY (POUŽITÉ)" else "SATELLITES LEGEND (USED)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
                         LegendRow(color = RoseCritical, text = if (isCs) "< 5 satelitů (Slabý fix)" else "< 5 sats (Poor fix)")
-                        LegendRow(color = AmberWarning, text = if (isCs) "5 až 10 (Základní fix)" else "5 to 10 (Basic fix)")
-                        LegendRow(color = EmeraldSignal, text = if (isCs) "11 až 25 (Výborný fix)" else "11 to 25 (Great fix)")
-                        LegendRow(color = BlueSatellite, text = if (isCs) "> 25 satelitů (Top fix)" else "> 25 sats (Optimal)")
+                        LegendRow(color = AmberWarning, text = if (isCs) "5 až 20 satelitů" else "5 to 20 sats")
+                        LegendRow(color = CyanTertiary, text = if (isCs) "21 až 30 satelitů" else "21 to 30 sats")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "31 až 50 satelitů" else "31 to 50 sats")
+                        LegendRow(color = BlueSatellite, text = if (isCs) "> 50 satelitů (Nejlepší)" else "> 50 sats (Best)")
                     }
                     MapVisualizationMode.PDOP -> {
                         Text(text = if (isCs) "LEGENDA PDOP" else "PDOP LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LegendRow(color = EmeraldSignal, text = if (isCs) "< 1.5 (Ideální)" else "< 1.5 (Ideal)")
-                        LegendRow(color = CyanTertiary, text = if (isCs) "1.5 až 3.0 (Výborný)" else "1.5 to 3.0 (Good)")
-                        LegendRow(color = AmberWarning, text = if (isCs) "3.0 až 5.0 (Vyhovující)" else "3.0 to 5.0 (Moderate)")
-                        LegendRow(color = RoseCritical, text = if (isCs) "> 5.0 (Slabá geometrie)" else "> 5.0 (Poor geometry)")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "< 1.0 (Nejlepší)" else "< 1.0 (Best)")
+                        LegendRow(color = CyanTertiary, text = if (isCs) "1.0 až 2.0 (Výborný)" else "1.0 to 2.0 (Good)")
+                        LegendRow(color = AmberWarning, text = if (isCs) "2.0 až 4.0 (Zhoršený)" else "2.0 to 4.0 (Fair)")
+                        LegendRow(color = RoseCritical, text = if (isCs) "≥ 4.0 (Nejhorší)" else "≥ 4.0 (Worst)")
                     }
                 }
             }

@@ -35,6 +35,18 @@ enum class SkyPlotColorMode {
     CN0_SIGNAL
 }
 
+private data class GroupedSkySat(
+    val key: String,
+    val svid: Int,
+    val constellationName: String,
+    val elevationDegrees: Float,
+    val azimuthDegrees: Float,
+    val cn0DbHz: Float,
+    val usedInFix: Boolean,
+    val isDualFreq: Boolean,
+    val bandsJoined: String
+)
+
 @Composable
 fun SkyPlotView(
     satellites: List<SatelliteInfo>,
@@ -45,9 +57,30 @@ fun SkyPlotView(
     var colorMode by remember { mutableStateOf(SkyPlotColorMode.CONSTELLATION) }
     var selectedKey by remember { mutableStateOf<String?>(null) }
 
-    val selectedSat = remember(satellites, selectedKey) {
+    val groupedSatellites = remember(satellites) {
+        satellites
+            .groupBy { "${it.constellationType}_${it.svid}" }
+            .map { (key, group) ->
+                val first = group.first()
+                GroupedSkySat(
+                    key = key,
+                    svid = first.svid,
+                    constellationName = first.constellationName,
+                    elevationDegrees = first.elevationDegrees,
+                    azimuthDegrees = first.azimuthDegrees,
+                    cn0DbHz = group.maxOf { it.cn0DbHz },
+                    usedInFix = group.any { it.usedInFix },
+                    isDualFreq = group.any {
+                        it.bandLabel.contains("L5") || it.bandLabel.contains("E5") || it.bandLabel.contains("B2")
+                    },
+                    bandsJoined = group.map { it.bandLabel }.distinct().joinToString(" + ")
+                )
+            }
+    }
+
+    val selectedSat = remember(groupedSatellites, selectedKey) {
         selectedKey?.let { key ->
-            satellites.firstOrNull { "${it.constellationType}_${it.svid}" == key }
+            groupedSatellites.firstOrNull { it.key == key }
         }
     }
 
@@ -150,14 +183,14 @@ fun SkyPlotView(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(satellites) {
+                        .pointerInput(groupedSatellites) {
                             detectTapGestures { tapOffset ->
                                 val cx = size.width / 2f
                                 val cy = size.height / 2f
                                 val r = (size.width / 2f) * 0.9f
-                                var nearest: SatelliteInfo? = null
+                                var nearest: GroupedSkySat? = null
                                 var nearestDist = 42f
-                                satellites.forEach { sat ->
+                                groupedSatellites.forEach { sat ->
                                     val elRad = (90f - sat.elevationDegrees.coerceIn(0f, 90f)) / 90f
                                     val satDist = r * elRad
                                     val azRad = Math.toRadians((sat.azimuthDegrees - 90.0)).toFloat()
@@ -169,7 +202,7 @@ fun SkyPlotView(
                                         nearest = sat
                                     }
                                 }
-                                val tappedKey = nearest?.let { "${it.constellationType}_${it.svid}" }
+                                val tappedKey = nearest?.key
                                 selectedKey = if (tappedKey == selectedKey) null else tappedKey
                             }
                         }
@@ -197,7 +230,7 @@ fun SkyPlotView(
                         strokeWidth = 1f
                     )
 
-                    satellites.forEach { sat ->
+                    groupedSatellites.forEach { sat ->
                         val elRad = (90f - sat.elevationDegrees.coerceIn(0f, 90f)) / 90f
                         val satDist = r * elRad
 
@@ -205,8 +238,7 @@ fun SkyPlotView(
                         val sx = cx + satDist * cos(azRad)
                         val sy = cy + satDist * sin(azRad)
 
-                        val isDualFreq = sat.bandLabel.contains("L5") || sat.bandLabel.contains("E5") || sat.bandLabel.contains("B2")
-                        val isSelected = selectedKey == "${sat.constellationType}_${sat.svid}"
+                        val isSelected = selectedKey == sat.key
 
                         val baseColor = if (colorMode == SkyPlotColorMode.CONSTELLATION) {
                             when (sat.constellationName.uppercase()) {
@@ -234,31 +266,34 @@ fun SkyPlotView(
                             )
                         }
 
-                        if (isDualFreq) {
+                        if (sat.isDualFreq) {
                             drawCircle(
                                 color = EmeraldSignal,
-                                radius = if (sat.usedInFix) 8.dp.toPx() else 6.5.dp.toPx(),
+                                radius = if (sat.usedInFix) 8.2.dp.toPx() else 6.8.dp.toPx(),
                                 center = Offset(sx, sy),
-                                style = Stroke(width = 1.5f)
+                                style = Stroke(width = 1.5.dp.toPx())
                             )
                         }
 
                         if (sat.usedInFix) {
+                            // In fix: solid saturated dot + crisp white ring (matches legend)
                             drawCircle(
                                 color = Color.White,
-                                radius = 5.5.dp.toPx(),
+                                radius = 5.6.dp.toPx(),
                                 center = Offset(sx, sy)
                             )
                             drawCircle(
                                 color = baseColor,
-                                radius = 4.5.dp.toPx(),
+                                radius = 4.3.dp.toPx(),
                                 center = Offset(sx, sy)
                             )
                         } else {
+                            // Out of fix: hollow outline circle without solid fill (matches legend)
                             drawCircle(
-                                color = baseColor.copy(alpha = 0.45f),
-                                radius = 3.5.dp.toPx(),
-                                center = Offset(sx, sy)
+                                color = baseColor.copy(alpha = 0.85f),
+                                radius = 4.0.dp.toPx(),
+                                center = Offset(sx, sy),
+                                style = Stroke(width = 1.6.dp.toPx())
                             )
                         }
                     }
@@ -300,7 +335,7 @@ fun SkyPlotView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${selectedSat.constellationName} #${selectedSat.svid} (${selectedSat.bandLabel})",
+                        text = "${selectedSat.constellationName} #${selectedSat.svid} (${selectedSat.bandsJoined})",
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = CyanTertiary
@@ -317,7 +352,7 @@ fun SkyPlotView(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Synchronized Legend
+        // Synchronized Legend (1:1 visual match with Skyplot markers)
         if (colorMode == SkyPlotColorMode.CONSTELLATION) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -338,19 +373,45 @@ fun SkyPlotView(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(7.dp).background(Color.White, CircleShape))
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .border(1.5.dp, Color.White, CircleShape)
+                            .background(CyanTertiary, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isCs) "Ve fixu" else "In fix", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                    Text(
+                        text = if (isCs) "Plný + bílý okraj = Ve fixu" else "Filled + white border = In fix",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
 
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.size(7.dp).border(1.dp, Color.Gray, CircleShape))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .border(1.6.dp, TextSecondaryDark, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isCs) "Mimo fix" else "Unused", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
-
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.size(9.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Text(
+                        text = if (isCs) "Prázdný kroužek = Mimo fix" else "Hollow ring = Unused",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(10.dp).border(1.5.dp, EmeraldSignal, CircleShape))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isCs) "Zelený kroužek = L5/E5a" else "Green ring = L5/E5a", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = EmeraldSignal)
+                    Text(
+                        text = if (isCs) "Zelený vnější kroužek = Pásmo L5/E5a/B2a" else "Green outer ring = L5/E5a/B2a band",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = EmeraldSignal
+                    )
                 }
             }
         } else {
@@ -365,7 +426,6 @@ fun SkyPlotView(
                     LegendItem(color = EmeraldSignal, label = if (isCs) "≥ 35 dB-Hz (Silný)" else "≥ 35 dB-Hz (Strong)")
                     LegendItem(color = CyanTertiary, label = "25–34 dB-Hz")
                     LegendItem(color = AmberWarning, label = if (isCs) "< 25 dB-Hz (Slabý)" else "< 25 dB-Hz (Weak)")
-                    LegendItem(color = Color.Gray, label = if (isCs) "Mimo fix" else "Unused")
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
@@ -373,14 +433,45 @@ fun SkyPlotView(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(7.dp).border(1.5.dp, Color.White, CircleShape).background(EmeraldSignal, CircleShape))
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .border(1.5.dp, Color.White, CircleShape)
+                            .background(EmeraldSignal, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isCs) "Bílá záře = Ve fixu" else "White border = In fix", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
+                    Text(
+                        text = if (isCs) "Plný + bílý okraj = Ve fixu" else "Filled + white border = In fix",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
 
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.size(9.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(9.dp)
+                            .border(1.6.dp, Color.Gray, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(if (isCs) "Zelený kroužek = Pásmo L5/E5a" else "Green ring = L5/E5a band", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = EmeraldSignal)
+                    Text(
+                        text = if (isCs) "Šedý kroužek = Mimo fix" else "Gray ring = Unused",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(10.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isCs) "Zelený vnější kroužek = Pásmo L5/E5a/B2a" else "Green outer ring = L5/E5a/B2a band",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = EmeraldSignal
+                    )
                 }
             }
         }

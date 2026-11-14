@@ -81,6 +81,8 @@ class MainActivity : ComponentActivity() {
             val sessionStartTimeMs by TelemetryLoggingService.sessionStartTimeMs.collectAsStateWithLifecycle()
             val sessionDistanceMeters by TelemetryLoggingService.sessionDistanceMeters.collectAsStateWithLifecycle()
             val handoverCount by TelemetryLoggingService.handoverCount.collectAsStateWithLifecycle()
+            val handoverCountSim1 by TelemetryLoggingService.handoverCountSim1.collectAsStateWithLifecycle()
+            val handoverCountSim2 by TelemetryLoggingService.handoverCountSim2.collectAsStateWithLifecycle()
             val chartPoints by TelemetryLoggingService.recentChartPoints.collectAsStateWithLifecycle()
             val liveMapTrail by TelemetryLoggingService.liveMapTrail.collectAsStateWithLifecycle()
 
@@ -254,6 +256,8 @@ class MainActivity : ComponentActivity() {
                                     sessionStartTimeMs = sessionStartTimeMs,
                                     sessionDistanceMeters = sessionDistanceMeters,
                                     handoverCount = handoverCount,
+                                    handoverCountSim1 = handoverCountSim1,
+                                    handoverCountSim2 = handoverCountSim2,
                                     fieldsSelection = settings.fieldsSelection,
                                     lang = currentLang,
                                     onStartLogging = {
@@ -300,7 +304,10 @@ class MainActivity : ComponentActivity() {
                             AppTab.CELLULAR_RF -> {
                                 CellularRfTab(
                                     cellular = cellularState,
+                                    isLogging = isLogging,
                                     handoverCount = handoverCount,
+                                    handoverCountSim1 = handoverCountSim1,
+                                    handoverCountSim2 = handoverCountSim2,
                                     lang = currentLang
                                 )
                             }

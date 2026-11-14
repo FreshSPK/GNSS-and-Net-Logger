@@ -41,6 +41,8 @@ class TelemetryLoggingService : Service() {
     private var maxSpeedKmh = 0.0
     private var lastSim1Pci: Int = 0
     private var lastSim1CellId: String = ""
+    private var lastSim2Pci: Int = 0
+    private var lastSim2CellId: String = ""
     private var lastAnomalyAlertMs: Long = 0L
 
     companion object {
@@ -75,6 +77,12 @@ class TelemetryLoggingService : Service() {
 
         private val _handoverCount = MutableStateFlow(0)
         val handoverCount: StateFlow<Int> = _handoverCount.asStateFlow()
+
+        private val _handoverCountSim1 = MutableStateFlow(0)
+        val handoverCountSim1: StateFlow<Int> = _handoverCountSim1.asStateFlow()
+
+        private val _handoverCountSim2 = MutableStateFlow(0)
+        val handoverCountSim2: StateFlow<Int> = _handoverCountSim2.asStateFlow()
 
         // Real-time chart ring buffer
         private val _recentChartPoints = MutableStateFlow<List<ChartPoint>>(emptyList())
@@ -166,11 +174,15 @@ class TelemetryLoggingService : Service() {
         maxSpeedKmh = 0.0
         lastSim1Pci = 0
         lastSim1CellId = ""
+        lastSim2Pci = 0
+        lastSim2CellId = ""
         lastLoggedLocation = null
         lastLogTimestampMs = 0L
         _loggedPointsCount.value = 0
         _sessionStartTimeMs.value = startMs
         _sessionDistanceMeters.value = 0.0
+        _handoverCountSim1.value = 0
+        _handoverCountSim2.value = 0
         _handoverCount.value = 0
 
         app.reconcileEngines()
@@ -317,17 +329,29 @@ class TelemetryLoggingService : Service() {
         val sim1 = cellular.sim1
         val sim2 = cellular.sim2
 
-        // Handover detection on SIM 1 (real cell change)
-        val validCi = sim1.ci.isNotBlank() && sim1.ci != "N/A" && sim1.ci != "Na příjmu"
-        if (validCi && sim1.pci > 0) {
+        // Handover detection on SIM 1 and SIM 2 independently (real cell change)
+        val validSim1Ci = sim1.ci.isNotBlank() && sim1.ci != "N/A" && sim1.ci != "Na příjmu"
+        if (validSim1Ci && sim1.pci > 0) {
             if (lastSim1Pci > 0 && lastSim1CellId.isNotBlank() &&
                 (lastSim1Pci != sim1.pci || lastSim1CellId != sim1.ci)
             ) {
-                _handoverCount.value = _handoverCount.value + 1
+                _handoverCountSim1.value = _handoverCountSim1.value + 1
             }
             lastSim1Pci = sim1.pci
             lastSim1CellId = sim1.ci
         }
+
+        val validSim2Ci = sim2.ci.isNotBlank() && sim2.ci != "N/A" && sim2.ci != "Na příjmu"
+        if (validSim2Ci && sim2.pci > 0) {
+            if (lastSim2Pci > 0 && lastSim2CellId.isNotBlank() &&
+                (lastSim2Pci != sim2.pci || lastSim2CellId != sim2.ci)
+            ) {
+                _handoverCountSim2.value = _handoverCountSim2.value + 1
+            }
+            lastSim2Pci = sim2.pci
+            lastSim2CellId = sim2.ci
+        }
+        _handoverCount.value = _handoverCountSim1.value + _handoverCountSim2.value
 
         // Acoustic alert for critical jamming / 2G downgrade
         if (currentSettings.audioAnomalyAlerts) {
@@ -342,6 +366,15 @@ class TelemetryLoggingService : Service() {
 
         val bestNeighbor = sim1.neighbors.firstOrNull()
         val fields = currentSettings.fieldsSelection
+
+        val usedSatsDetail = if (fields.logGnss) {
+            formatSatelliteDetail(gnss.satellites.filter { it.usedInFix })
+        } else ""
+        val visibleSatsDetail = if (fields.logGnss) {
+            formatSatelliteDetail(gnss.satellites)
+        } else ""
+        val sim1CaText = if (fields.logCellularRf) formatCaSummary(sim1.carrierAggregationSummary, sim1.aggregatedCarriers) else ""
+        val sim2CaText = if (fields.logCellularRf) formatCaSummary(sim2.carrierAggregationSummary, sim2.aggregatedCarriers) else ""
 
         val record = TelemetryRecord(
             sessionId = sessionId,
@@ -412,7 +445,13 @@ class TelemetryLoggingService : Service() {
             batteryLevelPct = if (fields.logBattery) env.battery.levelPct else null,
             nmeaSentence = if (fields.logNmea) gnss.latestNmeaSentence else null,
             rawDopplerHz = if (fields.logGnss) gnss.rawDopplerHz else null,
-            waypointNote = waypointNote
+            waypointNote = waypointNote,
+            uniqueSatellitesInView = if (fields.logGnss) gnss.uniqueSatellitesInView else 0,
+            uniqueSatellitesUsed = if (fields.logGnss) gnss.uniqueSatellitesUsedInFix else 0,
+            usedSatellitesDetail = usedSatsDetail,
+            visibleSatellitesDetail = visibleSatsDetail,
+            sim1CaSummary = sim1CaText,
+            sim2CaSummary = sim2CaText
         )
 
         val dao = app.database.telemetryDao()
@@ -438,6 +477,7 @@ class TelemetryLoggingService : Service() {
                 sinrSim2 = sim2.sinr,
                 speedKmh = gnss.speedKmh,
                 satCount = gnss.satellitesUsedInFix,
+                satInViewCount = gnss.satellitesInView,
                 pdop = if (gnss.hasFix && gnss.pdop > 0f && gnss.pdop < 9.0f) gnss.pdop else null,
                 agcScore = gnss.agcInterferenceScore,
                 pingMs = cellular.pingRttMs?.toFloat(),
@@ -459,6 +499,7 @@ class TelemetryLoggingService : Service() {
                     sim2Rsrp = sim2.rsrp,
                     speedKmh = gnss.speedKmh,
                     satellitesUsed = gnss.satellitesUsedInFix,
+                    satellitesInView = gnss.satellitesInView,
                     pdop = gnss.pdop,
                     timestampMs = now
                 )
@@ -467,8 +508,38 @@ class TelemetryLoggingService : Service() {
 
         if (loggedCount % 5 == 0 || waypointNote != null) {
             val wpPrefix = if (waypointNote != null) "★ $waypointNote | " else ""
-            updateNotification("${wpPrefix}Bodů: $loggedCount | Sat: ${gnss.satellitesUsedInFix} | RSRP: ${sim1.rsrp ?: "N/A"} dBm")
+            updateNotification("${wpPrefix}Bodů: $loggedCount | Sat: ${gnss.satellitesUsedInFix}/${gnss.satellitesInView} | RSRP: ${sim1.rsrp ?: "N/A"} dBm")
         }
+    }
+
+    private fun formatSatelliteDetail(satellites: List<com.example.model.SatelliteInfo>): String {
+        if (satellites.isEmpty()) return ""
+        return satellites
+            .groupBy { "${it.constellationType}_${it.svid}" }
+            .values
+            .joinToString("; ") { group ->
+                val first = group.first()
+                val prefix = when (first.constellationName.uppercase()) {
+                    "GPS" -> "G"
+                    "GLONASS" -> "R"
+                    "GALILEO" -> "E"
+                    "BEIDOU" -> "C"
+                    "QZSS" -> "J"
+                    "SBAS" -> "S"
+                    "IRNSS", "NAVIC" -> "I"
+                    else -> first.constellationName.take(1).uppercase()
+                }
+                val bands = group.map { it.bandLabel }.distinct().joinToString("/")
+                val maxCn0 = group.maxOfOrNull { it.cn0DbHz } ?: 0f
+                "$prefix${first.svid}($bands@${maxCn0.toInt()})"
+            }
+    }
+
+    private fun formatCaSummary(summary: String?, carriers: List<String>): String {
+        val parts = mutableListOf<String>()
+        if (!summary.isNullOrBlank()) parts.add(summary)
+        if (carriers.isNotEmpty()) parts.add(carriers.joinToString(" + "))
+        return parts.joinToString(" | ")
     }
 
     private fun playAlertBeep() {

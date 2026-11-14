@@ -275,6 +275,8 @@ class GnssTelemetryEngine(
         var usedCount = 0
         var dualFreqUsedCount = 0
         var dualFreqViewCount = 0
+        val uniqueInViewKeys = mutableSetOf<Long>()
+        val uniqueUsedKeys = mutableSetOf<Long>()
 
         val constellationMap = mutableMapOf<String, Pair<Int, Int>>() // Constellation -> (used, total)
 
@@ -287,6 +289,10 @@ class GnssTelemetryEngine(
             val azim = status.getAzimuthDegrees(i)
             val used = status.usedInFix(i)
             if (used) usedCount++
+
+            val uniqueKey = (constType.toLong() shl 32) or (svid.toLong() and 0xFFFFFFFFL)
+            uniqueInViewKeys.add(uniqueKey)
+            if (used) uniqueUsedKeys.add(uniqueKey)
 
             var hasCarrier = false
             var carrierHz = 0f
@@ -379,12 +385,15 @@ class GnssTelemetryEngine(
         _gnssState.value = current.copy(
             satellitesInView = satCount,
             satellitesUsedInFix = usedCount,
+            uniqueSatellitesInView = uniqueInViewKeys.size,
+            uniqueSatellitesUsedInFix = uniqueUsedKeys.size,
             satellites = satList,
             hdop = currentHdop,
             vdop = currentVdop,
             pdop = currentPdop,
             l1Count = effectiveL1Count,
             l5Count = effectiveL5Count,
+            l5InViewCount = dualFreqViewCount,
             dualFrequencyRatioPct = dualRatio,
             constellationCountMap = constellationMap
         )

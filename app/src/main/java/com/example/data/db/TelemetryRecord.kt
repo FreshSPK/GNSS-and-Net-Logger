@@ -106,5 +106,13 @@ data class TelemetryRecord(
     val sim2Rssi: Int? = null,
     val sim2TimingAdvance: Int? = null,
     val sim2EstimatedDistanceM: Double? = null,
-    val waypointNote: String? = null
+    val waypointNote: String? = null,
+
+    // Detailed satellite & CA logging (v1.4)
+    val uniqueSatellitesInView: Int = 0,
+    val uniqueSatellitesUsed: Int = 0,
+    val usedSatellitesDetail: String = "",
+    val visibleSatellitesDetail: String = "",
+    val sim1CaSummary: String = "",
+    val sim2CaSummary: String = ""
 )

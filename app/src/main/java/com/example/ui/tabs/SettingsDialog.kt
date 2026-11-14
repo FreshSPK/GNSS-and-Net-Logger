@@ -12,10 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import com.example.model.LogTriggerMode
 import com.example.model.LoggingSettings
 import com.example.ui.theme.*
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialog(
     settings: LoggingSettings,
@@ -66,29 +69,54 @@ fun SettingsDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     AssistChip(
                         onClick = {
                             triggerMode = LogTriggerMode.HYBRID
-                            interval = 2
-                            distThreshold = 5f
+                            interval = 5
+                            distThreshold = 10f
                         },
-                        label = { Text(if (effectiveIsCs) "Chůze (2s/5m)" else "Walk (2s/5m)", fontSize = 11.sp) }
+                        label = {
+                            Text(
+                                text = if (effectiveIsCs) "Pěší (5s/10m)" else "Walk (5s/10m)",
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     )
                     AssistChip(
                         onClick = {
                             triggerMode = LogTriggerMode.HYBRID
-                            interval = 1
-                            distThreshold = 15f
+                            interval = 10
+                            distThreshold = 50f
                         },
-                        label = { Text(if (effectiveIsCs) "Auto (1s/15m)" else "Drive (1s/15m)", fontSize = 11.sp) }
+                        label = {
+                            Text(
+                                text = if (effectiveIsCs) "Auto (10s/50m)" else "Drive (10s/50m)",
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     )
                     AssistChip(
                         onClick = {
                             triggerMode = LogTriggerMode.TIME
-                            interval = 5
+                            interval = 10
                         },
-                        label = { Text(if (effectiveIsCs) "Stativ (5s)" else "Static (5s)", fontSize = 11.sp) }
+                        label = {
+                            Text(
+                                text = if (effectiveIsCs) "Statické (10s)" else "Static (10s)",
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     )
                 }
 

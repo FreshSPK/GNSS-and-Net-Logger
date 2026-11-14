@@ -165,6 +165,7 @@ class SignalLoggerApp : Application() {
                             sim2Rsrp = c.sim2.rsrp,
                             speedKmh = g.speedKmh,
                             satellitesUsed = g.satellitesUsedInFix,
+                            satellitesInView = g.satellitesInView,
                             pdop = g.pdop,
                             timestampMs = now
                         )
@@ -182,6 +183,7 @@ class SignalLoggerApp : Application() {
                             sinrSim2 = c.sim2.sinr,
                             speedKmh = g.speedKmh,
                             satCount = g.satellitesUsedInFix,
+                            satInViewCount = g.satellitesInView,
                             pdop = if (g.hasFix && g.pdop > 0f && g.pdop < 9.0f) g.pdop else null,
                             agcScore = g.agcInterferenceScore,
                             pingMs = c.pingRttMs?.toFloat(),

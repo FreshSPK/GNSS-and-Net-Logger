@@ -33,7 +33,8 @@ object Exporter {
                     "Sim1RSRP_dBm,Sim1RSRQ_dB,Sim1RSSI_dBm,Sim1SINR_dB,Sim1SS_RSRP,Sim1SS_SINR,Sim1TA,Sim1EstDist_m," +
                     "Sim2Operator,Sim2PLMN,Sim2Tech,Sim2TAC,Sim2CellId,Sim2eNodeB_gNodeB,Sim2Sector,Sim2PCI,Sim2ARFCN,Sim2Band," +
                     "Sim2RSRP_dBm,Sim2RSRQ_dB,Sim2RSSI_dBm,Sim2SINR_dB,Sim2TA,Sim2EstDist_m," +
-                    "BestNeighborRSRP,NeighborDelta_dB,Pressure_hPa,SeaLevelPressure_hPa,BaroAlt_m,BatteryTemp_C,BatteryLevel_pct,Ping_ms,NmeaSentence\n"
+                    "BestNeighborRSRP,NeighborDelta_dB,Pressure_hPa,SeaLevelPressure_hPa,BaroAlt_m,BatteryTemp_C,BatteryLevel_pct,Ping_ms,NmeaSentence," +
+                    "UniqueSatsInView,UniqueSatsUsed,UsedSatellites,VisibleSatellites,Sim1CA,Sim2CA\n"
             )
 
             for (r in records) {
@@ -101,7 +102,13 @@ object Exporter {
                 append("${r.batteryTempC ?: ""},")
                 append("${r.batteryLevelPct ?: ""},")
                 append("${r.pingRttMs ?: ""},")
-                append("\"${escapeCsv(r.nmeaSentence ?: "")}\"\n")
+                append("\"${escapeCsv(r.nmeaSentence ?: "")}\",")
+                append("${r.uniqueSatellitesInView},")
+                append("${r.uniqueSatellitesUsed},")
+                append("\"${escapeCsv(r.usedSatellitesDetail)}\",")
+                append("\"${escapeCsv(r.visibleSatellitesDetail)}\",")
+                append("\"${escapeCsv(r.sim1CaSummary)}\",")
+                append("\"${escapeCsv(r.sim2CaSummary)}\"\n")
             }
             flush()
         }
@@ -213,6 +220,12 @@ object Exporter {
                 if (r.satellitesUsedInFix >= 4 && r.vdop > 0f && r.vdop < 9f) append("        <vdop>${r.vdop}</vdop>\n")
                 if (r.satellitesUsedInFix >= 4 && r.pdop > 0f && r.pdop < 9f) append("        <pdop>${r.pdop}</pdop>\n")
                 append("        <extensions>\n")
+                append("          <sats_used>${r.satellitesUsedInFix}</sats_used>\n")
+                append("          <sats_in_view>${r.satellitesInView}</sats_in_view>\n")
+                append("          <unique_sats_used>${r.uniqueSatellitesUsed}</unique_sats_used>\n")
+                append("          <unique_sats_in_view>${r.uniqueSatellitesInView}</unique_sats_in_view>\n")
+                if (r.usedSatellitesDetail.isNotBlank()) append("          <used_satellites>${escapeXml(r.usedSatellitesDetail)}</used_satellites>\n")
+                if (r.visibleSatellitesDetail.isNotBlank()) append("          <visible_satellites>${escapeXml(r.visibleSatellitesDetail)}</visible_satellites>\n")
                 append("          <speed_kmh>${r.speedKmh}</speed_kmh>\n")
                 r.sim1Rsrp?.let { append("          <sim1_rsrp>$it</sim1_rsrp>\n") }
                 if (r.sim1Band.isNotBlank()) append("          <sim1_band>${escapeXml(r.sim1Band)}</sim1_band>\n")
@@ -253,18 +266,25 @@ object Exporter {
                 append("        \"speedKmh\": ${r.speedKmh},\n")
                 append("        \"bearingDeg\": ${r.bearingDeg},\n")
                 append("        \"satellitesUsed\": ${r.satellitesUsedInFix},\n")
+                append("        \"satellitesInView\": ${r.satellitesInView},\n")
+                append("        \"uniqueSatellitesUsed\": ${r.uniqueSatellitesUsed},\n")
+                append("        \"uniqueSatellitesInView\": ${r.uniqueSatellitesInView},\n")
+                append("        \"usedSatellites\": \"${escapeJson(r.usedSatellitesDetail)}\",\n")
+                append("        \"visibleSatellites\": \"${escapeJson(r.visibleSatellitesDetail)}\",\n")
                 append("        \"pdop\": ${if (r.satellitesUsedInFix >= 4 && r.pdop > 0f && r.pdop < 9f) r.pdop else "null"},\n")
                 append("        \"dualFrequencyRatioPct\": ${r.dualFrequencyRatioPct},\n")
                 append("        \"agcScore\": ${r.agcInterferenceScore},\n")
                 append("        \"sim1Operator\": \"${escapeJson(r.sim1Operator)}\",\n")
                 append("        \"sim1NetworkGen\": \"${escapeJson(r.sim1NetworkGen)}\",\n")
                 append("        \"sim1Band\": \"${escapeJson(r.sim1Band)}\",\n")
+                append("        \"sim1CaSummary\": \"${escapeJson(r.sim1CaSummary)}\",\n")
                 append("        \"sim1Pci\": ${r.sim1Pci},\n")
                 append("        \"sim1Rsrp\": ${r.sim1Rsrp ?: "null"},\n")
                 append("        \"sim1Sinr\": ${r.sim1Sinr ?: "null"},\n")
                 append("        \"sim2Operator\": \"${escapeJson(r.sim2Operator)}\",\n")
                 append("        \"sim2NetworkGen\": \"${escapeJson(r.sim2NetworkGen)}\",\n")
                 append("        \"sim2Band\": \"${escapeJson(r.sim2Band)}\",\n")
+                append("        \"sim2CaSummary\": \"${escapeJson(r.sim2CaSummary)}\",\n")
                 append("        \"sim2Pci\": ${r.sim2Pci},\n")
                 append("        \"sim2Rsrp\": ${r.sim2Rsrp ?: "null"},\n")
                 append("        \"sim2Sinr\": ${r.sim2Sinr ?: "null"},\n")

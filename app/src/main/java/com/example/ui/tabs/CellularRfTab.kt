@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import com.example.R
 import com.example.model.AnomalySeverity
 import com.example.model.CellularState
@@ -32,7 +34,10 @@ import java.util.Locale
 @Composable
 fun CellularRfTab(
     cellular: CellularState,
+    isLogging: Boolean = false,
     handoverCount: Int = 0,
+    handoverCountSim1: Int = 0,
+    handoverCountSim2: Int = 0,
     lang: String
 ) {
     val isCs = lang != "EN"
@@ -69,7 +74,7 @@ fun CellularRfTab(
                     color = TextSecondaryDark
                 )
             }
-            if (handoverCount > 0) {
+            if (isLogging || handoverCount > 0) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = CyanSecondary.copy(alpha = 0.25f)
@@ -81,11 +86,13 @@ fun CellularRfTab(
                         Icon(imageVector = Icons.Default.SwapHoriz, contentDescription = null, tint = CyanTertiary, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "HO: $handoverCount",
-                            fontSize = 11.sp,
+                            text = "HO S1:$handoverCountSim1 | S2:$handoverCountSim2 (Σ$handoverCount)",
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = CyanTertiary
+                            color = CyanTertiary,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -422,6 +429,12 @@ fun CellularRfTab(
                 Box(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = when {
+                            neighborBandFilter == "5G" ->
+                                if (isCs) {
+                                    "Žádné samostatné 5G NR sousední buňky. V síti 5G NSA je telefon řízen přes 4G LTE kotvu a modem měří 5G sousedy jen při aktivním datovém přenosu (B1/B2 event). V budoucí síti 5G SA se sousední 5G buňky budou vypisovat standardně."
+                                } else {
+                                    "No standalone 5G NR neighbors reported. In 5G NSA, control signaling stays on the 4G LTE anchor and NR cells are measured only during active data transfers (B1/B2 events). In 5G SA, NR neighbors are broadcast directly."
+                                }
                             rawNeighbors.isEmpty() && selectedSimTab == 1 && !cellular.sim2.isDataActive ->
                                 if (isCs) "Modem v režimu standby neposkytuje samostatný seznam sousedních buněk pro SIM 2." else "Modem in DSDS standby does not report independent neighbor list for SIM 2."
                             rawNeighbors.isEmpty() ->
@@ -504,8 +517,9 @@ fun CellularRfTab(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            val arfcnPrefix = if (n.tech.contains("5G") || n.tech.contains("NR")) "NR-ARFCN" else "EARFCN"
                             Text(
-                                text = "${n.band} • EARFCN ${n.earfcn}",
+                                text = "${n.band} • $arfcnPrefix ${n.earfcn}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondaryDark
                             )
@@ -684,6 +698,7 @@ private fun SimModeBanner(sim: SimCellInfo, simLabel: String, accentColor: Color
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DetailedSimCard(sim: SimCellInfo, lang: String) {
     val isCs = lang != "EN"
@@ -876,18 +891,68 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                 MetricItem(label = if (isCs) "TAC (Oblast)" else "TAC (Area)", value = sim.tac, modifier = Modifier.weight(1f))
             }
 
-            // 5G specific SS & CSI split metrology (honest N/A when modem doesn't report split CSI/SS)
-            if (sim.networkGen.contains("5G") || sim.ssRsrp != null || sim.csiRsrp != null) {
+            // 5G specific NSA vs SA architecture status & SS/CSI metrology
+            if (sim.networkGen.contains("5G") || sim.ssRsrp != null || sim.csiRsrp != null || sim.nrBand != null) {
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider(color = DarkSlate700)
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = if (isCs) "5G NR METRIKY: SS (BROADCAST) vs. CSI (DATAPATH)" else "5G NR METRICS: SS (BROADCAST) vs. CSI (DATAPATH)",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                    color = Purple5G,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isCs) "5G NR ARCHITEKTURA & METRIKY" else "5G NR ARCHITECTURE & METRICS",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = Purple5G,
+                        fontWeight = FontWeight.Bold
+                    )
+                    val stateText = when (sim.nrStateLabel) {
+                        "EN-DC NR Aktivní" -> if (isCs) "NSA • NR Aktivní (EN-DC)" else "NSA • NR Active (EN-DC)"
+                        "EN-DC LTE Kotva (Idle)" -> if (isCs) "NSA • LTE Kotva (čeká na data)" else "NSA • LTE Anchor (Idle)"
+                        "5G Standalone (SA)" -> if (isCs) "5G SA (Standalone)" else "5G SA (Standalone)"
+                        else -> sim.networkGen
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Purple5G.copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = stateText,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = Purple5G
+                        )
+                    }
+                }
+                if (sim.nrBand != null || sim.nrPci != null || sim.nrArfcn != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val nrParts = buildList {
+                        sim.nrBand?.let { add(it) }
+                        sim.nrPci?.let { add("PCI $it") }
+                        sim.nrArfcn?.let { add("NR-ARFCN $it") }
+                        sim.nrDlFreqMhz?.let { add(String.format(Locale.US, "%.1f MHz", it)) }
+                    }
+                    Text(
+                        text = (if (isCs) "5G NR větev (SCG): " else "5G NR SCG leg: ") + nrParts.joinToString(" • "),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = CyanTertiary
+                    )
+                } else if (sim.nrStateLabel == "EN-DC LTE Kotva (Idle)") {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isCs) {
+                            "Buňka podporuje 5G NSA (DCNR). Modem drží LTE kotvu a 5G NR větev připojí při datové zátěži."
+                        } else {
+                            "Anchor supports 5G NSA (DCNR). Modem stays on LTE anchor until data load triggers NR SCG."
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     MetricItem(label = "SS-RSRP", value = sim.ssRsrp?.let { "$it dBm" } ?: "N/A", modifier = Modifier.weight(1f))
                     MetricItem(label = "SS-RSRQ", value = sim.ssRsrq?.let { "$it dB" } ?: "N/A", modifier = Modifier.weight(1f))
@@ -909,15 +974,16 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                         color = TextSecondaryDark
                     )
+                    val channelLabel = if (sim.networkGen == "5G SA") "NR-ARFCN" else "EARFCN"
                     Text(
                         text = if (sim.earfcnOrArfcn > 0 && sim.dlFreqMhz != null && sim.dlFreqMhz > 0.0) {
                             val dlStr = String.format(Locale.US, "%.1f", sim.dlFreqMhz)
                             val ulStr = String.format(Locale.US, "%.1f", sim.ulFreqMhz ?: sim.dlFreqMhz)
-                            "EARFCN ${sim.earfcnOrArfcn} • DL: $dlStr MHz • UL: $ulStr MHz"
+                            "$channelLabel ${sim.earfcnOrArfcn} • DL: $dlStr MHz • UL: $ulStr MHz"
                         } else if (sim.earfcnOrArfcn > 0) {
-                            "EARFCN ${sim.earfcnOrArfcn} • ${if (isCs) "Frekvence dle přidělení" else "Band allocation"}"
+                            "$channelLabel ${sim.earfcnOrArfcn} • ${if (isCs) "Frekvence dle přidělení" else "Band allocation"}"
                         } else {
-                            if (isCs) "EARFCN: Na příjmu • Frekvence: Dynamická" else "EARFCN: Standby • Frequency: Dynamic"
+                            if (isCs) "$channelLabel: Na příjmu • Frekvence: Dynamická" else "$channelLabel: Standby • Frequency: Dynamic"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
@@ -955,6 +1021,74 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (sim.timingAdvance != null) EmeraldSignal else TextSecondaryDark
+                    )
+                }
+            }
+
+            if (!sim.carrierAggregationSummary.isNullOrBlank() || sim.aggregatedCarriers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = DarkSlate700)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isCs) "CARRIER AGGREGATION • AGREGOVANÉ KMITOČTY" else "CARRIER AGGREGATION • COMPONENT FREQUENCIES",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = Purple5G
+                    )
+                    val caTotalMhz = sim.totalAggregatedBandwidthKhz?.let { "${it / 1000} MHz" }
+                    if (caTotalMhz != null) {
+                        Text(
+                            text = if (isCs) "Celkem: $caTotalMhz" else "Total: $caTotalMhz",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = CyanTertiary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                if (sim.aggregatedCarriers.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        sim.aggregatedCarriers.forEach { carrierText ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Purple5G.copy(alpha = 0.16f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Purple5G.copy(alpha = 0.45f))
+                            ) {
+                                Text(
+                                    text = carrierText,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimaryDark
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val fallbackFreq = sim.dlFreqMhz?.takeIf { it > 0.0 }?.let {
+                        String.format(Locale.US, "%.1f MHz", it)
+                    } ?: ""
+                    val fallbackBw = sim.channelBandwidthKhz?.let { "${it / 1000} MHz" } ?: ""
+                    val pccDesc = listOf(sim.band, fallbackFreq, fallbackBw).filter { it.isNotBlank() }.joinToString(" • ")
+                    Text(
+                        text = if (isCs) {
+                            "PCC: $pccDesc (další SCC kmitočty v idle/modem HAL nehlásí)"
+                        } else {
+                            "PCC: $pccDesc (secondary SCC frequencies not exposed by modem HAL in idle)"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
                     )
                 }
             }

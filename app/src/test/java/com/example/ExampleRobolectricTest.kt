@@ -150,7 +150,13 @@ class ExampleRobolectricTest {
         sim2Rssi = -78,
         sim2TimingAdvance = 3,
         sim2EstimatedDistanceM = 468.7,
-        waypointNote = waypoint
+        waypointNote = waypoint,
+        uniqueSatellitesInView = 18,
+        uniqueSatellitesUsed = satsUsed,
+        usedSatellitesDetail = "G10(L1/L5@34); E03(E1/E5a@29)",
+        visibleSatellitesDetail = "G02(L1@33); G10(L1/L5@34); E03(E1/E5a@29)",
+        sim1CaSummary = "LTE-A 2CA (B20+B3 • 30 MHz) | PCC: B20 • 806.0 MHz • 10 MHz + SCC 1: B3 • 1845.0 MHz • 20 MHz",
+        sim2CaSummary = "5G NSA EN-DC (n78 • 40 MHz)"
     )
 
     @Test
@@ -166,6 +172,10 @@ class ExampleRobolectricTest {
         assertTrue(csv.contains("\"Bazar/Bridge\""))
         assertTrue(csv.contains("\"25400\""))
         assertTrue(csv.contains(",-,-,-,")) // no-fix DOP turns into '-'
+        assertTrue(csv.contains("UniqueSatsInView,UniqueSatsUsed,UsedSatellites,VisibleSatellites,Sim1CA,Sim2CA"))
+        assertTrue(csv.contains("G10(L1/L5@34); E03(E1/E5a@29)"))
+        assertTrue(csv.contains("G02(L1@33); G10(L1/L5@34); E03(E1/E5a@29)"))
+        assertTrue(csv.contains("PCC: B20 • 806.0 MHz • 10 MHz + SCC 1: B3 • 1845.0 MHz • 20 MHz"))
     }
 
     @Test
@@ -185,11 +195,18 @@ class ExampleRobolectricTest {
         assertTrue(gpx.contains("<gpx version=\"1.1\""))
         assertTrue(gpx.contains("<wpt lat=\"49.2268\" lon=\"16.5754\">"))
         assertTrue(gpx.contains("<sim2_rsrp>-91</sim2_rsrp>"))
+        assertTrue(gpx.contains("<sats_in_view>24</sats_in_view>"))
+        assertTrue(gpx.contains("<used_satellites>G10(L1/L5@34); E03(E1/E5a@29)</used_satellites>"))
+        assertTrue(gpx.contains("<visible_satellites>G02(L1@33); G10(L1/L5@34); E03(E1/E5a@29)</visible_satellites>"))
 
         val geoJson = Exporter.exportToGeoJson(session, records)
         assertTrue(geoJson.contains("\"type\": \"FeatureCollection\""))
         assertTrue(geoJson.contains("\"waypointNote\": \"Start Gate\""))
         assertTrue(geoJson.contains("\"sim2Rsrp\": -91"))
+        assertTrue(geoJson.contains("\"satellitesInView\": 24"))
+        assertTrue(geoJson.contains("\"uniqueSatellitesInView\": 18"))
+        assertTrue(geoJson.contains("\"usedSatellites\": \"G10(L1/L5@34); E03(E1/E5a@29)\""))
+        assertTrue(geoJson.contains("\"visibleSatellites\": \"G02(L1@33); G10(L1/L5@34); E03(E1/E5a@29)\""))
     }
 
     @Test
@@ -219,6 +236,9 @@ class ExampleRobolectricTest {
             assertEquals(1, loadedRecords.size)
             assertEquals("Check 1", loadedRecords[0].waypointNote)
             assertEquals(412, loadedRecords[0].sim2Pci)
+            assertEquals(18, loadedRecords[0].uniqueSatellitesInView)
+            assertEquals("G10(L1/L5@34); E03(E1/E5a@29)", loadedRecords[0].usedSatellitesDetail)
+            assertEquals("G02(L1@33); G10(L1/L5@34); E03(E1/E5a@29)", loadedRecords[0].visibleSatellitesDetail)
         } finally {
             db.close()
         }
@@ -231,27 +251,96 @@ class ExampleRobolectricTest {
 
         // Add first point (Brno VUT)
         TelemetryLoggingService.addMapTrailPoint(
-            MapTrailPoint(49.226800, 16.575400, -85, -92, 30f, 18, 1.1f, 1000L)
+            MapTrailPoint(49.226800, 16.575400, -85, -92, 30f, 18, 30, 1.1f, 1000L)
         )
         // Add jitter point < 1.5m away (should be deduplicated)
         TelemetryLoggingService.addMapTrailPoint(
-            MapTrailPoint(49.226803, 16.575403, -86, -92, 30f, 18, 1.1f, 2000L)
+            MapTrailPoint(49.226803, 16.575403, -86, -92, 30f, 18, 30, 1.1f, 2000L)
         )
         assertEquals(1, TelemetryLoggingService.liveMapTrail.value.size)
 
         // Add point ~15m away (should be added)
         TelemetryLoggingService.addMapTrailPoint(
-            MapTrailPoint(49.226950, 16.575400, -98, -89, 32f, 16, 1.3f, 3000L)
+            MapTrailPoint(49.226950, 16.575400, -98, -89, 32f, 16, 28, 1.3f, 3000L)
         )
         assertEquals(2, TelemetryLoggingService.liveMapTrail.value.size)
 
         val sim = SimCellInfo(
             channelBandwidthKhz = 20_000,
             totalAggregatedBandwidthKhz = 60_000,
-            carrierAggregationSummary = "CA 3CC (60 MHz)"
+            carrierAggregationSummary = "CA 3CC (60 MHz)",
+            aggregatedCarriers = listOf("PCC: B20 • 806.0 MHz • 10 MHz", "SCC 1: B3 • 1845.0 MHz • 20 MHz")
         )
         assertEquals(20_000, sim.channelBandwidthKhz)
         assertEquals(60_000, sim.totalAggregatedBandwidthKhz)
+        assertEquals(2, sim.aggregatedCarriers.size)
+        assertEquals("800 MHz", BandMapper.lteBandToFreqLabel(20))
+        assertEquals("3500 MHz C-Band", BandMapper.nrBandToFreqLabel(78))
         TelemetryLoggingService.clearLiveMapTrail()
+    }
+
+    @Test
+    fun test5gNsaVsSaClassificationAndNrBands() {
+        // 1. Plain 4G LTE without any NR indication
+        val plainLte = com.example.telemetry.CellularTelemetryEngine.classifyCellularGeneration(
+            baseTech = "4G LTE",
+            overrideNetworkType = 0,
+            isNrConnectedByServiceState = false,
+            isNrNotRestrictedByServiceState = false,
+            hasNrSecondaryCell = false,
+            hasNrPhysicalChannel = false,
+            hasNrSignalStrength = false,
+            isDataNetworkNr = false
+        )
+        assertEquals("4G LTE", plainLte.first)
+        assertEquals(null, plainLte.second)
+
+        // 2. 5G NSA in idle on LTE Anchor (status bar shows 5G via TelephonyDisplayInfo or NR_STATE_NOT_RESTRICTED)
+        val nsaAnchor = com.example.telemetry.CellularTelemetryEngine.classifyCellularGeneration(
+            baseTech = "4G LTE",
+            overrideNetworkType = 3, // OVERRIDE_NETWORK_TYPE_NR_NSA
+            isNrConnectedByServiceState = false,
+            isNrNotRestrictedByServiceState = true,
+            hasNrSecondaryCell = false,
+            hasNrPhysicalChannel = false,
+            hasNrSignalStrength = false,
+            isDataNetworkNr = false
+        )
+        assertEquals("5G NSA", nsaAnchor.first)
+        assertEquals("EN-DC LTE Kotva (Idle)", nsaAnchor.second)
+
+        // 3. 5G NSA with active NR SCG (EN-DC connected / CellSignalStrengthNr / PhysicalChannelConfig NR)
+        val nsaActive = com.example.telemetry.CellularTelemetryEngine.classifyCellularGeneration(
+            baseTech = "4G LTE",
+            overrideNetworkType = 3,
+            isNrConnectedByServiceState = true,
+            isNrNotRestrictedByServiceState = true,
+            hasNrSecondaryCell = true,
+            hasNrPhysicalChannel = true,
+            hasNrSignalStrength = true,
+            isDataNetworkNr = false
+        )
+        assertEquals("5G NSA", nsaActive.first)
+        assertEquals("EN-DC NR Aktivní", nsaActive.second)
+
+        // 4. Future 5G SA (primary serving CellInfoNr without NR_NSA override)
+        val sa5g = com.example.telemetry.CellularTelemetryEngine.classifyCellularGeneration(
+            baseTech = "5G SA",
+            overrideNetworkType = 0,
+            isNrConnectedByServiceState = true,
+            isNrNotRestrictedByServiceState = false,
+            hasNrSecondaryCell = false,
+            hasNrPhysicalChannel = true,
+            hasNrSignalStrength = true,
+            isDataNetworkNr = true
+        )
+        assertEquals("5G SA", sa5g.first)
+        assertEquals("5G Standalone (SA)", sa5g.second)
+
+        // 5. Verify European 5G NR bands don't shadow each other
+        assertTrue(BandMapper.nrArfcnToBand(155000).startsWith("n28"))
+        assertTrue(BandMapper.nrArfcnToBand(160000).startsWith("n20"))
+        assertTrue(BandMapper.nrArfcnToBand(426000).startsWith("n1"))
+        assertTrue(BandMapper.nrArfcnToBand(636000).startsWith("n78"))
     }
 }

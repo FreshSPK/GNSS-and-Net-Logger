@@ -82,9 +82,21 @@ fun GnssTab(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = if (isCs) "/ ${gnss.satellitesInView} v dosahu" else "/ ${gnss.satellitesInView} in view",
+                        text = if (isCs) "/ ${gnss.satellitesInView} signálů" else "/ ${gnss.satellitesInView} signals",
                         style = MaterialTheme.typography.titleMedium,
                         color = TextPrimaryDark
+                    )
+                }
+                if (gnss.uniqueSatellitesInView > 0) {
+                    Text(
+                        text = if (isCs) {
+                            "Satelity (unikátní): ${gnss.uniqueSatellitesUsedInFix} / ${gnss.uniqueSatellitesInView}"
+                        } else {
+                            "Unique Satellites: ${gnss.uniqueSatellitesUsedInFix} / ${gnss.uniqueSatellitesInView}"
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = TextSecondaryDark,
+                        fontFamily = FontFamily.Monospace
                     )
                 }
                 val ttffText = gnss.ttffSeconds?.let { "TTFF: ${String.format(Locale.US, "%.1f s", it)}" }
@@ -137,7 +149,7 @@ fun GnssTab(
             FilterChip(
                 selected = selectedFilter == "L5",
                 onClick = { selectedFilter = "L5" },
-                label = { Text(if (isCs) "L5 / E5a / B2a (${gnss.l5Count})" else "L5 / E5a / B2a (${gnss.l5Count})") }
+                label = { Text("L5 / E5a / B2a (${gnss.l5InViewCount})") }
             )
             FilterChip(
                 selected = selectedFilter == "GPS",
@@ -554,10 +566,10 @@ fun GnssTab(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = if (isCs) "• < 1.0 (Ideální): Mimořádná přesnost, satelity rovnoměrně rozprostřeny." else "• < 1.0 (Ideal): Highest possible accuracy, satellites evenly distributed.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = if (isCs) "• 1.0 - 2.0 (Výborné): Běžná kvalita pro otevřené prostranství." else "• 1.0 - 2.0 (Excellent): Standard open sky accuracy.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = if (isCs) "• 2.0 - 5.0 (Dobré): Plně vyhovující pro navigaci a měření v terénu." else "• 2.0 - 5.0 (Good): Sufficient for standard route and vehicle tracking.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = if (isCs) "• > 5.0 (Slabé): Satelity jsou v jedné přímce nebo stíněny zástavbou." else "• > 5.0 (Poor): Satellites in one line or heavily shielded by buildings.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• < 1.0 (Nejlepší): Mimořádná přesnost, satelity rovnoměrně rozprostřeny (venku běžně 0.6–0.8)." else "• < 1.0 (Best): Highest accuracy, satellites evenly distributed (typically 0.6–0.8 outdoors).", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 1.0 - 2.0 (Výborné): Velmi dobrá kvalita pro běžné měření." else "• 1.0 - 2.0 (Excellent): Very good quality for standard surveying.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 2.0 - 4.0 (Zhoršené): Částečné stínění zástavbou nebo stromy." else "• 2.0 - 4.0 (Fair): Partial shielding by buildings or canopy.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• ≥ 4.0 (Nejhorší): Silně zhoršená geometrie satelitů nebo hluboký kaňon." else "• ≥ 4.0 (Worst): Severely degraded satellite geometry or urban canyon.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (isCs) "HDOP = horizontální poloha (zeměpisná šířka a délka)\nVDOP = vertikální poloha (nadmořská výška)\nPDOP = celkový 3D polohový rozptyl (sqrt(HDOP² + VDOP²))" else "HDOP = Horizontal position (Lat/Lon)\nVDOP = Vertical position (Altitude)\nPDOP = 3D Spatial position dispersion (sqrt(HDOP² + VDOP²))",

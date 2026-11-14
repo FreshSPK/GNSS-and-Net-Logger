@@ -45,6 +45,8 @@ fun OverviewTab(
     sessionStartTimeMs: Long? = null,
     sessionDistanceMeters: Double = 0.0,
     handoverCount: Int = 0,
+    handoverCountSim1: Int = 0,
+    handoverCountSim2: Int = 0,
     fieldsSelection: LoggedFieldsSelection,
     lang: String,
     onStartLogging: () -> Unit,
@@ -151,9 +153,9 @@ fun OverviewTab(
                             val distStr = String.format(Locale.US, "%.2f km", sessionDistanceMeters / 1000.0)
                             Text(
                                 text = if (isCs) {
-                                    "$timerStr  •  Vzorků: $loggedPoints  •  $distStr  •  HO: $handoverCount"
+                                    "$timerStr  •  Vzorků: $loggedPoints  •  $distStr\nHO SIM1: $handoverCountSim1  |  SIM2: $handoverCountSim2  (Celkem: $handoverCount)"
                                 } else {
-                                    "$timerStr  •  Samples: $loggedPoints  •  $distStr  •  HO: $handoverCount"
+                                    "$timerStr  •  Samples: $loggedPoints  •  $distStr\nHO SIM1: $handoverCountSim1  |  SIM2: $handoverCountSim2  (Total: $handoverCount)"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
@@ -470,7 +472,13 @@ fun OverviewTab(
                         color = CyanTertiary
                     )
                     Text(
-                        text = if (isCs) "${gnss.satellitesUsedInFix} použito z ${gnss.satellitesInView} viditelných" else "${gnss.satellitesUsedInFix} used of ${gnss.satellitesInView} visible",
+                        text = if (isCs) {
+                            val uniq = if (gnss.uniqueSatellitesInView > 0) " (${gnss.uniqueSatellitesUsedInFix}/${gnss.uniqueSatellitesInView} sat.)" else ""
+                            "${gnss.satellitesUsedInFix}/${gnss.satellitesInView} sig.$uniq"
+                        } else {
+                            val uniq = if (gnss.uniqueSatellitesInView > 0) " (${gnss.uniqueSatellitesUsedInFix}/${gnss.uniqueSatellitesInView} sats)" else ""
+                            "${gnss.satellitesUsedInFix}/${gnss.satellitesInView} sig.$uniq"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
                         color = EmeraldSignal
@@ -838,11 +846,26 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val bandDesc = buildString {
+                append(sim.band)
+                if (!sim.nrBand.isNullOrBlank()) {
+                    append(" + ")
+                    append(sim.nrBand.substringBefore(" "))
+                }
+                append(" (PCI ${if (sim.pci > 0) sim.pci else "N/A"})")
+                if (!sim.nrStateLabel.isNullOrBlank()) {
+                    append(" • ${sim.nrStateLabel}")
+                }
+            }
             Text(
-                text = "${sim.band} (PCI ${if (sim.pci > 0) sim.pci else "N/A"})",
+                text = bandDesc,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondaryDark
+                color = if (sim.networkGen.contains("5G")) Purple5G else TextSecondaryDark,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
             )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "${sim.rsrp ?: "N/A"} dBm",
                 style = MaterialTheme.typography.bodyMedium,

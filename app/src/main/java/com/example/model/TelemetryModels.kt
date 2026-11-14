@@ -28,6 +28,8 @@ data class GnssState(
     val verticalAccuracyM: Float = 0f,
     val satellitesInView: Int = 0,
     val satellitesUsedInFix: Int = 0,
+    val uniqueSatellitesInView: Int = 0,
+    val uniqueSatellitesUsedInFix: Int = 0,
     val pdop: Float = 0f,
     val hdop: Float = 0f,
     val vdop: Float = 0f,
@@ -38,6 +40,7 @@ data class GnssState(
     val constellationCountMap: Map<String, Pair<Int, Int>> = emptyMap(), // Constellation -> (used, total)
     val l1Count: Int = 0,
     val l5Count: Int = 0,
+    val l5InViewCount: Int = 0,
     val latestNmeaSentence: String? = null,
     val rawDopplerHz: Float? = null,
     val adrValidCount: Int = 0,
@@ -113,7 +116,13 @@ data class SimCellInfo(
     val neighbors: List<CellNeighbor> = emptyList(),
     val anomalies: List<CellularAnomaly> = emptyList(),
     val carrierAggregationSummary: String? = null,
-    val totalAggregatedBandwidthKhz: Int? = null
+    val totalAggregatedBandwidthKhz: Int? = null,
+    val aggregatedCarriers: List<String> = emptyList(),
+    val nrStateLabel: String? = null,
+    val nrBand: String? = null,
+    val nrArfcn: Int? = null,
+    val nrPci: Int? = null,
+    val nrDlFreqMhz: Double? = null
 )
 
 data class CellularState(
@@ -159,6 +168,7 @@ data class ChartPoint(
     val rsrpSim2: Float? = null,
     val speedKmh: Float,
     val satCount: Int,
+    val satInViewCount: Int = 0,
     val pingMs: Float?,
     val accelMagnitude: Float = 9.81f,
     val gyroZ: Float = 0f,
@@ -179,6 +189,7 @@ data class MapTrailPoint(
     val sim2Rsrp: Int?,
     val speedKmh: Float,
     val satellitesUsed: Int,
+    val satellitesInView: Int = 0,
     val pdop: Float,
     val timestampMs: Long
 )

@@ -31,16 +31,54 @@ object BandMapper {
      */
     fun nrArfcnToBand(nrarfcn: Int): String {
         return when (nrarfcn) {
-            in 140000..170000 -> "n28 (700 MHz FDD)"
-            in 151600..160600 -> "n20 (800 MHz FDD)"
+            in 158200..164200 -> "n20 (800 MHz FDD)"
+            in 140000..158199 -> "n28 (700 MHz FDD)"
             in 185000..192000 -> "n8 (900 MHz FDD)"
             in 361000..376000 -> "n3 (1800 MHz FDD)"
             in 422000..434000 -> "n1 (2100 MHz FDD)"
-            in 499200..537999 -> "n7 (2600 MHz FDD)"
+            in 514000..524000 -> "n38 (2600 MHz TDD)"
+            in 499200..538000 -> "n7 (2600 MHz FDD)"
             in 620000..653333 -> "n78 (3500 MHz C-Band)"
-            in 636667..672000 -> "n77 (3700 MHz C-Band)"
-            in 499200..538000 -> "n38 (2600 MHz TDD)"
+            in 653334..693333 -> "n77 (3700 MHz C-Band)"
             else -> if (nrarfcn > 0) "NR-ARFCN $nrarfcn" else "Unknown NR Band"
+        }
+    }
+
+    fun lteBandToFreqLabel(band: Int): String {
+        return when (band) {
+            1 -> "2100 MHz"
+            2 -> "1900 MHz"
+            3 -> "1800 MHz"
+            4 -> "1700/2100 MHz"
+            5 -> "850 MHz"
+            7 -> "2600 MHz"
+            8 -> "900 MHz"
+            20 -> "800 MHz"
+            28 -> "700 MHz"
+            32 -> "1500 MHz SDL"
+            38 -> "2600 MHz TDD"
+            40 -> "2300 MHz TDD"
+            41 -> "2500 MHz TDD"
+            42 -> "3500 MHz TDD"
+            43 -> "3700 MHz TDD"
+            else -> if (band > 0) "Band $band" else ""
+        }
+    }
+
+    fun nrBandToFreqLabel(band: Int): String {
+        return when (band) {
+            1 -> "2100 MHz"
+            3 -> "1800 MHz"
+            7 -> "2600 MHz"
+            8 -> "900 MHz"
+            20 -> "800 MHz"
+            28 -> "700 MHz"
+            38 -> "2600 MHz TDD"
+            40 -> "2300 MHz TDD"
+            41 -> "2500 MHz TDD"
+            77 -> "3700 MHz C-Band"
+            78 -> "3500 MHz C-Band"
+            else -> if (band > 0) "n$band" else ""
         }
     }
 
@@ -50,11 +88,33 @@ object BandMapper {
     fun lteEarfcnToFrequencies(earfcn: Int): Pair<Double, Double> {
         return when (earfcn) {
             in 0..599 -> Pair(2110.0 + 0.1 * (earfcn - 0), 1920.0 + 0.1 * (earfcn - 0)) // B1
+            in 600..1199 -> Pair(1930.0 + 0.1 * (earfcn - 600), 1850.0 + 0.1 * (earfcn - 600)) // B2
             in 1200..1949 -> Pair(1805.0 + 0.1 * (earfcn - 1200), 1710.0 + 0.1 * (earfcn - 1200)) // B3
             in 2750..3449 -> Pair(2620.0 + 0.1 * (earfcn - 2750), 2500.0 + 0.1 * (earfcn - 2750)) // B7
             in 3450..3799 -> Pair(925.0 + 0.1 * (earfcn - 3450), 880.0 + 0.1 * (earfcn - 3450)) // B8
             in 6150..6449 -> Pair(791.0 + 0.1 * (earfcn - 6150), 832.0 + 0.1 * (earfcn - 6150)) // B20
             in 8650..9039 -> Pair(758.0 + 0.1 * (earfcn - 8650), 703.0 + 0.1 * (earfcn - 8650)) // B28
+            in 9210..9659 -> Pair(1452.0 + 0.1 * (earfcn - 9210), 0.0) // B32 SDL
+            in 37750..38249 -> {
+                val f = 2570.0 + 0.1 * (earfcn - 37750)
+                Pair(f, f) // B38 TDD
+            }
+            in 38650..39649 -> {
+                val f = 2300.0 + 0.1 * (earfcn - 38650)
+                Pair(f, f) // B40 TDD
+            }
+            in 39650..41589 -> {
+                val f = 2496.0 + 0.1 * (earfcn - 39650)
+                Pair(f, f) // B41 TDD
+            }
+            in 41590..43589 -> {
+                val f = 3400.0 + 0.1 * (earfcn - 41590)
+                Pair(f, f) // B42 TDD
+            }
+            in 43590..45589 -> {
+                val f = 3600.0 + 0.1 * (earfcn - 43590)
+                Pair(f, f) // B43 TDD
+            }
             else -> Pair(0.0, 0.0)
         }
     }

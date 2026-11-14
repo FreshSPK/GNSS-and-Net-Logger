@@ -50,6 +50,7 @@ fun ChartsTab(
                         sinrSim2 = r.sim2Sinr,
                         speedKmh = r.speedKmh,
                         satCount = r.satellitesUsedInFix,
+                        satInViewCount = r.satellitesInView,
                         pdop = if (r.satellitesUsedInFix >= 4 && r.pdop > 0f && r.pdop < 9.0f) r.pdop else null,
                         agcScore = r.agcInterferenceScore,
                         pingMs = r.pingRttMs?.toFloat(),
@@ -73,6 +74,7 @@ fun ChartsTab(
     val sinrSim2Values = effectivePoints.map { it.sinrSim2 }
     val speedValues = effectivePoints.map { it.speedKmh }
     val satValues = effectivePoints.map { it.satCount.toFloat() }
+    val satInViewValues = effectivePoints.map { it.satInViewCount.toFloat() }
     val pdopValues = effectivePoints.map { it.pdop }
     val agcValues = effectivePoints.map { it.agcScore }
     val pingValues = effectivePoints.map { it.pingMs }
@@ -91,6 +93,7 @@ fun ChartsTab(
 
     val lastSpeed = lastPoint?.let { String.format(Locale.US, "%.1f", it.speedKmh) } ?: "0.0"
     val lastSats = lastPoint?.satCount?.toString() ?: "0"
+    val lastSatsInView = lastPoint?.satInViewCount?.toString() ?: "0"
     val lastPdop = lastPoint?.pdop?.let { String.format(Locale.US, "%.2f", it) } ?: "—"
     val lastAgc = lastPoint?.let { String.format(Locale.US, "%.1f", it.agcScore) } ?: "0.0"
     val lastPing = lastPoint?.pingMs?.let { String.format(Locale.US, "%.0f", it) } ?: "—"
@@ -204,30 +207,35 @@ fun ChartsTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // 4. Satellite in Fix Count Chart (adaptive ceiling handles 60+ sats!)
-        RealtimeSparklineChart(
-            title = if (isCs) "Počet satelitů ve fixu" else "Satellites Used in Fix",
-            currentValue = lastSats,
-            unit = if (isCs) "satelitů" else "sats",
-            values = satValues,
+        // 4. Satellite Used vs Visible Count Chart
+        DualRealtimeSparklineChart(
+            title = if (isCs) "Počet satelitů (použité vs. viditelné)" else "Satellites (Used in Fix vs. Visible)",
+            label1 = if (isCs) "Ve fixu" else "Used",
+            currentValue1 = lastSats,
+            values1 = satValues,
+            color1 = EmeraldSignal,
+            label2 = if (isCs) "Viditelné" else "Visible",
+            currentValue2 = lastSatsInView,
+            values2 = satInViewValues,
+            color2 = BlueSatellite,
             timestampsMs = timestamps,
-            lineColor = BlueSatellite,
+            unit = if (isCs) "sat." else "sats",
             minY = 0f,
-            maxY = 40f
+            maxY = 60f
         )
 
         Spacer(modifier = Modifier.height(14.dp))
 
         // 5. PDOP Geometry Chart
         RealtimeSparklineChart(
-            title = if (isCs) "3D geometrie PDOP v čase" else "PDOP 3D Constellation Geometry",
+            title = if (isCs) "3D geometrie PDOP v čase (< 1.0 nejlepší, ≥ 4.0 nejhorší)" else "PDOP 3D Constellation Geometry (< 1.0 best, ≥ 4.0 worst)",
             currentValue = lastPdop,
             unit = "PDOP",
             values = pdopValues,
             timestampsMs = timestamps,
             lineColor = CyanTertiary,
             minY = 0f,
-            maxY = 5f
+            maxY = 4f
         )
 
         Spacer(modifier = Modifier.height(14.dp))
