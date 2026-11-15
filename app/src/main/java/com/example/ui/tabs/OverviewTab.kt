@@ -300,11 +300,16 @@ fun OverviewTab(
                         fontWeight = FontWeight.Bold,
                         color = CyanTertiary
                     )
+                    val has3dFix = gnss.hasFix && gnss.satellitesUsedInFix >= 4
                     Text(
-                        text = if (gnss.hasFix) (if (isCs) "3D GNSS Fix Aktivní" else "3D GNSS Fix Active") else (if (isCs) "Vyhledávání..." else "Searching..."),
+                        text = when {
+                            has3dFix -> if (isCs) "3D GNSS Fix Aktivní" else "3D GNSS Fix Active"
+                            gnss.hasFix -> if (isCs) "Omezený GNSS Fix" else "Limited GNSS Fix"
+                            else -> if (isCs) "Bez GNSS Fixu (Vyhledávání...)" else "No GNSS Fix (Searching...)"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (gnss.hasFix) EmeraldSignal else AmberWarning
+                        color = if (has3dFix) EmeraldSignal else AmberWarning
                     )
                 }
 
@@ -339,13 +344,17 @@ fun OverviewTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "RYCHLOST" else "SPEED", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h",
+                            text = if (gnss.hasFix) "${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h" else "—",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = CyanTertiary
+                            color = if (gnss.hasFix) CyanTertiary else TextSecondaryDark
                         )
-                        val spdAccStr = gnss.speedAccuracyKmh?.let { "±${String.format(Locale.US, "%.1f", it)} km/h" } ?: "—"
+                        val spdAccStr = if (gnss.hasFix) {
+                            gnss.speedAccuracyKmh?.let { "±${String.format(Locale.US, "%.1f", it)} km/h" } ?: "—"
+                        } else {
+                            if (isCs) "Bez fixu" else "No fix"
+                        }
                         Text(text = spdAccStr, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
@@ -377,11 +386,11 @@ fun OverviewTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "AZIMUT (SMĚR)" else "AZIMUTH", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                         Text(
-                            text = "${String.format(Locale.US, "%.0f", gnss.bearingDeg)}°",
+                            text = if (gnss.hasFix) "${String.format(Locale.US, "%.0f", gnss.bearingDeg)}°" else "—",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = AmberWarning
+                            color = if (gnss.hasFix) AmberWarning else TextSecondaryDark
                         )
                         Text(text = "T (BEARING)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }

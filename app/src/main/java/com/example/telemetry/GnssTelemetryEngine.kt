@@ -36,6 +36,8 @@ class GnssTelemetryEngine(
     @Volatile
     private var isStarted = false
     private var startElapsedMs: Long = 0L
+    @Volatile
+    private var lastFixElapsedMs: Long = 0L
     private var measuredTtffSec: Float? = null
     private var latestGeoidSepM: Double? = null
     private var gnssThread: android.os.HandlerThread? = null
@@ -132,6 +134,38 @@ class GnssTelemetryEngine(
         gnssHandler = null
     }
 
+    fun resetState() {
+        lastValidGpsLocation = null
+        agcBaselineDb = null
+        isNmeaDopAvailable = false
+        lastFixElapsedMs = 0L
+        measuredTtffSec = null
+        latestGeoidSepM = null
+        _gnssState.value = GnssState()
+    }
+
+    fun checkFixTimeout() {
+        val current = _gnssState.value
+        if (!current.hasFix) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val elapsedSinceFix = if (lastFixElapsedMs > 0L) now - lastFixElapsedMs else Long.MAX_VALUE
+        val timedOut = elapsedSinceFix > 8000L || (current.satellitesUsedInFix == 0 && elapsedSinceFix > 2500L)
+        if (timedOut) {
+            isNmeaDopAvailable = false
+            _gnssState.value = current.copy(
+                hasFix = false,
+                speedKmh = 0f,
+                speedMs = 0f,
+                speedAccuracyKmh = null,
+                horizontalAccuracyM = 0f,
+                verticalAccuracyM = 0f,
+                pdop = 0f,
+                hdop = 0f,
+                vdop = 0f
+            )
+        }
+    }
+
     fun resetAgcBaseline() {
         agcBaselineDb = null
         val cur = _gnssState.value
@@ -175,8 +209,10 @@ class GnssTelemetryEngine(
     }
 
     private fun updateLocationState(loc: Location) {
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        lastFixElapsedMs = nowElapsed
         if (measuredTtffSec == null && startElapsedMs > 0L) {
-            measuredTtffSec = ((android.os.SystemClock.elapsedRealtime() - startElapsedMs) / 1000f).coerceAtLeast(0.1f)
+            measuredTtffSec = ((nowElapsed - startElapsedMs) / 1000f).coerceAtLeast(0.1f)
         }
 
         val speedMs = if (loc.hasSpeed()) loc.speed else 0f
@@ -331,6 +367,11 @@ class GnssTelemetryEngine(
             )
         }
 
+        // Clear stale NMEA DOP when fewer than 4 satellites are used in fix
+        if (usedCount < 4) {
+            isNmeaDopAvailable = false
+        }
+
         // Geometric DOP calculation if NMEA has not arrived yet
         var currentPdop = _gnssState.value.pdop
         var currentHdop = _gnssState.value.hdop
@@ -370,6 +411,14 @@ class GnssTelemetryEngine(
             }
         }
 
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+        val elapsedSinceFix = if (lastFixElapsedMs > 0L) nowElapsed - lastFixElapsedMs else Long.MAX_VALUE
+        val fixStillValid = _gnssState.value.hasFix && when {
+            usedCount == 0 -> elapsedSinceFix <= 2500L
+            usedCount < 4 -> elapsedSinceFix <= 5000L
+            else -> elapsedSinceFix <= 10000L
+        }
+
         val dualRatio = if (usedCount > 0) {
             (dualFreqUsedCount.toFloat() / usedCount.toFloat() * 100f).coerceAtMost(100f)
         } else 0f
@@ -383,6 +432,12 @@ class GnssTelemetryEngine(
 
         val current = _gnssState.value
         _gnssState.value = current.copy(
+            hasFix = fixStillValid,
+            speedKmh = if (fixStillValid) current.speedKmh else 0f,
+            speedMs = if (fixStillValid) current.speedMs else 0f,
+            speedAccuracyKmh = if (fixStillValid) current.speedAccuracyKmh else null,
+            horizontalAccuracyM = if (fixStillValid) current.horizontalAccuracyM else 0f,
+            verticalAccuracyM = if (fixStillValid) current.verticalAccuracyM else 0f,
             satellitesInView = satCount,
             satellitesUsedInFix = usedCount,
             uniqueSatellitesInView = uniqueInViewKeys.size,

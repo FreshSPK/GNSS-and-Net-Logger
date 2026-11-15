@@ -267,11 +267,17 @@ fun SkyPlotView(
                         }
 
                         if (sat.isDualFreq) {
+                            val glowRadius = if (sat.usedInFix) 9.6.dp.toPx() else 8.0.dp.toPx()
                             drawCircle(
-                                color = EmeraldSignal,
+                                color = EmeraldSignal.copy(alpha = 0.28f),
+                                radius = glowRadius,
+                                center = Offset(sx, sy)
+                            )
+                            drawCircle(
+                                color = EmeraldSignal.copy(alpha = 0.85f),
                                 radius = if (sat.usedInFix) 8.2.dp.toPx() else 6.8.dp.toPx(),
                                 center = Offset(sx, sy),
-                                style = Stroke(width = 1.5.dp.toPx())
+                                style = Stroke(width = 1.4.dp.toPx())
                             )
                         }
 
@@ -405,10 +411,15 @@ fun SkyPlotView(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(10.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(EmeraldSignal.copy(alpha = 0.25f), CircleShape)
+                            .border(1.3.dp, EmeraldSignal, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Zelený vnější kroužek = Pásmo L5/E5a/B2a" else "Green outer ring = L5/E5a/B2a band",
+                        text = if (isCs) "Zelená záře = Pásmo L5/E5a/B2a" else "Green glow = L5/E5a/B2a band",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = EmeraldSignal
                     )
@@ -465,10 +476,15 @@ fun SkyPlotView(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(10.dp).border(1.5.dp, EmeraldSignal, CircleShape))
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(EmeraldSignal.copy(alpha = 0.25f), CircleShape)
+                            .border(1.3.dp, EmeraldSignal, CircleShape)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Zelený vnější kroužek = Pásmo L5/E5a/B2a" else "Green outer ring = L5/E5a/B2a band",
+                        text = if (isCs) "Zelená záře = Pásmo L5/E5a/B2a" else "Green glow = L5/E5a/B2a band",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = EmeraldSignal
                     )

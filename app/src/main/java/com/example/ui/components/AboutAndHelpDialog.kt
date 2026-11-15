@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.School
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,6 +119,25 @@ fun AboutAndHelpDialog(
                                 color = CyanSecondary
                             )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .testTag("author_github_link")
+                                .clickable {
+                                    val ghIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/FreshSPK/GNSS-and-Net-Logger"))
+                                    context.startActivity(ghIntent)
+                                }
+                        ) {
+                            Icon(imageVector = Icons.Default.Code, contentDescription = "GitHub Repository", tint = CyanTertiary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "GitHub: https://github.com/FreshSPK/GNSS-and-Net-Logger",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = CyanTertiary
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Kontakt: kufa@vut.cz / kufa@vutbr.cz",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
@@ -155,15 +176,15 @@ fun AboutAndHelpDialog(
                             text = if (isCs) {
                                 "• Přesná detekce 5G NSA (EN-DC) vs. 5G SA + 5G NR sousedé: rozpoznává 5G NSA kotevní buňku i v RRC Idle (ikona 5G v liště) a aktivní 5G NR SCG větev (n1/n3/n28/n78) s odděleným filtrem 4G LTE / 5G NR\n" +
                                 "• Agregované kmitočty v Carrier Aggregation: zobrazení všech agregovaných nosných (PCC/SCC) včetně konkrétního pásma a frekvence v MHz (např. B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
-                                "• Shoda s GPS Test & SkyPlot: zobrazení fyzických unikátních družic i počtu L1+L5/E5a/B2a signálů, přesná synchronizace legendy Skyplotu (plné kolečko s bílým okrajem = ve fixu, prázdný kroužek = mimo fix)\n" +
-                                "• Oddělené handovery SIM 1 / SIM 2: samostatné počítadlo handoverů pro každou SIM i celkový součet (HO SIM1 | SIM2 | Celkem)\n" +
-                                "• Upravené prahy DOP & Satelitů + Logování: nová škála PDOP (< 1,0 výborný až ≥ 4,0 kritický) a satelitů (< 5, 5–20, 21–30, 31–50, > 50); databáze (Room v4), grafy i CSV/GPX/GeoJSON nyní logují jak použité, tak viditelné satelity včetně seznamu PRN\n" +
+                                "• Shoda s GPS Test & SkyPlot: zobrazení fyzických unikátních družic i počtu L1+L5/E5a/B2a signálů, synchronizace legendy Skyplotu (plný + bílý okraj = ve fixu, prázdný kroužek = mimo fix, zelená záře = L5/E5a/B2a)\n" +
+                                "• Oddělené handovery SIM 1 / SIM 2 & Indoor Fix Guard: samostatné HO počítadlo pro každou SIM, viditelný banner při zapnutém Demo režimu a nulování zastaralého fixu/rychlosti při ztrátě signálu v budově\n" +
+                                "• Upravené prahy DOP & Satelitů + Logování: nová škála PDOP (< 1,0 výborný až ≥ 4,0 kritický) a satelitů (< 5, 5–20, 21–30, 31–50, > 50); databáze (Room v4), grafy i CSV/GPX/GeoJSON nyní logují jak použité, tak viditelné satelity\n" +
                                 "• Vylepšené profily měření: nezalamující se předvolby Pěší (5s/10m), Auto (10s/50m) a Statické (10s)"
                             } else {
                                 "• Accurate 5G NSA (EN-DC) vs. 5G SA & 5G NR Neighbors: distinguishes 5G NSA LTE anchor (even when RRC Idle matches the status-bar 5G badge) from active 5G NR SCG legs (n1/n3/n28/n78) with dedicated 4G LTE / 5G NR neighbor filtering\n" +
                                 "• Component Carrier Frequencies in CA: displays all aggregated PCC/SCC carriers with exact band labels and center frequencies in MHz (e.g., B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
-                                "• GPS Test Alignment & SkyPlot Legend Fix: reports both unique physical satellites and total L1+L5/E5a/B2a signals; Skyplot legend matches canvas 1:1 (filled dot + white border = in fix, hollow ring = unused)\n" +
-                                "• Per-SIM Handover Tracking: independent handover counters for SIM 1, SIM 2, and combined total (HO SIM1 | SIM2)\n" +
+                                "• GPS Test Alignment & SkyPlot Legend: reports both unique physical satellites and total L1+L5/E5a/B2a signals; Skyplot legend matches canvas 1:1 (filled + white border = in fix, hollow ring = unused, green glow = L5/E5a/B2a)\n" +
+                                "• Per-SIM Handovers, Demo Banner & Indoor Fix Guard: independent HO counters per SIM, clear Demo Mode top banner across all tabs, and automatic fix/speed timeout reset when moving indoors\n" +
                                 "• Recalibrated DOP & Satellite Scales + Full Sat Logging: updated PDOP (< 1.0 optimal to ≥ 4.0 poor) and Satellite (< 5, 5–20, 21–30, 31–50, > 50) map/chart thresholds; Room v4, charts & CSV/GPX/GeoJSON now record both used and visible satellites\n" +
                                 "• Clean Settings Presets: non-wrapping chips for Walking (5s/10m), Driving (10s/50m), and Static (10s)"
                             },

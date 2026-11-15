@@ -330,6 +330,10 @@ class CellularTelemetryEngine(
         }
     }
 
+    fun resetState() {
+        _cellularState.value = CellularState()
+    }
+
     fun updateDemoData(sim1: SimCellInfo, sim2: SimCellInfo, pingMs: Long?) {
         _cellularState.value = _cellularState.value.copy(
             sim1 = sim1,

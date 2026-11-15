@@ -112,6 +112,11 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         _envState.value = current.copy(baseQnhHpa = qnhHpa, relativeAltitudeM = alt)
     }
 
+    fun resetToLiveDefaults() {
+        val qnh = _envState.value.baseQnhHpa
+        _envState.value = EnvironmentState(baseQnhHpa = qnh)
+    }
+
     fun updateDemoPressure(pressureHpa: Float, qnhHpa: Float) {
         val alt = calculateBarometricAltitude(pressureHpa, qnhHpa)
         val curBattery = _envState.value.battery

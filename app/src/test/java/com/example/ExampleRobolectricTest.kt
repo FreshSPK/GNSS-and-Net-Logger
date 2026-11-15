@@ -1,6 +1,10 @@
 package com.example
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.db.AppDatabase
@@ -8,14 +12,31 @@ import com.example.data.db.LogSession
 import com.example.data.db.TelemetryRecord
 import com.example.export.Exporter
 import com.example.model.AnomalyType
+import com.example.model.BatteryState
+import com.example.model.CellularState
+import com.example.model.EnvironmentState
+import com.example.model.GnssState
+import com.example.model.LoggedFieldsSelection
 import com.example.model.MapTrailPoint
+import com.example.model.SatelliteInfo
 import com.example.model.SimCellInfo
 import com.example.service.TelemetryLoggingService
+import com.example.telemetry.DemoSimulationEngine
+import com.example.telemetry.GnssTelemetryEngine
+import com.example.ui.components.AboutAndHelpDialog
+import com.example.ui.components.SkyPlotView
+import com.example.ui.tabs.OverviewTab
+import com.example.ui.theme.SignalLoggerTheme
 import com.example.util.BandMapper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -24,6 +45,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ExampleRobolectricTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
 
     @Test
     fun testCalculateLteDistanceMeters() {
@@ -342,5 +366,124 @@ class ExampleRobolectricTest {
         assertTrue(BandMapper.nrArfcnToBand(160000).startsWith("n20"))
         assertTrue(BandMapper.nrArfcnToBand(426000).startsWith("n1"))
         assertTrue(BandMapper.nrArfcnToBand(636000).startsWith("n78"))
+    }
+
+    @Test
+    fun testGnssEngineResetAndFixTimeoutClearsStaleDemoOrOutdoorSpeed() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val engine = GnssTelemetryEngine(context, scope)
+
+        // Simulate stale state (e.g. Demo Mode 44 km/h fix)
+        engine.updateDemoState(
+            GnssState(
+                hasFix = true,
+                latitude = 49.226756,
+                longitude = 16.571020,
+                speedKmh = 44.0f,
+                speedMs = 12.22f,
+                satellitesInView = 44,
+                satellitesUsedInFix = 0
+            )
+        )
+        assertTrue(engine.gnssState.value.hasFix)
+        assertEquals(44.0f, engine.gnssState.value.speedKmh, 0.01f)
+
+        // Check fix timeout immediately clears stale hasFix and speedKmh when lastFixElapsedMs == 0
+        engine.checkFixTimeout()
+        assertFalse(engine.gnssState.value.hasFix)
+        assertEquals(0f, engine.gnssState.value.speedKmh, 0.01f)
+
+        // Reset state completely clears coordinates and counts when leaving Demo mode
+        engine.updateDemoState(GnssState(hasFix = true, latitude = 49.226756, longitude = 16.571020, speedKmh = 44.0f))
+        engine.resetState()
+        assertFalse(engine.gnssState.value.hasFix)
+        assertEquals(0.0, engine.gnssState.value.latitude, 0.0001)
+        assertEquals(0.0, engine.gnssState.value.longitude, 0.0001)
+        assertEquals(0f, engine.gnssState.value.speedKmh, 0.01f)
+    }
+
+    @Test
+    fun testDemoSimulationGeneratesCaCarriersAndValidTelemetry() {
+        val demo = DemoSimulationEngine()
+        val (gnss, cellular, _) = demo.nextSimulationStep(taMultiplierMode = 2)
+        assertTrue(gnss.hasFix)
+        assertTrue(gnss.latitude in 49.0..49.5)
+        assertTrue(gnss.uniqueSatellitesInView > 0)
+        assertTrue(gnss.satellitesInView >= gnss.uniqueSatellitesInView)
+        assertTrue(cellular.sim1.aggregatedCarriers.isNotEmpty())
+        assertTrue(cellular.sim2.aggregatedCarriers.any { it.contains("n78") })
+        assertEquals("5G NSA", cellular.sim2.networkGen)
+    }
+
+    @Test
+    fun testSkyPlotGreenGlowAndAboutGithubLinkUi() {
+        val sampleSats = listOf(
+            SatelliteInfo(
+                svid = 10,
+                constellationType = 1,
+                constellationName = "GPS",
+                cn0DbHz = 38.0f,
+                elevationDegrees = 45f,
+                azimuthDegrees = 120f,
+                hasCarrierFrequency = true,
+                carrierFrequencyHz = 1176450000f,
+                bandLabel = "L5 (1176.45 MHz)",
+                usedInFix = true
+            )
+        )
+
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SkyPlotView(satellites = sampleSats, lang = "CS")
+            }
+        }
+        composeTestRule.onNodeWithText("Plný + bílý okraj = Ve fixu").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Prázdný kroužek = Mimo fix").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Zelená záře = Pásmo L5/E5a/B2a").assertIsDisplayed()
+    }
+
+    @Test
+    fun testAboutDialogShowsRelease14AndGithubRepoLink() {
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                AboutAndHelpDialog(lang = "CS", onDismiss = {})
+            }
+        }
+        composeTestRule.onNodeWithText("Release v1.4").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("author_github_link").assertIsDisplayed()
+        composeTestRule.onNodeWithText("GitHub: https://github.com/FreshSPK/GNSS-and-Net-Logger").assertIsDisplayed()
+    }
+
+    @Test
+    fun testOverviewTabNoFixDoesNotShowGnssFixOrStaleSpeed() {
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                OverviewTab(
+                    gnss = GnssState(
+                        hasFix = false,
+                        speedKmh = 44.0f,
+                        satellitesInView = 44,
+                        satellitesUsedInFix = 0,
+                        uniqueSatellitesInView = 44,
+                        uniqueSatellitesUsedInFix = 0
+                    ),
+                    cellular = CellularState(),
+                    env = EnvironmentState(battery = BatteryState()),
+                    isLogging = false,
+                    isPaused = false,
+                    loggedPoints = 0,
+                    fieldsSelection = LoggedFieldsSelection(),
+                    lang = "CS",
+                    onStartLogging = {},
+                    onPauseLogging = {},
+                    onResumeLogging = {},
+                    onStopLogging = {},
+                    onUpdateFieldsSelection = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Bez GNSS Fixu (Vyhledávání...)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("44.0 km/h").assertDoesNotExist()
     }
 }

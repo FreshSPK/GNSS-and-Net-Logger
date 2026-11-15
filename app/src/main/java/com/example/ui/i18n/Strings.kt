@@ -79,6 +79,7 @@ object Strings {
             "author_name" -> "Ing. Jan Kufa, Ph.D."
             "author_dept" -> if (isCs) "Ústav radioelektroniky (UREL), Fakulta elektrotechniky a komunikačních technologií (FEKT), Vysoké učení technické v Brně (VUT)." else "Department of Radio Electronics (UREL), Faculty of Electrical Engineering and Communication (FEKT), Brno University of Technology (VUT Brno)."
             "author_profile" -> "https://www.vut.cz/lide/jan-kufa-125512"
+            "author_github" -> "https://github.com/FreshSPK/GNSS-and-Net-Logger"
             "author_contact" -> "kufa@vut.cz"
             "language_switch" -> if (isCs) "Jazyk rozhraní" else "App Language"
             else -> key

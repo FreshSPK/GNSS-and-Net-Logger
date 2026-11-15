@@ -124,6 +124,11 @@ class TelemetryLoggingService : Service() {
         fun clearLiveMapTrail() {
             _liveMapTrail.value = emptyList()
         }
+
+        @Synchronized
+        fun clearRecentChartPoints() {
+            _recentChartPoints.value = emptyList()
+        }
     }
 
     override fun onCreate() {
@@ -383,9 +388,9 @@ class TelemetryLoggingService : Service() {
             longitude = if (fields.logGnss) gnss.longitude else 0.0,
             altitudeMsl = if (fields.logGnss) gnss.altitudeMsl else 0.0,
             altitudeWgs84 = if (fields.logGnss) gnss.altitudeWgs84 else 0.0,
-            speedKmh = if (fields.logGnss) gnss.speedKmh else 0f,
-            speedMs = if (fields.logGnss) gnss.speedMs else 0f,
-            bearingDeg = if (fields.logGnss) gnss.bearingDeg else motion.compassAzimuthDeg,
+            speedKmh = if (fields.logGnss && gnss.hasFix) gnss.speedKmh else 0f,
+            speedMs = if (fields.logGnss && gnss.hasFix) gnss.speedMs else 0f,
+            bearingDeg = if (fields.logGnss && gnss.hasFix) gnss.bearingDeg else motion.compassAzimuthDeg,
             horizontalAccuracyM = if (fields.logGnss) gnss.horizontalAccuracyM else 0f,
             verticalAccuracyM = if (fields.logGnss) gnss.verticalAccuracyM else 0f,
             satellitesInView = if (fields.logGnss) gnss.satellitesInView else 0,
@@ -475,7 +480,7 @@ class TelemetryLoggingService : Service() {
                 rsrpSim2 = sim2.rsrp?.toFloat(),
                 sinrSim1 = sim1.sinr,
                 sinrSim2 = sim2.sinr,
-                speedKmh = gnss.speedKmh,
+                speedKmh = if (gnss.hasFix) gnss.speedKmh else 0f,
                 satCount = gnss.satellitesUsedInFix,
                 satInViewCount = gnss.satellitesInView,
                 pdop = if (gnss.hasFix && gnss.pdop > 0f && gnss.pdop < 9.0f) gnss.pdop else null,

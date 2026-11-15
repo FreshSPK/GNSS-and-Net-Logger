@@ -12,7 +12,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -35,6 +38,7 @@ import com.example.data.db.TelemetryRecord
 import com.example.service.TelemetryLoggingService
 import com.example.ui.components.AboutAndHelpDialog
 import com.example.ui.tabs.*
+import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.DarkSlate800
 import com.example.ui.theme.DarkSlate900
 import com.example.ui.theme.RoseCritical
@@ -160,14 +164,31 @@ class MainActivity : ComponentActivity() {
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
-                                        Text(
-                                            text = "GNSS & Net Logger",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
-                                            color = Color.White,
-                                            maxLines = 1
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "GNSS & Net Logger",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp,
+                                                color = Color.White,
+                                                maxLines = 1
+                                            )
+                                            if (settings.isDemoMode) {
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(AmberWarning, RoundedCornerShape(4.dp))
+                                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "DEMO",
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = DarkSlate900
+                                                    )
+                                                }
+                                            }
+                                        }
                                         Text(
                                             text = if (isCs) "Aplikaci vytvořil Jan Kufa z VUT" else "Developed by Jan Kufa (BUT Brno)",
                                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
@@ -239,11 +260,66 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
+                        if (settings.isDemoMode) {
+                            Surface(
+                                color = AmberWarning.copy(alpha = 0.18f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("demo_mode_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Science,
+                                            contentDescription = null,
+                                            tint = AmberWarning,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isCs) {
+                                                "DEMO REŽIM AKTIVNÍ • Syntetická data (Brno FEKT)"
+                                            } else {
+                                                "DEMO MODE ACTIVE • Synthetic data (Brno FEKT)"
+                                            },
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                            fontWeight = FontWeight.Bold,
+                                            color = AmberWarning
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .background(AmberWarning, RoundedCornerShape(6.dp))
+                                            .clickable {
+                                                app.updateSettings(settings.copy(isDemoMode = false))
+                                            }
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isCs) "Vypnout" else "Disable",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DarkSlate900
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         when (currentTab) {
                             AppTab.OVERVIEW -> {
                                 OverviewTab(
@@ -395,6 +471,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
+                        }
                         }
                     }
                 }

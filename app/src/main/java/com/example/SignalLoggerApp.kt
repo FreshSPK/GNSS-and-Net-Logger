@@ -40,6 +40,7 @@ class SignalLoggerApp : Application() {
 
     @Volatile
     private var isUiInForeground: Boolean = false
+    private var wasDemoMode: Boolean = false
 
     private var demoLoopJob: Job? = null
     private var chartFeedJob: Job? = null
@@ -90,6 +91,7 @@ class SignalLoggerApp : Application() {
             fieldsSelection = fields
         )
         _settings.value = loaded
+        wasDemoMode = loaded.isDemoMode
 
         environmentEngine.setQnh(loaded.qnhHpa)
         cellularEngine.setTaMultiplierMode(loaded.taMultiplierMode)
@@ -103,6 +105,15 @@ class SignalLoggerApp : Application() {
 
     fun reconcileEngines() {
         val current = _settings.value
+        if (wasDemoMode != current.isDemoMode) {
+            wasDemoMode = current.isDemoMode
+            gnssEngine.resetState()
+            cellularEngine.resetState()
+            environmentEngine.resetToLiveDefaults()
+            TelemetryLoggingService.clearLiveMapTrail()
+            TelemetryLoggingService.clearRecentChartPoints()
+        }
+
         val loggingActive = TelemetryLoggingService.isLogging.value
         val needsTelemetry = isUiInForeground || loggingActive
 
@@ -152,6 +163,9 @@ class SignalLoggerApp : Application() {
         if (chartFeedJob?.isActive == true) return
         chartFeedJob = applicationScope.launch {
             while (isActive && (isUiInForeground || TelemetryLoggingService.isLogging.value)) {
+                if (!_settings.value.isDemoMode) {
+                    gnssEngine.checkFixTimeout()
+                }
                 val c = cellularEngine.cellularState.value
                 val g = gnssEngine.gnssState.value
                 val now = System.currentTimeMillis()
@@ -181,10 +195,10 @@ class SignalLoggerApp : Application() {
                             rsrpSim2 = c.sim2.rsrp?.toFloat(),
                             sinrSim1 = c.sim1.sinr,
                             sinrSim2 = c.sim2.sinr,
-                            speedKmh = g.speedKmh,
+                            speedKmh = if (g.hasFix) g.speedKmh else 0f,
                             satCount = g.satellitesUsedInFix,
                             satInViewCount = g.satellitesInView,
-                            pdop = if (g.hasFix && g.pdop > 0f && g.pdop < 9.0f) g.pdop else null,
+                            pdop = if (g.hasFix && g.satellitesUsedInFix >= 4 && g.pdop > 0f && g.pdop < 9.0f) g.pdop else null,
                             agcScore = g.agcInterferenceScore,
                             pingMs = c.pingRttMs?.toFloat(),
                             accelMagnitude = e.motion.accelMagnitude,
