@@ -136,6 +136,11 @@ fun GnssTab(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        val gpsCount = gnss.constellationCountMap["GPS"]?.second ?: 0
+        val galCount = gnss.constellationCountMap["Galileo"]?.second ?: 0
+        val gloCount = gnss.constellationCountMap["GLONASS"]?.second ?: 0
+        val bdsCount = gnss.constellationCountMap["BeiDou"]?.second ?: 0
+
         // Constellation / Band Filter Pills
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -154,7 +159,7 @@ fun GnssTab(
             FilterChip(
                 selected = selectedFilter == "GPS",
                 onClick = { selectedFilter = "GPS" },
-                label = { Text("GPS") }
+                label = { Text("GPS ($gpsCount)") }
             )
         }
 
@@ -167,17 +172,17 @@ fun GnssTab(
             FilterChip(
                 selected = selectedFilter == "GALILEO",
                 onClick = { selectedFilter = "GALILEO" },
-                label = { Text("Galileo") }
+                label = { Text("Galileo ($galCount)") }
             )
             FilterChip(
                 selected = selectedFilter == "GLONASS",
                 onClick = { selectedFilter = "GLONASS" },
-                label = { Text("GLONASS") }
+                label = { Text("GLONASS ($gloCount)") }
             )
             FilterChip(
                 selected = selectedFilter == "BEIDOU",
                 onClick = { selectedFilter = "BEIDOU" },
-                label = { Text("BeiDou") }
+                label = { Text("BeiDou ($bdsCount)") }
             )
         }
 
@@ -326,6 +331,15 @@ fun GnssTab(
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 val hasValidDop = gnss.hasFix && gnss.satellitesUsedInFix >= 4 && gnss.pdop > 0f && gnss.pdop < 9.0f
+                val dopColor: (Float) -> Color = { v ->
+                    when {
+                        !hasValidDop || v <= 0f -> TextSecondaryDark
+                        v < 1.0f -> EmeraldSignal
+                        v < 2.0f -> CyanTertiary
+                        v < 4.0f -> AmberWarning
+                        else -> RoseCritical
+                    }
+                }
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = "HDOP", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
@@ -333,7 +347,7 @@ fun GnssTab(
                             text = if (hasValidDop && gnss.hdop > 0f) String.format(Locale.US, "%.2f", gnss.hdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (hasValidDop) EmeraldSignal else TextSecondaryDark
+                            color = dopColor(gnss.hdop)
                         )
                         Text(text = if (isCs) "Horizontální" else "Horizontal", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -343,7 +357,7 @@ fun GnssTab(
                             text = if (hasValidDop && gnss.vdop > 0f) String.format(Locale.US, "%.2f", gnss.vdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (hasValidDop) TextPrimaryDark else TextSecondaryDark
+                            color = dopColor(gnss.vdop)
                         )
                         Text(text = if (isCs) "Vertikální" else "Vertical", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -353,7 +367,7 @@ fun GnssTab(
                             text = if (hasValidDop) String.format(Locale.US, "%.2f", gnss.pdop) else "—",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (hasValidDop) CyanTertiary else TextSecondaryDark
+                            color = dopColor(gnss.pdop)
                         )
                         Text(text = if (isCs) "Prostorový 3D" else "Spatial 3D", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }

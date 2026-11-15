@@ -176,11 +176,11 @@ class CellularTelemetryEngine(
 
                         override fun onPhysicalChannelConfigChanged(configs: MutableList<PhysicalChannelConfig>) {
                             activeCarrierChannelsBySubId[subKey] = configs.mapNotNull { cfg ->
-                                val bw = cfg.cellBandwidthDownlinkKhz
+                                val bw = cfg.cellBandwidthDownlinkKhz.let { if (it == Int.MAX_VALUE || it < 0) 0 else it }
                                 val dlFreq = try { cfg.downlinkFrequencyKhz } catch (_: Exception) { 0 }
                                 val dlCh = try { cfg.downlinkChannelNumber } catch (_: Exception) { 0 }
                                 val isPrim = try { cfg.connectionStatus == PhysicalChannelConfig.CONNECTION_PRIMARY_SERVING } catch (_: Exception) { false }
-                                if (bw > 0) {
+                                if (bw > 0 || cfg.band > 0 || dlFreq > 0 || (dlCh > 0 && dlCh != Int.MAX_VALUE)) {
                                     ActiveCarrierChannel(
                                         networkType = cfg.networkType,
                                         band = cfg.band,
@@ -987,11 +987,13 @@ class CellularTelemetryEngine(
             try { it.cellBandwidths.filter { bw -> bw > 0 } } catch (_: Exception) { emptyList() }
         } ?: emptyList()
 
-        val channelsSnapshot = if (subId != -1) {
-            activeCarrierChannelsBySubId[subId]
-                ?: if (isDataActive) activeCarrierChannelsBySubId[-1].orEmpty() else emptyList()
-        } else {
-            activeCarrierChannelsBySubId[-1].orEmpty()
+        val subChannels = if (subId != -1) activeCarrierChannelsBySubId[subId].orEmpty() else emptyList()
+        val defaultChannels = if (isDataActive || isSingleSim || subId == -1) activeCarrierChannelsBySubId[-1].orEmpty() else emptyList()
+        val channelsSnapshot = when {
+            subChannels.size > 1 -> subChannels
+            defaultChannels.size > subChannels.size -> defaultChannels
+            subChannels.isNotEmpty() -> subChannels
+            else -> defaultChannels
         }
 
         val nrPhysChannel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1081,6 +1083,13 @@ class CellularTelemetryEngine(
                 }
             }.distinct()
 
+        val positiveChannelBws = channelsSnapshot.map { it.bandwidthKhz }.filter { it > 0 }
+        val effectiveTotalAggBwKhz: Int? = totalAggregatedBwKhz ?: when {
+            positiveChannelBws.size > 1 -> positiveChannelBws.sum()
+            serviceStateBandwidthsKhz.size > 1 -> serviceStateBandwidthsKhz.sum()
+            else -> null
+        }
+
         val caPhysicalDetails = channelsSnapshot.mapIndexedNotNull { idx, ch ->
             val isNrChannel = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ch.networkType == TelephonyManager.NETWORK_TYPE_NR
             val prefix = if (isNrChannel) "n" else "B"
@@ -1108,16 +1117,13 @@ class CellularTelemetryEngine(
                 bandRangeLabel.isNotBlank() -> bandRangeLabel
                 else -> null
             }
+            val bwPart = if (ch.bandwidthKhz > 0) "${ch.bandwidthKhz / 1000} MHz" else null
 
-            if (bandTag != null || freqPart != null) {
-                val head = listOfNotNull(bandTag, freqPart).joinToString(" • ")
-                "$roleTag: $head • ${ch.bandwidthKhz / 1000} MHz"
-            } else {
-                "$roleTag: ${ch.bandwidthKhz / 1000} MHz"
-            }
+            val body = listOfNotNull(bandTag, freqPart, bwPart).joinToString(" • ")
+            if (body.isNotBlank()) "$roleTag: $body" else null
         }
 
-        val registeredCarrierDetails = registeredCompatibleCells.mapNotNull { c ->
+        val registeredCarrierDetails = registeredCompatibleCells.mapIndexedNotNull { idx, c ->
             when (c) {
                 is CellInfoLte -> {
                     val earfcn = c.cellIdentity.earfcn
@@ -1128,8 +1134,9 @@ class CellularTelemetryEngine(
                         val bwPart = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && c.cellIdentity.bandwidth in 1..200000) {
                             " • ${c.cellIdentity.bandwidth / 1000} MHz"
                         } else ""
-                        if (dlF > 0.0) String.format(java.util.Locale.US, "%s • %.1f MHz%s", bShort, dlF, bwPart)
-                        else "$bFull$bwPart"
+                        val role = if (idx == 0) "PCC" else "SCC$idx"
+                        if (dlF > 0.0) String.format(java.util.Locale.US, "%s: %s • %.1f MHz%s", role, bShort, dlF, bwPart)
+                        else "$role: $bFull$bwPart"
                     } else null
                 }
                 else -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && c is CellInfoNr) {
@@ -1139,20 +1146,71 @@ class CellularTelemetryEngine(
                         val bShort = BandMapper.nrArfcnToBand(nrarfcn).substringBefore(" ")
                         val bFull = BandMapper.nrArfcnToBand(nrarfcn)
                         val dlF = BandMapper.nrArfcnToFrequencies(nrarfcn).first
-                        if (dlF > 0.0) String.format(java.util.Locale.US, "%s • %.1f MHz", bShort, dlF)
-                        else bFull
+                        val role = if (idx == 0 && servingCell is CellInfoNr) "PCC" else "SCC$idx (5G NR)"
+                        if (dlF > 0.0) String.format(java.util.Locale.US, "%s: %s • %.1f MHz", role, bShort, dlF)
+                        else "$role: $bFull"
                     } else null
                 } else null
             }
         }.distinct()
 
-        val aggregatedCarriersList: List<String> = when {
-            caPhysicalDetails.size > 1 -> caPhysicalDetails
-            caPhysicalDetails.size == 1 && registeredCarrierDetails.size > 1 ->
-                (caPhysicalDetails + registeredCarrierDetails).distinct()
-            registeredCarrierDetails.size > 1 -> registeredCarrierDetails
-            caPhysicalDetails.isNotEmpty() && totalAggregatedBwKhz != null -> caPhysicalDetails
-            else -> emptyList()
+        val mergedCarriers = mutableListOf<String>()
+        when {
+            caPhysicalDetails.size > 1 -> mergedCarriers.addAll(caPhysicalDetails)
+            registeredCarrierDetails.size > 1 -> {
+                if (caPhysicalDetails.isNotEmpty()) {
+                    mergedCarriers.addAll(caPhysicalDetails)
+                    registeredCarrierDetails.forEach { reg ->
+                        val regBand = reg.substringAfter(": ").substringBefore(" •").trim()
+                        if (mergedCarriers.none { it.contains(regBand) }) {
+                            mergedCarriers.add(reg)
+                        }
+                    }
+                } else {
+                    mergedCarriers.addAll(registeredCarrierDetails)
+                }
+            }
+            caPhysicalDetails.isNotEmpty() -> mergedCarriers.addAll(caPhysicalDetails)
+            registeredCarrierDetails.isNotEmpty() -> mergedCarriers.addAll(registeredCarrierDetails)
+            band != "N/A" && !band.contains("Datový") && !band.contains("Pohotovost") -> {
+                val pccFreq = dlFreq?.takeIf { it > 0.0 }?.let { String.format(java.util.Locale.US, "%.1f MHz", it) }
+                val pccBw = bandwidthKhz?.takeIf { it > 0 }?.let { "${it / 1000} MHz" }
+                mergedCarriers.add("PCC: " + listOfNotNull(band.substringBefore(" "), pccFreq, pccBw).joinToString(" • "))
+            }
+        }
+
+        // Ensure 5G NR SCG leg (in 5G NSA) is listed among aggregated carriers even if PhysicalChannelConfig omitted it
+        if (!nrBand.isNullOrBlank()) {
+            val nrShort = nrBand.substringBefore(" ")
+            if (mergedCarriers.none { it.contains(nrShort) }) {
+                val nrFreq = nrDlFreq?.takeIf { it > 0.0 }?.let { String.format(java.util.Locale.US, "%.1f MHz", it) }
+                    ?: nrBand.substringAfter("(", "").substringBefore(")").takeIf { it.isNotBlank() }
+                val nrRole = if (mergedCarriers.isEmpty()) "PCC" else "SCC${mergedCarriers.size} (5G NR)"
+                mergedCarriers.add("$nrRole: " + listOfNotNull(nrShort, nrFreq).joinToString(" • "))
+            }
+        }
+
+        // If ServiceState reports multiple aggregated component bandwidths (e.g., [20000, 10000]) without HAL ARFCN details, append SCC slots
+        if (serviceStateBandwidthsKhz.size > 1 && mergedCarriers.size < serviceStateBandwidthsKhz.size) {
+            for (i in mergedCarriers.size until serviceStateBandwidthsKhz.size) {
+                val bwMhz = serviceStateBandwidthsKhz[i] / 1000
+                if (bwMhz > 0) {
+                    mergedCarriers.add("SCC$i: $bwMhz MHz (bez HAL frekvence)")
+                }
+            }
+        }
+
+        val aggregatedCarriersList: List<String> = if (
+            mergedCarriers.size > 1 ||
+            effectiveTotalAggBwKhz != null ||
+            subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA ||
+            subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
+            subOverrideType == 4 ||
+            subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED
+        ) {
+            mergedCarriers.distinct()
+        } else {
+            emptyList()
         }
 
         val caPhysicalLabels = channelsSnapshot.mapNotNull { ch ->
@@ -1161,16 +1219,17 @@ class CellularTelemetryEngine(
                 val prefix = if (isNrChannel) "n" else "B"
                 val bandRange = if (isNrChannel) BandMapper.nrBandToFreqLabel(ch.band) else BandMapper.lteBandToFreqLabel(ch.band)
                 val rangeShort = bandRange.substringBefore(" ")
+                val bwSuffix = if (ch.bandwidthKhz > 0) " (${ch.bandwidthKhz / 1000}M)" else ""
                 if (rangeShort.isNotBlank() && rangeShort.all { it.isDigit() }) {
-                    "$prefix${ch.band}/${rangeShort}M (${ch.bandwidthKhz / 1000}M)"
+                    "$prefix${ch.band}/${rangeShort}M$bwSuffix"
                 } else {
-                    "$prefix${ch.band} (${ch.bandwidthKhz / 1000}M)"
+                    "$prefix${ch.band}$bwSuffix"
                 }
             } else null
         }.distinct()
 
         val combinedCaBands = if (caPhysicalLabels.size > 1) caPhysicalLabels else registeredCompatibleBands
-        val totalBwSuffix = totalAggregatedBwKhz?.let { " • ${it / 1000} MHz" } ?: ""
+        val totalBwSuffix = effectiveTotalAggBwKhz?.let { " • ${it / 1000} MHz" } ?: ""
 
         val isNsaOverride = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
             (subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
@@ -1189,7 +1248,7 @@ class CellularTelemetryEngine(
                 if (nsaBands.size > 1) "5G NSA EN-DC (${nsaBands.joinToString("+")}$totalBwSuffix)"
                 else "5G NSA EN-DC ($anchor$totalBwSuffix)"
             }
-            tech == "5G SA" && (isNrAdvOverride || combinedCaBands.size > 1 || totalAggregatedBwKhz != null) -> {
+            tech == "5G SA" && (isNrAdvOverride || combinedCaBands.size > 1 || effectiveTotalAggBwKhz != null) -> {
                 if (combinedCaBands.size > 1) "5G SA NR CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
                 else "5G SA Standalone$totalBwSuffix"
             }
@@ -1204,7 +1263,7 @@ class CellularTelemetryEngine(
             combinedCaBands.size > 1 -> {
                 "${combinedCaBands.size}CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
             }
-            totalAggregatedBwKhz != null -> "CA Aggregated (${totalAggregatedBwKhz / 1000} MHz)"
+            effectiveTotalAggBwKhz != null -> "CA Aggregated (${effectiveTotalAggBwKhz / 1000} MHz)"
             else -> null
         }
 
@@ -1229,7 +1288,7 @@ class CellularTelemetryEngine(
             operatorAlpha = operatorName,
             networkGen = tech,
             carrierAggregationSummary = caSummary,
-            totalAggregatedBandwidthKhz = totalAggregatedBwKhz,
+            totalAggregatedBandwidthKhz = effectiveTotalAggBwKhz,
             aggregatedCarriers = aggregatedCarriersList,
             nrStateLabel = nrStateLabel,
             nrBand = nrBand,

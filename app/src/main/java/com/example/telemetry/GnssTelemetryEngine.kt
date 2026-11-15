@@ -509,6 +509,15 @@ class GnssTelemetryEngine(
                     else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
                 }
             }
+            GnssStatus.CONSTELLATION_QZSS,
+            GnssStatus.CONSTELLATION_SBAS,
+            GnssStatus.CONSTELLATION_IRNSS -> {
+                when {
+                    freqMhz in 1570.0..1580.0 -> "L1 (1575.42 MHz)"
+                    freqMhz in 1170.0..1185.0 -> "L5 (1176.45 MHz)"
+                    else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
+                }
+            }
             else -> String.format(java.util.Locale.US, "%.1f MHz", freqMhz)
         }
     }

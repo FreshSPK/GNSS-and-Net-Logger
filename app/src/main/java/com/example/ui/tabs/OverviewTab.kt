@@ -413,6 +413,15 @@ fun OverviewTab(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 val hasValidDop = gnss.hasFix && gnss.satellitesUsedInFix >= 4 && gnss.pdop > 0f && gnss.pdop < 9.0f
+                val dopColor: (Float) -> Color = { v ->
+                    when {
+                        !hasValidDop || v <= 0f -> TextSecondaryDark
+                        v < 1.0f -> EmeraldSignal
+                        v < 2.0f -> CyanTertiary
+                        v < 4.0f -> AmberWarning
+                        else -> RoseCritical
+                    }
+                }
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(text = if (isCs) "HDOP (Horizontální)" else "HDOP (Horizontal)", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = TextSecondaryDark)
@@ -421,7 +430,7 @@ fun OverviewTab(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = if (hasValidDop) EmeraldSignal else TextSecondaryDark
+                            color = dopColor(gnss.hdop)
                         )
                         Text(text = if (isCs) "Vliv na polohu X/Y" else "Impact on X/Y", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -432,7 +441,7 @@ fun OverviewTab(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = if (hasValidDop) TextPrimaryDark else TextSecondaryDark
+                            color = dopColor(gnss.vdop)
                         )
                         Text(text = if (isCs) "Vliv na výšku Z" else "Impact on Altitude Z", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -443,7 +452,7 @@ fun OverviewTab(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = if (hasValidDop) CyanTertiary else TextSecondaryDark
+                            color = dopColor(gnss.pdop)
                         )
                         Text(text = if (isCs) "Celková geometrie" else "Total geometry", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = TextSecondaryDark)
                     }
@@ -487,15 +496,15 @@ fun OverviewTab(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = if (gnss.l5Count > 0) (if (isCs) "DVOUFREKVENČNÍ PŘÍJEM (L1+L5/E5a)" else "DUAL-BAND FIX (L1+L5/E5a)") else (if (isCs) "JEDNOFREKVENČNÍ PŘÍJEM" else "SINGLE-BAND FIX"),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        fontWeight = FontWeight.SemiBold,
                         color = if (gnss.l5Count > 0) EmeraldSignal else TextSecondaryDark
                     )
-                    Spacer(modifier = Modifier.weight(1f))
                     Text(
-                        text = "L1/E1/B1/G1: ${gnss.l1Count} • L5/E5a/B2a: ${gnss.l5Count}",
+                        text = "L1/E1/B1/G1: ${gnss.l1Count}  •  L5/E5a/B2a: ${gnss.l5Count}",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         fontWeight = FontWeight.Bold,
                         color = TextPrimaryDark
@@ -905,6 +914,23 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                 color = TextSecondaryDark
+            )
+        }
+
+        if (!sim.carrierAggregationSummary.isNullOrBlank() || sim.aggregatedCarriers.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            val caLine = if (sim.aggregatedCarriers.isNotEmpty()) {
+                "CA: " + sim.aggregatedCarriers.joinToString(" + ")
+            } else {
+                "CA: ${sim.carrierAggregationSummary}"
+            }
+            Text(
+                text = caLine,
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                fontFamily = FontFamily.Monospace,
+                color = Purple5G,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

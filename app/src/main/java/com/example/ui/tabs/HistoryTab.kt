@@ -713,8 +713,9 @@ fun SessionDetailInspector(
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = CyanTertiary
                             )
+                            val uniqSuffix = if (r.uniqueSatellitesInView > 0) " (${r.uniqueSatellitesUsed}/${r.uniqueSatellitesInView} sat.)" else ""
                             Text(
-                                text = "Sats: ${r.satellitesUsedInFix}/${r.satellitesInView} (L1/L5: ${String.format(Locale.US, "%.0f%%", r.dualFrequencyRatioPct)})",
+                                text = "Sats: ${r.satellitesUsedInFix}/${r.satellitesInView}$uniqSuffix",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 fontWeight = FontWeight.Bold,
                                 color = EmeraldSignal
@@ -762,6 +763,43 @@ fun SessionDetailInspector(
                                 fontWeight = FontWeight.Bold,
                                 color = if ((mainRsrp ?: -120) >= -85) EmeraldSignal else AmberWarning
                             )
+                        }
+
+                        if (r.sim1CaSummary.isNotBlank() || r.sim2CaSummary.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val caTxt = listOfNotNull(
+                                r.sim1CaSummary.takeIf { it.isNotBlank() }?.let { "S1 CA: $it" },
+                                r.sim2CaSummary.takeIf { it.isNotBlank() }?.let { "S2 CA: $it" }
+                            ).joinToString(" | ")
+                            Text(
+                                text = caTxt,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                fontFamily = FontFamily.Monospace,
+                                color = Purple5G,
+                                maxLines = 2
+                            )
+                        }
+
+                        if (r.usedSatellitesDetail.isNotBlank() || r.visibleSatellitesDetail.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            if (r.usedSatellitesDetail.isNotBlank()) {
+                                Text(
+                                    text = (if (isCs) "Použité: " else "Used: ") + r.usedSatellitesDetail,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    fontFamily = FontFamily.Monospace,
+                                    color = EmeraldSignal.copy(alpha = 0.9f),
+                                    maxLines = 2
+                                )
+                            }
+                            if (r.visibleSatellitesDetail.isNotBlank()) {
+                                Text(
+                                    text = (if (isCs) "Viditelné: " else "Visible: ") + r.visibleSatellitesDetail,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TextSecondaryDark,
+                                    maxLines = 2
+                                )
+                            }
                         }
 
                         if (r.rawDopplerHz != null || r.batteryTempC != null) {

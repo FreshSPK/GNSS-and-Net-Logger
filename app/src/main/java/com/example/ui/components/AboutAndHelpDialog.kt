@@ -85,7 +85,7 @@ fun AboutAndHelpDialog(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Release v1.3",
+                                    text = "Release v1.4",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldSignal
@@ -136,7 +136,7 @@ fun AboutAndHelpDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Release v1.3 New Features Box
+                // Release v1.4 New Features Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -145,7 +145,7 @@ fun AboutAndHelpDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = if (isCs) "✨ Novinky verze 1.3 (Release v1.3)" else "✨ What's New in Release v1.3",
+                            text = if (isCs) "✨ Novinky verze 1.4 (Release v1.4)" else "✨ What's New in Release v1.4",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
@@ -153,9 +153,19 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "• Stabilita & Výdrž baterie: chytré pozastavení GPS/senzorů na pozadí bez aktivního záznamu, průběžné ukládání relace proti pádu, neomezený WakeLock, filtr GPS driftu v režimu Vzdálenost a živá změna nastavení za běhu\n• Waypointy & Stopky: tlačítko [+ Značka] pro označení bodu zájmu v terénu + stopky, ujetá vzdálenost a počítadlo handoverů (HO)\n• Měřič RF bez falešných hodnot: reálné CQI z modemu, detekce Carrier Aggregation (CA / 5G EN-DC), TTFF (doba prvního fixu), geoid N (WGS84 vs MSL) a kalibrace AGC\n• Interaktivní SkyPlot & Grafy: klepnutím na satelit zobrazíte detail, grafy s dotykovým odečtem hodnot, automatickou osou Y (60+ satelitů) a novými grafy SINR, PDOP a AGC\n• Profily & Tmavá mapa: tmavý noční filtr OpenStreetMap, opravený zoom při přehrávání, klikatelné značky, souhrnná statistika relace, GPX 1.1 a vícebarevné RSRP KML streamované do Downloads\n• Tlačítko Ukončit: v horní liště pro kompletní bezpečné ukončení aplikace i služeb"
+                                "• Přesná detekce 5G NSA (EN-DC) vs. 5G SA + 5G NR sousedé: rozpoznává 5G NSA kotevní buňku i v RRC Idle (ikona 5G v liště) a aktivní 5G NR SCG větev (n1/n3/n28/n78) s odděleným filtrem 4G LTE / 5G NR\n" +
+                                "• Agregované kmitočty v Carrier Aggregation: zobrazení všech agregovaných nosných (PCC/SCC) včetně konkrétního pásma a frekvence v MHz (např. B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
+                                "• Shoda s GPS Test & SkyPlot: zobrazení fyzických unikátních družic i počtu L1+L5/E5a/B2a signálů, přesná synchronizace legendy Skyplotu (plné kolečko s bílým okrajem = ve fixu, prázdný kroužek = mimo fix)\n" +
+                                "• Oddělené handovery SIM 1 / SIM 2: samostatné počítadlo handoverů pro každou SIM i celkový součet (HO SIM1 | SIM2 | Celkem)\n" +
+                                "• Upravené prahy DOP & Satelitů + Logování: nová škála PDOP (< 1,0 výborný až ≥ 4,0 kritický) a satelitů (< 5, 5–20, 21–30, 31–50, > 50); databáze (Room v4), grafy i CSV/GPX/GeoJSON nyní logují jak použité, tak viditelné satelity včetně seznamu PRN\n" +
+                                "• Vylepšené profily měření: nezalamující se předvolby Pěší (5s/10m), Auto (10s/50m) a Statické (10s)"
                             } else {
-                                "• Stability & Battery Endurance: smart lifecycle pause when backgrounded without logging, crash-safe progress checkpoints, continuous WakeLock, distance static drift filter, and live settings reload\n• Field Waypoints & HUD Timer: [+ Mark] waypoint tagging button, live chronometer, distance counter, and handover (HO) tracking\n• Honest RF/GNSS Telemetry: real modem LTE CQI, Carrier Aggregation (CA / 5G EN-DC) badges, GNSS TTFF timer, Geoid separation N (WGS84 vs MSL), and Reset AGC baseline\n• Interactive SkyPlot & Charts: tap satellites on radar to inspect, touch-drag crosshair scrubbing, dynamic Y-scaling (60+ sats), plus SINR, PDOP, and AGC waveforms\n• Night Map & Streaming Export: Dark OSM tile filter, fixed zoom stability during replay, clickable markers, session analytics card, GPX 1.1 & multi-color RSRP KML\n• Power Exit Button: clean shutdown action in the top app bar"
+                                "• Accurate 5G NSA (EN-DC) vs. 5G SA & 5G NR Neighbors: distinguishes 5G NSA LTE anchor (even when RRC Idle matches the status-bar 5G badge) from active 5G NR SCG legs (n1/n3/n28/n78) with dedicated 4G LTE / 5G NR neighbor filtering\n" +
+                                "• Component Carrier Frequencies in CA: displays all aggregated PCC/SCC carriers with exact band labels and center frequencies in MHz (e.g., B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
+                                "• GPS Test Alignment & SkyPlot Legend Fix: reports both unique physical satellites and total L1+L5/E5a/B2a signals; Skyplot legend matches canvas 1:1 (filled dot + white border = in fix, hollow ring = unused)\n" +
+                                "• Per-SIM Handover Tracking: independent handover counters for SIM 1, SIM 2, and combined total (HO SIM1 | SIM2)\n" +
+                                "• Recalibrated DOP & Satellite Scales + Full Sat Logging: updated PDOP (< 1.0 optimal to ≥ 4.0 poor) and Satellite (< 5, 5–20, 21–30, 31–50, > 50) map/chart thresholds; Room v4, charts & CSV/GPX/GeoJSON now record both used and visible satellites\n" +
+                                "• Clean Settings Presets: non-wrapping chips for Walking (5s/10m), Driving (10s/50m), and Static (10s)"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark
@@ -177,54 +187,54 @@ fun AboutAndHelpDialog(
                 HelpSection(
                     title = if (isCs) "1. Měření (Přehled HUD & Waypointy)" else "1. Measurement (Overview HUD & Waypoints)",
                     body = if (isCs) {
-                        "Centrální přístrojový štít. Spouští, pozastavuje a zastavuje záznam na pozadí, zobrazuje stopky relace, ujetou vzdálenost a počet handoverů (HO). Během měření umožňuje tlačítkem „Značka“ vložit bod zájmu (tunel, rušení, BTS). Upozorní na systémovou optimalizaci baterie."
+                        "Centrální přístrojový štít. Spouští, pozastavuje a zastavuje záznam na pozadí, zobrazuje stopky relace, ujetou vzdálenost a handovery zvlášť pro SIM 1 a SIM 2. Během měření umožňuje tlačítkem „Značka“ vložit bod zájmu (tunel, rušení, BTS)."
                     } else {
-                        "Main telemetry cockpit. Starts, pauses, and stops foreground recording with session chronometer, distance counter, and handover counter. Insert custom terrain waypoints on the fly and configure exact recorded telemetry fields."
+                        "Main telemetry cockpit. Starts, pauses, and stops foreground recording with session chronometer, distance counter, and separate SIM 1 / SIM 2 handover tracking. Insert custom terrain waypoints on the fly and configure exact recorded telemetry fields."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "2. Mobily (RF parametry, CA & Spoofing)" else "2. Cellular RF (LTE, 5G & CA)",
+                    title = if (isCs) "2. Mobily (5G NSA/SA, CA kmitočty & Spoofing)" else "2. Cellular RF (5G NSA/SA, CA Frequencies & Security)",
                     body = if (isCs) {
-                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Rozpoznává Carrier Aggregation (LTE-A CA, 5G NSA EN-DC), reálné CQI, rozpad ECI/NCI na eNodeB/gNodeB + sektor, Timing Advance vzdálenost k BTS (kalibrace 1× nebo 2×) a detekuje 2G downgrade či anomálie IMSI Catcheru."
+                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Rozlišuje 4G LTE, 5G NSA (EN-DC) a 5G SA, zobrazuje konkrétní agregované kmitočty CA v MHz, reálné CQI, rozpad ECI/NCI na eNodeB/gNodeB + sektor, Timing Advance vzdálenost k BTS (1× nebo 2×) a detekuje 2G downgrade či anomálie IMSI Catcheru."
                     } else {
-                        "Dual-SIM radio analyzer displaying Carrier Aggregation (LTE-A CA, 5G NSA EN-DC), real modem CQI, decoded eNodeB/gNodeB + Sector IDs, Timing Advance BTS distance, and IMSI Catcher / 2G downgrade anomaly alerts."
+                        "Dual-SIM radio analyzer distinguishing 4G LTE, 5G NSA (EN-DC), and 5G SA, displaying exact aggregated CA MHz component frequencies, real modem CQI, decoded eNodeB/gNodeB + Sector IDs, Timing Advance BTS distance, and IMSI Catcher / 2G downgrade anomaly alerts."
                     }
                 )
 
                 HelpSection(
-                    title = if (isCs) "3. Satelity (SkyPlot, TTFF & AGC Monitor)" else "3. Satellites (SkyPlot, TTFF & AGC Monitor)",
+                    title = if (isCs) "3. Satelity (SkyPlot, Dual-Band & AGC Monitor)" else "3. Satellites (SkyPlot, Dual-Band & AGC Monitor)",
                     body = if (isCs) {
-                        "Multi-konstelační příjem (GPS, Galileo, GLONASS, BeiDou) s pásmy L1/E1 i L5/E5a. Klepnutím na satelit na radaru zobrazíte detail C/N0 a azimutu/elevace. Měří dobu prvního fixu (TTFF), geoidní separaci N a hladinu rušení AGC s tlačítkem Kalibrovat."
+                        "Multi-konstelační příjem (GPS, Galileo, GLONASS, BeiDou, QZSS, SBAS, NavIC) s pásmy L1/E1 i L5/E5a/B2a a zobrazením unikátních družic i jednotlivých signálů. Klepnutím na satelit na radaru zobrazíte detail C/N0, azimutu a elevace. Měří TTFF, geoid N, DOP i rušení AGC."
                     } else {
-                        "Multi-constellation L1+L5 receiver monitor. Tap any satellite dot on the radar for detailed C/N0, elevation, and azimuth. Tracks TTFF, Geoid separation, DOP factors, NMEA/Doppler raw data, and AGC jamming index with baseline calibration."
+                        "Multi-constellation L1+L5/E5a/B2a monitor showing both unique physical satellites and tracked signals. Tap any satellite dot on the radar for detailed C/N0, elevation, and azimuth. Tracks TTFF, Geoid separation, DOP factors, NMEA/Doppler raw data, and AGC jamming index."
                     }
                 )
 
                 HelpSection(
                     title = if (isCs) "4. Mapa (OpenStreetMap & Živá barevná trasa)" else "4. Map (OpenStreetMap & Live Heatmap)",
                     body = if (isCs) {
-                        "OpenStreetMap bez API klíčů s tmavým/světlým režimem a auto-sledováním. Živá trasa se sbírá průběžně na pozadí i při prohlížení jiných karet a barevně se vykresluje podle RSRP (S1/S2), rychlosti, satelitů i PDOP stejně jako záznamy z Historie."
+                        "OpenStreetMap bez API klíčů s tmavým/světlým režimem a auto-sledováním. Živá trasa se sbírá průběžně na pozadí i při prohlížení jiných karet a barevně se vykresluje podle RSRP (S1/S2), rychlosti, satelitů (< 5 až > 50) i PDOP (< 1,0 až ≥ 4,0) stejně jako záznamy z Historie."
                     } else {
-                        "OpenStreetMap view with dark night-mode filter and auto-follow. Records live trail continuously in background across tabs and renders color-coded tracks by RSRP (S1/S2), Speed, Satellites, or PDOP both live and in replay."
+                        "OpenStreetMap view with dark night-mode filter and auto-follow. Records live trail continuously in background across tabs and renders color-coded tracks by RSRP (S1/S2), Speed, Satellites (< 5 to > 50), or PDOP (< 1.0 to ≥ 4.0) both live and in replay."
                     }
                 )
 
                 HelpSection(
                     title = if (isCs) "5. Grafy (Živé i Historické křivky)" else "5. Charts (Live & Historical Waveforms)",
                     body = if (isCs) {
-                        "Interaktivní grafy s dotykovým odečtem hodnot a dynamickou osou Y: RSRP (SIM 1 vs SIM 2), SINR (SIM 1 vs SIM 2), rychlost, satelity, PDOP, AGC rušení, Ping RTT, IMU senzory a teplota baterie. Lze otevřít i pro libovolnou uloženou relaci z Historie."
+                        "Interaktivní grafy s dotykovým odečtem hodnot a dynamickou osou Y: RSRP (SIM 1 vs SIM 2), SINR (SIM 1 vs SIM 2), rychlost, použité i viditelné satelity, PDOP (0–4), AGC rušení, Ping RTT, IMU senzory a teplota baterie. Lze otevřít i pro libovolnou uloženou relaci z Historie."
                     } else {
-                        "Interactive touch-scrubbing charts with dynamic Y-axis scaling: dual-SIM RSRP & SINR, speed, satellites, PDOP, AGC interference, ping latency, IMU motion, and battery temperature. Available both live and for past sessions."
+                        "Interactive touch-scrubbing charts with dynamic Y-axis scaling: dual-SIM RSRP & SINR, speed, used & visible satellites, PDOP (0–4), AGC interference, ping latency, IMU motion, and battery temperature. Available both live and for past sessions."
                     }
                 )
 
                 HelpSection(
                     title = if (isCs) "6. Historie (Analytika, Skok na bod & Export)" else "6. History (Analytics, Point Jump & Export)",
                     body = if (isCs) {
-                        "Lokální databáze relací se souhrnnou statistikou (min/prům/max RSRP, podíl 5G/4G, průměrný PDOP), bodovým prohlížečem (klepnutím na konkrétní bod jej ihned vycentrujete na Mapě) a streamovaným exportem do CSV (plné sloupce SIM 2), 3D KML, GPX 1.1 a GeoJSON do Downloads."
+                        "Lokální databáze relací se souhrnnou statistikou (min/prům/max RSRP, podíl 5G/4G, průměrný PDOP), bodovým prohlížečem (zobrazuje použité/viditelné satelity, CA pásma a skok na Mapu) a streamovaným exportem do CSV, 3D KML, GPX 1.1 a GeoJSON do Downloads."
                     } else {
-                        "Local session manager with analytics summary, point-by-point inspector (tap any point to jump directly to its location on the Map), and memory-safe streaming export to CSV (full SIM 2 & waypoint columns), 3D KML, GPX 1.1, and GeoJSON directly to Downloads."
+                        "Local session manager with analytics summary, point-by-point inspector (displaying used/visible satellites, CA frequencies, and jump-to-Map), and memory-safe streaming export to CSV, 3D KML, GPX 1.1, and GeoJSON directly to Downloads."
                     }
                 )
 
