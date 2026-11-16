@@ -807,6 +807,32 @@ fun SessionDetailInspector(
                             )
                         }
 
+                        if (!r.sim1BtsLocation.isNullOrBlank() || !r.sim2BtsLocation.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val btsParts = listOfNotNull(
+                                r.sim1BtsLocation?.takeIf { it.isNotBlank() }?.let { loc ->
+                                    val d = r.sim1BtsDistanceM?.let { " • ${com.example.bts.BtsGeoUtils.formatDistance(it)}" } ?: ""
+                                    val az = r.sim1BtsAzimuthDeg?.let {
+                                        " (${String.format(Locale.US, "%.0f° %s", it, com.example.bts.BtsGeoUtils.bearingToCardinal(it, isCs))})"
+                                    } ?: ""
+                                    "S1 BTS: $loc$d$az"
+                                },
+                                r.sim2BtsLocation?.takeIf { it.isNotBlank() }?.let { loc ->
+                                    val d = r.sim2BtsDistanceM?.let { " • ${com.example.bts.BtsGeoUtils.formatDistance(it)}" } ?: ""
+                                    val az = r.sim2BtsAzimuthDeg?.let {
+                                        " (${String.format(Locale.US, "%.0f° %s", it, com.example.bts.BtsGeoUtils.bearingToCardinal(it, isCs))})"
+                                    } ?: ""
+                                    "S2 BTS: $loc$d$az"
+                                }
+                            ).joinToString("\n")
+                            Text(
+                                text = btsParts,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                color = EmeraldSignal,
+                                maxLines = 2
+                            )
+                        }
+
                         if (r.rawDopplerHz != null || r.batteryTempC != null) {
                             Spacer(modifier = Modifier.height(2.dp))
                             Row(

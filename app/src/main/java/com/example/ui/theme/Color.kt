@@ -24,3 +24,9 @@ val LightSurface = Color(0xFFFFFFFF)
 val LightSurfaceVariant = Color(0xFFE2E8F0)
 val TextPrimaryLight = Color(0xFF0F172A)
 val TextSecondaryLight = Color(0xFF64748B)
+
+// Czech operator accent colors for BTS cards & map markers
+val TMobileMagenta = Color(0xFFE20074)
+val O2Blue = Color(0xFF38BDF8)
+val VodafoneRed = Color(0xFFEF4444)
+

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -37,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.db.TelemetryRecord
 import com.example.service.TelemetryLoggingService
 import com.example.ui.components.AboutAndHelpDialog
+import com.example.ui.components.BtsDatabaseDialog
 import com.example.ui.tabs.*
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.DarkSlate800
@@ -44,6 +46,7 @@ import com.example.ui.theme.DarkSlate900
 import com.example.ui.theme.RoseCritical
 import com.example.ui.theme.SignalLoggerTheme
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 enum class AppTab(val title: String, val icon: ImageVector) {
     OVERVIEW("Měření", Icons.Default.Speed),
@@ -91,13 +94,17 @@ class MainActivity : ComponentActivity() {
             val liveMapTrail by TelemetryLoggingService.liveMapTrail.collectAsStateWithLifecycle()
 
             val sessions by app.database.telemetryDao().getAllSessions().collectAsStateWithLifecycle(initialValue = emptyList())
+            val btsStats by app.btsRepository.operatorStats.collectAsStateWithLifecycle(initialValue = emptyList())
 
             var currentTab by remember { mutableStateOf(AppTab.OVERVIEW) }
             var showSettingsDialog by remember { mutableStateOf(false) }
             var showHelpDialog by remember { mutableStateOf(false) }
+            var showBtsDatabaseDialog by remember { mutableStateOf(false) }
+            var btsDialogInitialQuery by remember { mutableStateOf("") }
             var showExitConfirmDialog by remember { mutableStateOf(false) }
             var replayRecords by remember { mutableStateOf<List<TelemetryRecord>?>(null) }
             var focusedReplayPoint by remember { mutableStateOf<TelemetryRecord?>(null) }
+            var focusedBtsCoord by remember { mutableStateOf<Triple<Double, Double, String>?>(null) }
             var historicalChartTitle by remember { mutableStateOf<String?>(null) }
             var historicalChartRecords by remember { mutableStateOf<List<TelemetryRecord>?>(null) }
 
@@ -374,6 +381,10 @@ class MainActivity : ComponentActivity() {
                                     onOpenBatterySettings = { openBatteryOptimizationSettings() },
                                     onUpdateFieldsSelection = { newFields ->
                                         app.updateSettings(settings.copy(fieldsSelection = newFields))
+                                    },
+                                    onOpenBtsDatabase = {
+                                        btsDialogInitialQuery = ""
+                                        showBtsDatabaseDialog = true
                                     }
                                 )
                             }
@@ -384,7 +395,49 @@ class MainActivity : ComponentActivity() {
                                     handoverCount = handoverCount,
                                     handoverCountSim1 = handoverCountSim1,
                                     handoverCountSim2 = handoverCountSim2,
-                                    lang = currentLang
+                                    lang = currentLang,
+                                    btsStats = btsStats,
+                                    onOpenBtsDatabase = {
+                                        btsDialogInitialQuery = ""
+                                        showBtsDatabaseDialog = true
+                                    },
+                                    onGeocodeBts = { match ->
+                                        coroutineScope.launch {
+                                            val coords = app.btsRepository.geocodeAndSaveSite(
+                                                plmn = match.operatorPlmn,
+                                                cellId = match.cellId,
+                                                enodebId = match.enodebId,
+                                                locationName = match.locationName
+                                            )
+                                            if (coords != null) {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    if (isCs) {
+                                                        "GPS BTS uložena: ${String.format(Locale.US, "%.5f, %.5f", coords.first, coords.second)}"
+                                                    } else {
+                                                        "BTS GPS saved: ${String.format(Locale.US, "%.5f, %.5f", coords.first, coords.second)}"
+                                                    },
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    if (isCs) "Adresu BTS se nepodařilo dohledat – upravte ji v DB BTS" else "Could not geocode BTS address – edit in BTS DB",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    },
+                                    onShowBtsOnMap = { match ->
+                                        if (match.latitude != null && match.longitude != null) {
+                                            focusedBtsCoord = Triple(
+                                                match.latitude,
+                                                match.longitude,
+                                                "${match.operatorName} • ${match.locationName}"
+                                            )
+                                            currentTab = AppTab.MAP
+                                        }
+                                    }
                                 )
                             }
                             AppTab.GNSS -> {
@@ -411,7 +464,10 @@ class MainActivity : ComponentActivity() {
                                         focusedReplayPoint = null
                                     },
                                     onClearFocusedPoint = { focusedReplayPoint = null },
-                                    onClearLiveTrail = { TelemetryLoggingService.clearLiveMapTrail() }
+                                    onClearLiveTrail = { TelemetryLoggingService.clearLiveMapTrail() },
+                                    loadNearbyBts = { lat, lon -> app.btsRepository.findNearbyTowers(lat, lon) },
+                                    focusedBts = focusedBtsCoord,
+                                    onClearFocusedBts = { focusedBtsCoord = null }
                                 )
                             }
                             AppTab.CHARTS -> {
@@ -482,8 +538,26 @@ class MainActivity : ComponentActivity() {
                         lang = currentLang,
                         onDismiss = { showSettingsDialog = false },
                         onOpenBatterySettings = { openBatteryOptimizationSettings() },
+                        onOpenBtsDatabase = {
+                            btsDialogInitialQuery = ""
+                            showBtsDatabaseDialog = true
+                        },
                         onSaveSettings = { newSettings ->
                             app.updateSettings(newSettings)
+                        }
+                    )
+                }
+
+                if (showBtsDatabaseDialog) {
+                    BtsDatabaseDialog(
+                        btsRepository = app.btsRepository,
+                        lang = currentLang,
+                        initialQuery = btsDialogInitialQuery,
+                        onDismiss = { showBtsDatabaseDialog = false },
+                        onShowTowerOnMap = { lat, lon, label ->
+                            showBtsDatabaseDialog = false
+                            focusedBtsCoord = Triple(lat, lon, label)
+                            currentTab = AppTab.MAP
                         }
                     )
                 }

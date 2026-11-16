@@ -56,6 +56,13 @@ class CellularTelemetryEngine(
     private val overrideNetworkTypeBySubId = ConcurrentHashMap<Int, Int>()
     private val activeCarrierChannelsBySubId = ConcurrentHashMap<Int, List<ActiveCarrierChannel>>()
 
+    @Volatile
+    private var btsEnricher: (suspend (SimCellInfo) -> SimCellInfo)? = null
+
+    fun setBtsEnricher(enricher: (suspend (SimCellInfo) -> SimCellInfo)?) {
+        btsEnricher = enricher
+    }
+
     fun setPingEnabled(enabled: Boolean) {
         if (pingEnabled == enabled) return
         pingEnabled = enabled
@@ -344,7 +351,7 @@ class CellularTelemetryEngine(
     }
 
     @Suppress("DEPRECATION")
-    private fun readCellularTelemetry(providedCells: List<CellInfo>? = null, force: Boolean = false) {
+    private suspend fun readCellularTelemetry(providedCells: List<CellInfo>? = null, force: Boolean = false) {
         val tm = telephonyManager ?: return
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return
@@ -426,6 +433,12 @@ class CellularTelemetryEngine(
                 val opName = tm.networkOperatorName.ifEmpty { "Cellular" }
                 val assigned = mutableSetOf<CellInfo>()
                 sim1Info = parseCellInfoForSubscription(allCellInfo, tm, 0, -1, opName, isDataActive = true, subInfo = null, assignedCells = assigned, isSingleSim = true)
+            }
+
+            val enricher = btsEnricher
+            if (enricher != null) {
+                sim1Info = enricher(sim1Info)
+                sim2Info = enricher(sim2Info)
             }
 
             _cellularState.value = _cellularState.value.copy(

@@ -133,26 +133,26 @@ class DemoSimulationEngine {
             displayName = "SIM 1: T-Mobile CZ",
             operatorAlpha = "T-Mobile CZ",
             networkGen = "4G LTE Advanced",
-            carrierAggregationSummary = "LTE-A 3CA: B20+B3+B7 (45 MHz)",
+            carrierAggregationSummary = "LTE-A 3CA: B7+B3+B20 (45 MHz)",
             totalAggregatedBandwidthKhz = 45000,
             aggregatedCarriers = listOf(
-                "PCC: B20 • 796.0 MHz (800 MHz) • 10 MHz",
-                "SCC1: B3 • 1845.0 MHz (1800 MHz) • 20 MHz",
-                "SCC2: B7 • 2655.0 MHz (2600 MHz) • 15 MHz"
+                "PCC: B7 • 2655.0 MHz (2600 MHz) • 20 MHz",
+                "SCC1: B3 • 1845.0 MHz (1800 MHz) • 15 MHz",
+                "SCC2: B20 • 796.0 MHz (800 MHz) • 10 MHz"
             ),
             isServing = true,
             isDataActive = true,
             plmn = "23001",
-            tac = "51200",
-            ci = "25840897",
-            enbOrGnbId = "100941",
-            sectorId = "133",
-            pci = 184,
-            earfcnOrArfcn = 6300,
-            band = "B20 (800 MHz FDD)",
-            channelBandwidthKhz = 10000,
-            dlFreqMhz = 796.0,
-            ulFreqMhz = 837.0,
+            tac = "24656",
+            ci = "568853",
+            enbOrGnbId = "2222",
+            sectorId = "21",
+            pci = 21,
+            earfcnOrArfcn = 3100,
+            band = "B7 (2600 MHz FDD)",
+            channelBandwidthKhz = 20000,
+            dlFreqMhz = 2655.0,
+            ulFreqMhz = 2535.0,
             rsrp = lteRsrp,
             rsrq = -9,
             rssi = -54,
@@ -166,7 +166,7 @@ class DemoSimulationEngine {
                 CellNeighbor("LTE", 277, 6300, "B20 (800 MHz FDD)", lteRsrp - 18, 18, 791.0, 832.0),
                 CellNeighbor("LTE", 241, 1650, "B3 (1800 MHz FDD)", lteRsrp - 24, 24, 816.0, 857.0)
             ),
-            anomalies = BandMapper.detectCellularAnomalies("4G LTE Advanced", "51200", "100941", "133", lteRsrp, lteSinr, 4, true)
+            anomalies = BandMapper.detectCellularAnomalies("4G LTE Advanced", "24656", "2222", "21", lteRsrp, lteSinr, 4, true)
         )
 
         val sim2Ta = 4

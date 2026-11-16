@@ -71,7 +71,8 @@ enum class AnomalyType {
     DOWNGRADE_ATTACK_2G,     // Insecure 2G GSM downgrade without mutual auth
     TAC_INCONSISTENCY,       // Sudden TAC change or invalid area code
     RF_INTERFERENCE_JAMMING, // Strong RSRP but collapsed SINR
-    INVALID_CELL_ID          // Invalid eNodeB or zero sector ID
+    INVALID_CELL_ID,         // Invalid eNodeB or zero sector ID
+    BTS_DB_MISMATCH          // Serving PCI/TAC differs from known operator BTS DB
 }
 
 data class CellularAnomaly(
@@ -79,6 +80,34 @@ data class CellularAnomaly(
     val severity: AnomalySeverity,
     val title: String,
     val description: String
+)
+
+data class BtsMatchInfo(
+    val operatorPlmn: String,
+    val operatorName: String,
+    val cellId: Long,
+    val enodebId: Long,
+    val sectorId: Int,
+    val dbPci: Int,
+    val dbTac: Int,
+    val dbBand: String,
+    val gsmCid: String = "",
+    val updatedDate: String = "",
+    val districtCode: String = "",
+    val locationName: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val coordSource: String = "",
+    val distanceMeters: Double? = null,
+    val azimuthDeg: Float? = null,
+    val taDeltaMeters: Double? = null,
+    val fsplDb: Double? = null,
+    val coLocatedBands: List<String> = emptyList(),
+    val coLocatedCount: Int = 1,
+    val matchType: String = "CI", // "CI", "PCI+TAC", "MOCN"
+    val isMocnShared: Boolean = false,
+    val pciMismatch: Boolean = false,
+    val tacMismatch: Boolean = false
 )
 
 data class SimCellInfo(
@@ -122,7 +151,8 @@ data class SimCellInfo(
     val nrBand: String? = null,
     val nrArfcn: Int? = null,
     val nrPci: Int? = null,
-    val nrDlFreqMhz: Double? = null
+    val nrDlFreqMhz: Double? = null,
+    val btsMatch: BtsMatchInfo? = null
 )
 
 data class CellularState(
@@ -221,5 +251,6 @@ data class LoggingSettings(
     val fieldsSelection: LoggedFieldsSelection = LoggedFieldsSelection(),
     val taMultiplierMode: Int = 2, // 1 = standard 78m, 2 = 156m (calibrated for user mobile)
     val darkMapMode: Boolean = true,
-    val audioAnomalyAlerts: Boolean = false
+    val audioAnomalyAlerts: Boolean = false,
+    val autoGeocodeBts: Boolean = true
 )

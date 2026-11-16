@@ -1,5 +1,6 @@
 package com.example.ui.tabs
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -7,15 +8,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationSearching
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -25,7 +32,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import com.example.R
+import com.example.bts.BtsGeoUtils
+import com.example.data.db.OperatorBtsStats
 import com.example.model.AnomalySeverity
+import com.example.model.BtsMatchInfo
 import com.example.model.CellularState
 import com.example.model.SimCellInfo
 import com.example.ui.theme.*
@@ -38,7 +48,11 @@ fun CellularRfTab(
     handoverCount: Int = 0,
     handoverCountSim1: Int = 0,
     handoverCountSim2: Int = 0,
-    lang: String
+    lang: String,
+    btsStats: List<OperatorBtsStats> = emptyList(),
+    onOpenBtsDatabase: () -> Unit = {},
+    onGeocodeBts: (BtsMatchInfo) -> Unit = {},
+    onShowBtsOnMap: (BtsMatchInfo) -> Unit = {}
 ) {
     val isCs = lang != "EN"
     var showSpoofingInfoDialog by remember { mutableStateOf(false) }
@@ -95,6 +109,77 @@ fun CellularRfTab(
                             softWrap = false
                         )
                     }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Czech 3-Operator BTS Database Bar
+        val totalBtsCount = remember(btsStats) { btsStats.sumOf { it.totalCount } }
+        val totalLocatedBts = remember(btsStats) { btsStats.sumOf { it.locatedCount } }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSlate800),
+            border = BorderStroke(1.dp, CyanSecondary.copy(alpha = 0.45f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storage,
+                        contentDescription = null,
+                        tint = CyanTertiary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = if (isCs) "DATABÁZE VYSÍLAČŮ ČR (3 OPERÁTOŘI)" else "CZECH BTS DATABASE (3 OPERATORS)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = CyanTertiary
+                        )
+                        Text(
+                            text = if (totalBtsCount > 0) {
+                                if (isCs) "Uloženo $totalBtsCount buněk • S GPS: $totalLocatedBts"
+                                else "$totalBtsCount cells stored • GPS: $totalLocatedBts"
+                            } else {
+                                if (isCs) "Importujte CSV (T-Mobile / O2 / Vodafone)"
+                                else "Import CSV (T-Mobile / O2 / Vodafone)"
+                            },
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = TextSecondaryDark
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = onOpenBtsDatabase,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("open_bts_db_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.CellTower, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isCs) "Databáze BTS" else "BTS DB",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkSlate900
+                    )
                 }
             }
         }
@@ -349,12 +434,36 @@ fun CellularRfTab(
         Spacer(modifier = Modifier.height(14.dp))
 
         when (selectedSimTab) {
-            0 -> DetailedSimCard(sim = cellular.sim1, lang = lang)
-            1 -> DetailedSimCard(sim = cellular.sim2, lang = lang)
+            0 -> DetailedSimCard(
+                sim = cellular.sim1,
+                lang = lang,
+                onOpenBtsDatabase = onOpenBtsDatabase,
+                onGeocodeBts = onGeocodeBts,
+                onShowBtsOnMap = onShowBtsOnMap
+            )
+            1 -> DetailedSimCard(
+                sim = cellular.sim2,
+                lang = lang,
+                onOpenBtsDatabase = onOpenBtsDatabase,
+                onGeocodeBts = onGeocodeBts,
+                onShowBtsOnMap = onShowBtsOnMap
+            )
             else -> {
-                DetailedSimCard(sim = cellular.sim1, lang = lang)
+                DetailedSimCard(
+                    sim = cellular.sim1,
+                    lang = lang,
+                    onOpenBtsDatabase = onOpenBtsDatabase,
+                    onGeocodeBts = onGeocodeBts,
+                    onShowBtsOnMap = onShowBtsOnMap
+                )
                 Spacer(modifier = Modifier.height(14.dp))
-                DetailedSimCard(sim = cellular.sim2, lang = lang)
+                DetailedSimCard(
+                    sim = cellular.sim2,
+                    lang = lang,
+                    onOpenBtsDatabase = onOpenBtsDatabase,
+                    onGeocodeBts = onGeocodeBts,
+                    onShowBtsOnMap = onShowBtsOnMap
+                )
             }
         }
 
@@ -700,7 +809,13 @@ private fun SimModeBanner(sim: SimCellInfo, simLabel: String, accentColor: Color
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DetailedSimCard(sim: SimCellInfo, lang: String) {
+fun DetailedSimCard(
+    sim: SimCellInfo,
+    lang: String,
+    onOpenBtsDatabase: () -> Unit = {},
+    onGeocodeBts: (BtsMatchInfo) -> Unit = {},
+    onShowBtsOnMap: (BtsMatchInfo) -> Unit = {}
+) {
     val isCs = lang != "EN"
 
     Card(
@@ -1090,6 +1205,224 @@ fun DetailedSimCard(sim: SimCellInfo, lang: String) {
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
+                }
+            }
+
+            // Known Czech BTS Site Match & RF Link Geometry Section
+            sim.btsMatch?.let { match ->
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = DarkSlate700)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Icon(
+                            imageVector = if (match.pciMismatch || match.tacMismatch) Icons.Default.Warning else Icons.Default.Verified,
+                            contentDescription = null,
+                            tint = if (match.pciMismatch || match.tacMismatch) AmberWarning else EmeraldSignal,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isCs) "ZNÁMÝ VYSÍLAČ BTS (${match.operatorName})" else "KNOWN BTS SITE (${match.operatorName})",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            fontWeight = FontWeight.Bold,
+                            color = if (match.pciMismatch || match.tacMismatch) AmberWarning else EmeraldSignal
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (match.isMocnShared) Purple5G.copy(alpha = 0.25f) else EmeraldSignal.copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = when {
+                                match.isMocnShared -> "MOCN"
+                                match.matchType == "PCI+TAC" -> "PCI+TAC"
+                                else -> "ECI MATCH"
+                            },
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (match.isMocnShared) Purple5G else EmeraldSignal
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = match.locationName.ifBlank { "eNodeB ${match.enodebId} • CI ${match.cellId}" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryDark
+                )
+
+                val metaParts = buildList {
+                    if (match.districtCode.isNotBlank()) add("${if (isCs) "Okres" else "Dist"} ${match.districtCode}")
+                    if (match.updatedDate.isNotBlank()) add("${if (isCs) "Aktualizace" else "Updated"} ${match.updatedDate}")
+                    if (match.dbBand.isNotBlank()) add("DB: ${match.dbBand} MHz")
+                    if (match.gsmCid.isNotBlank()) add("GSM ${match.gsmCid}")
+                }
+                if (metaParts.isNotEmpty()) {
+                    Text(
+                        text = metaParts.joinToString(" • "),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        color = TextSecondaryDark
+                    )
+                }
+
+                if (match.coLocatedBands.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (isCs) "Pásma na stožáru (${match.coLocatedCount} buněk):" else "Site bands (${match.coLocatedCount} cells):",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = CyanTertiary,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                        match.coLocatedBands.forEach { b ->
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = CyanSecondary.copy(alpha = 0.2f)
+                            ) {
+                                Text(
+                                    text = if (b.all { it.isDigit() }) "$b MHz" else b,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = CyanTertiary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (match.latitude != null && match.longitude != null) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        MetricItem(
+                            label = if (isCs) "Skutečná vzdál. BTS" else "Real BTS Dist.",
+                            value = match.distanceMeters?.let { BtsGeoUtils.formatDistance(it) } ?: "Bez GNSS",
+                            modifier = Modifier.weight(1f),
+                            color = EmeraldSignal
+                        )
+                        MetricItem(
+                            label = if (isCs) "Azimut k BTS" else "Azimuth to BTS",
+                            value = match.azimuthDeg?.let {
+                                "${it.toInt()}° ${BtsGeoUtils.bearingToCardinal(it, isCs)}"
+                            } ?: "—",
+                            modifier = Modifier.weight(1f),
+                            color = CyanTertiary
+                        )
+                        MetricItem(
+                            label = if (isCs) "Odchylka TA" else "TA vs GPS Delta",
+                            value = match.taDeltaMeters?.let { delta ->
+                                val sign = if (delta >= 0) "+" else ""
+                                "$sign${delta.toInt()} m"
+                            } ?: "—",
+                            modifier = Modifier.weight(1f),
+                            color = AmberWarning
+                        )
+                        MetricItem(
+                            label = "FSPL (Útlum)",
+                            value = match.fsplDb?.let { String.format(Locale.US, "%.1f dB", it) } ?: "—",
+                            modifier = Modifier.weight(1f),
+                            color = Purple5G
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = String.format(
+                            Locale.US,
+                            "GPS BTS: %.5f, %.5f (%s)",
+                            match.latitude,
+                            match.longitude,
+                            match.coordSource.ifBlank { "DB" }
+                        ),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = TextSecondaryDark
+                    )
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = AmberWarning.copy(alpha = 0.12f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (isCs) {
+                                "Záznam z GSMweb neobsahuje GPS souřadnice (vzdálenost k BTS vyžaduje GPS). Naimportujte OpenCelliD (230.csv / .csv.gz) v DB BTS, nebo zkuste dohledat z adresy."
+                            } else {
+                                "GSMweb record has no GPS coordinates (needed for BTS distance). Import OpenCelliD (230.csv / .csv.gz) in BTS DB, or try address geocoding below."
+                            },
+                            modifier = Modifier.padding(8.dp),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = AmberWarning
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (match.latitude != null && match.longitude != null) {
+                        Button(
+                            onClick = { onShowBtsOnMap(match) },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldSignal),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Map, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isCs) "Zobrazit na Mapě" else "Show on Map",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkSlate900
+                            )
+                        }
+                    } else if (match.locationName.isNotBlank()) {
+                        Button(
+                            onClick = { onGeocodeBts(match) },
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AmberWarning),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.LocationSearching, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isCs) "Dohledat GPS BTS" else "Geocode BTS",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkSlate900
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onOpenBtsDatabase,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = if (isCs) "Detail v DB" else "DB Detail", fontSize = 11.sp)
+                    }
                 }
             }
         }

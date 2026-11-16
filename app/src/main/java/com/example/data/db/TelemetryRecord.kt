@@ -114,5 +114,13 @@ data class TelemetryRecord(
     val usedSatellitesDetail: String = "",
     val visibleSatellitesDetail: String = "",
     val sim1CaSummary: String = "",
-    val sim2CaSummary: String = ""
+    val sim2CaSummary: String = "",
+
+    // Matched BTS site & true distance logging (v1.5)
+    val sim1BtsLocation: String = "",
+    val sim1BtsDistanceM: Double? = null,
+    val sim1BtsAzimuthDeg: Float? = null,
+    val sim2BtsLocation: String = "",
+    val sim2BtsDistanceM: Double? = null,
+    val sim2BtsAzimuthDeg: Float? = null
 )

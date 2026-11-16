@@ -7,10 +7,17 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.example.bts.BtsCsvImporter
+import com.example.bts.BtsGeoUtils
+import com.example.bts.BtsRepository
 import com.example.data.db.AppDatabase
 import com.example.data.db.LogSession
 import com.example.data.db.TelemetryRecord
 import com.example.export.Exporter
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.nio.charset.Charset
+import java.util.zip.GZIPOutputStream
 import com.example.model.AnomalyType
 import com.example.model.BatteryState
 import com.example.model.CellularState
@@ -181,7 +188,13 @@ class ExampleRobolectricTest {
         usedSatellitesDetail = "G10(L1/L5@34); E03(E1/E5a@29)",
         visibleSatellitesDetail = "G02(L1@33); G10(L1/L5@34); E03(E1/E5a@29)",
         sim1CaSummary = "LTE-A 2CA (B20+B3 • 30 MHz) | PCC: B20 • 806.0 MHz • 10 MHz + SCC 1: B3 • 1845.0 MHz • 20 MHz",
-        sim2CaSummary = "5G NSA EN-DC (n78 • 40 MHz)"
+        sim2CaSummary = "5G NSA EN-DC (n78 • 40 MHz)",
+        sim1BtsLocation = "Brno - Královo Pole, Technická 3082/12",
+        sim1BtsDistanceM = 185.4,
+        sim1BtsAzimuthDeg = 42.0f,
+        sim2BtsLocation = "Brno - Kolejní, VUT",
+        sim2BtsDistanceM = 410.0,
+        sim2BtsAzimuthDeg = 120.0f
     )
 
     @Test
@@ -445,13 +458,13 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testAboutDialogShowsRelease14AndGithubRepoLink() {
+    fun testAboutDialogShowsRelease15AndGithubRepoLink() {
         composeTestRule.setContent {
             SignalLoggerTheme(darkTheme = true) {
                 AboutAndHelpDialog(lang = "CS", onDismiss = {})
             }
         }
-        composeTestRule.onNodeWithText("Release v1.4").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Release v1.5").assertIsDisplayed()
         composeTestRule.onNodeWithTag("author_github_link").assertIsDisplayed()
         composeTestRule.onNodeWithText("GitHub: https://github.com/FreshSPK/GNSS-and-Net-Logger").assertIsDisplayed()
     }
@@ -511,5 +524,250 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithText("S2: T-Mobile CZ (5G NSA) -91 dBm", substring = true).assertIsDisplayed()
         composeTestRule.onNodeWithText("Použité:", substring = true).assertDoesNotExist()
         composeTestRule.onNodeWithText("Viditelné:", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun testBtsGeoUtilsCalculationsAndNormalization() {
+        val dist = BtsGeoUtils.haversineDistanceMeters(49.2266, 16.5746, 49.22695, 16.57545)
+        assertTrue(dist in 55.0..90.0)
+
+        val bearing = BtsGeoUtils.bearingDegrees(49.2266, 16.5746, 49.22695, 16.57545)
+        assertTrue(bearing in 30f..85f)
+        assertEquals("SV", BtsGeoUtils.bearingToCardinal(45f, isCs = true))
+        assertEquals("NE", BtsGeoUtils.bearingToCardinal(45f, isCs = false))
+
+        val fspl = BtsGeoUtils.calculateFsplDb(2655.0, 1000.0)
+        assertNotNull(fspl)
+        assertEquals(100.93, fspl!!, 0.2)
+
+        assertEquals("23001", BtsGeoUtils.normalizeCzechOperatorPlmn("T-Mobile CZ"))
+        assertEquals("23002", BtsGeoUtils.normalizeCzechOperatorPlmn("23002"))
+        assertEquals("23003", BtsGeoUtils.normalizeCzechOperatorPlmn("Vodafone"))
+        assertEquals("23002", BtsGeoUtils.mocnPartnerPlmn("23001"))
+        assertEquals("23001", BtsGeoUtils.mocnPartnerPlmn("23002"))
+
+        val cleaned = BtsGeoUtils.cleanLocationForGeocoding("Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL")
+        assertEquals("Brno - Královo Pole, Technická 3082/12, Czechia", cleaned)
+    }
+
+    @Test
+    fun testBtsCsvImporterGsmwebCp1250AndPreservesCoords() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val btsDao = db.btsDao()
+            val cp1250 = Charset.forName("windows-1250")
+            val gsmwebSample = """
+                CellID;PhysCID;TAC;Band;GSMCID;Datum;Okr;Umisteni
+                568853;21;24656;2600;3391;25.04.2019;BM;Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL
+                568854;22;24656;1800;3392;25.04.2019;BM;Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL
+                ;;;;;;;
+            """.trimIndent()
+
+            val res1 = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(gsmwebSample.toByteArray(cp1250)),
+                btsDao = btsDao,
+                defaultOperatorPlmn = "23001",
+                fileNameHint = "tlte.csv",
+                replaceOperator = false
+            )
+            assertEquals(2, res1.importedCount)
+
+            val saved = btsDao.findByPlmnAndCellId("23001", 568853L)
+            assertNotNull(saved)
+            assertEquals(2222L, saved!!.enodebId)
+            assertEquals(21, saved.sectorId)
+            assertEquals("BM", saved.districtCode)
+            assertTrue(saved.locationName.contains("Královo Pole"))
+
+            // Save GPS coordinates manually and verify subsequent GSMweb re-import preserves them
+            btsDao.updateTowerCoordinates("23001", 568853L, 49.22695, 16.57545, "MANUAL")
+            BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(gsmwebSample.toByteArray(cp1250)),
+                btsDao = btsDao,
+                defaultOperatorPlmn = "23001",
+                fileNameHint = "tlte.csv",
+                replaceOperator = false
+            )
+            val reimported = btsDao.findByPlmnAndCellId("23001", 568853L)
+            assertEquals(49.22695, reimported?.latitude ?: 0.0, 0.0001)
+            assertEquals(16.57545, reimported?.longitude ?: 0.0, 0.0001)
+            assertEquals("MANUAL", reimported?.coordSource)
+
+            // Also verify OpenCelliD MCC 230 filtering & CLF format
+            val openCellCsv = """
+                radio,mcc,net,area,cell,unit,lon,lat,range
+                LTE,230,3,38003,827147,260,16.5712,49.2281,1000
+                LTE,262,1,12345,999999,10,13.4000,52.5000,1000
+            """.trimIndent()
+            val ocRes = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(openCellCsv.toByteArray()),
+                btsDao = btsDao
+            )
+            assertEquals(1, ocRes.importedCount)
+            assertEquals(1, ocRes.skippedCount)
+            val vfTower = btsDao.findByPlmnAndCellId("23003", 827147L)
+            assertNotNull(vfTower)
+            assertEquals(49.2281, vfTower?.latitude ?: 0.0, 0.0001)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun testBtsRepositoryMatchingMocnColocatedAndDemoFekt() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.btsDao()
+            val repo = BtsRepository(context, dao)
+            val gsmweb = """
+                CellID;PhysCID;TAC;Band;GSMCID;Datum;Okr;Umisteni
+                568853;21;24656;2600;3391;25.04.2019;BM;Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL
+                568833;21;24656;1800;3391;25.04.2019;BM;Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL
+            """.trimIndent()
+            BtsCsvImporter.importStream(ByteArrayInputStream(gsmweb.toByteArray()), dao, "23001", "tlte.csv")
+
+            val sim = SimCellInfo(
+                isServing = true,
+                networkGen = "4G LTE",
+                plmn = "23001",
+                operatorAlpha = "T-Mobile CZ",
+                ci = "568853",
+                enbOrGnbId = "2222",
+                sectorId = "21",
+                pci = 99, // intentional mismatch to test pciMismatch detection
+                tac = "24656",
+                dlFreqMhz = 2655.0,
+                estimatedDistanceM = 312.5
+            )
+
+            val match = repo.matchSimCell(
+                sim = sim,
+                ueLat = 49.2266,
+                ueLon = 16.5746,
+                hasGnssFix = true,
+                isDemoMode = true
+            )
+            assertNotNull(match)
+            assertEquals("DEMO_FEKT", match!!.coordSource)
+            assertTrue(match.pciMismatch)
+            assertFalse(match.tacMismatch)
+            assertTrue(match.coLocatedBands.contains("1800"))
+            assertTrue(match.coLocatedBands.contains("2600"))
+            assertTrue((match.distanceMeters ?: 0.0) in 50.0..100.0)
+            assertNotNull(match.azimuthDeg)
+            assertNotNull(match.taDeltaMeters)
+            assertNotNull(match.fsplDb)
+
+            // MOCN lookup: O2 SIM ("23002") matching T-Mobile cell ("23001")
+            val mocnMatch = repo.matchSimCell(
+                sim = sim.copy(plmn = "23002", operatorAlpha = "O2 - CZ", pci = 21),
+                ueLat = 49.2266,
+                ueLon = 16.5746,
+                hasGnssFix = true,
+                isDemoMode = true
+            )
+            assertNotNull(mocnMatch)
+            assertTrue(mocnMatch!!.isMocnShared)
+            assertEquals("MOCN", mocnMatch.matchType)
+            assertFalse(mocnMatch.pciMismatch)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun testExporterIncludesV15BtsFields() {
+        val session = sampleSession()
+        val records = listOf(sampleRecord(id = 1L))
+        val csv = Exporter.exportToCsv(session, records)
+        assertTrue(csv.contains("Sim1BtsLocation,Sim1BtsDistance_m,Sim1BtsAzimuth_deg,Sim2BtsLocation,Sim2BtsDistance_m,Sim2BtsAzimuth_deg"))
+        assertTrue(csv.contains("Brno - Královo Pole, Technická 3082/12"))
+
+        val gpx = Exporter.exportToGpx(session, records)
+        assertTrue(gpx.contains("<sim1_bts_location>Brno - Královo Pole, Technická 3082/12</sim1_bts_location>"))
+        assertTrue(gpx.contains("<sim1_bts_distance_m>185.4</sim1_bts_distance_m>"))
+
+        val geoJson = Exporter.exportToGeoJson(session, records)
+        assertTrue(geoJson.contains("\"sim1BtsLocation\": \"Brno - Královo Pole, Technická 3082/12\""))
+        assertTrue(geoJson.contains("\"sim1BtsDistanceM\": 185.4"))
+    }
+
+    @Test
+    fun testOpenCellIdGzipAndBidirectionalGsmwebMerge() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.btsDao()
+
+            // Headerless OpenCelliD .csv.gz (MCC 230 Czech operators + foreign row skipped)
+            val openCellRows = """
+                LTE,230,1,24656,568853,0,16.57545,49.22695,800,12,1,1600000000,1700000000,-85
+                NR,230,2,38002,990110,120,16.57120,49.22810,1200,5,1,1600000000,1700000000,-90
+                LTE,262,1,1000,123456,1,13.4000,52.5000,500,1,1,1600000000,1700000000,-80
+            """.trimIndent()
+            val gzOut = ByteArrayOutputStream()
+            GZIPOutputStream(gzOut).use { it.write(openCellRows.toByteArray()) }
+
+            val gzRes = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(gzOut.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "230.csv.gz"
+            )
+            assertEquals(2, gzRes.importedCount)
+            assertEquals(2, gzRes.withCoordsCount)
+            assertEquals(1, gzRes.skippedCount)
+
+            // Order 1: OpenCelliD imported first (has GPS), then GSMweb imported (no GPS, rich address + band + PCI)
+            val gsmweb = """
+                CellID;PhysCID;TAC;Band;GSMCID;Datum;Okr;Umisteni
+                568853;21;24656;2600;3391;25.04.2019;BM;Brno - Královo Pole, Technická 3082/12
+                777111;55;25400;1800;1122;01.05.2020;BM;Brno - Komín, Hlavní 10
+            """.trimIndent()
+            BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(gsmweb.toByteArray()),
+                btsDao = dao,
+                defaultOperatorPlmn = "23001",
+                fileNameHint = "tlte.csv"
+            )
+
+            val mergedOrder1 = dao.findByPlmnAndCellId("23001", 568853L)!!
+            assertEquals(49.22695, mergedOrder1.latitude!!, 0.0001)
+            assertEquals("OPENCELLID", mergedOrder1.coordSource)
+            assertEquals("Brno - Královo Pole, Technická 3082/12", mergedOrder1.locationName)
+            assertEquals("2600", mergedOrder1.band)
+            assertEquals(21, mergedOrder1.pci)
+            assertEquals("BM", mergedOrder1.districtCode)
+
+            // Order 2: GSMweb row 777111 existed WITHOUT GPS first; now OpenCelliD arrives WITH GPS
+            val openCellPatch = """
+                radio,mcc,net,area,cell,unit,lon,lat,range
+                LTE,230,1,25400,777111,0,16.55555,49.22111,900
+            """.trimIndent()
+            BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(openCellPatch.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "230.csv"
+            )
+
+            val mergedOrder2 = dao.findByPlmnAndCellId("23001", 777111L)!!
+            assertEquals(49.22111, mergedOrder2.latitude!!, 0.0001)
+            assertEquals(16.55555, mergedOrder2.longitude!!, 0.0001)
+            assertEquals("OPENCELLID", mergedOrder2.coordSource)
+            // GSMweb rich metadata MUST survive OpenCelliD upsert
+            assertEquals("Brno - Komín, Hlavní 10", mergedOrder2.locationName)
+            assertEquals("1800", mergedOrder2.band)
+            assertEquals(55, mergedOrder2.pci)
+            assertEquals("BM", mergedOrder2.districtCode)
+        } finally {
+            db.close()
+        }
     }
 }

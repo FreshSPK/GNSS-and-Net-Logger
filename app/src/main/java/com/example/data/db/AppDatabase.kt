@@ -8,12 +8,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [LogSession::class, TelemetryRecord::class],
-    version = 4,
+    entities = [LogSession::class, TelemetryRecord::class, BtsTowerEntity::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun telemetryDao(): TelemetryDao
+    abstract fun btsDao(): BtsDao
 
     companion object {
         @Volatile
@@ -46,6 +47,45 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `bts_towers` (
+                        `operatorPlmn` TEXT NOT NULL,
+                        `cellId` INTEGER NOT NULL,
+                        `enodebId` INTEGER NOT NULL,
+                        `sectorId` INTEGER NOT NULL,
+                        `pci` INTEGER NOT NULL,
+                        `tac` INTEGER NOT NULL,
+                        `band` TEXT NOT NULL,
+                        `gsmCid` TEXT NOT NULL,
+                        `updatedDate` TEXT NOT NULL,
+                        `districtCode` TEXT NOT NULL,
+                        `locationName` TEXT NOT NULL,
+                        `latitude` REAL,
+                        `longitude` REAL,
+                        `coordSource` TEXT NOT NULL,
+                        `importedAtMs` INTEGER NOT NULL,
+                        PRIMARY KEY(`operatorPlmn`, `cellId`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bts_towers_cellId` ON `bts_towers` (`cellId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bts_towers_operatorPlmn_enodebId` ON `bts_towers` (`operatorPlmn`, `enodebId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bts_towers_operatorPlmn_pci_tac` ON `bts_towers` (`operatorPlmn`, `pci`, `tac`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bts_towers_districtCode` ON `bts_towers` (`districtCode`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bts_towers_latitude_longitude` ON `bts_towers` (`latitude`, `longitude`)")
+
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim1BtsLocation TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim1BtsDistanceM REAL")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim1BtsAzimuthDeg REAL")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim2BtsLocation TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim2BtsDistanceM REAL")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim2BtsAzimuthDeg REAL")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -53,7 +93,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "signal_gnss_logger.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

@@ -456,7 +456,13 @@ class TelemetryLoggingService : Service() {
             usedSatellitesDetail = usedSatsDetail,
             visibleSatellitesDetail = visibleSatsDetail,
             sim1CaSummary = sim1CaText,
-            sim2CaSummary = sim2CaText
+            sim2CaSummary = sim2CaText,
+            sim1BtsLocation = if (fields.logCellularRf) sim1.btsMatch?.locationName.orEmpty() else "",
+            sim1BtsDistanceM = if (fields.logCellularRf) sim1.btsMatch?.distanceMeters else null,
+            sim1BtsAzimuthDeg = if (fields.logCellularRf) sim1.btsMatch?.azimuthDeg else null,
+            sim2BtsLocation = if (fields.logCellularRf) sim2.btsMatch?.locationName.orEmpty() else "",
+            sim2BtsDistanceM = if (fields.logCellularRf) sim2.btsMatch?.distanceMeters else null,
+            sim2BtsAzimuthDeg = if (fields.logCellularRf) sim2.btsMatch?.azimuthDeg else null
         )
 
         val dao = app.database.telemetryDao()

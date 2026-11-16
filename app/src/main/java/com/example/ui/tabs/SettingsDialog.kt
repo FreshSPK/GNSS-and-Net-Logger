@@ -18,6 +18,8 @@ import com.example.model.LogTriggerMode
 import com.example.model.LoggingSettings
 import com.example.ui.theme.*
 
+import androidx.compose.material.icons.filled.Storage
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsDialog(
@@ -25,6 +27,7 @@ fun SettingsDialog(
     lang: String,
     onDismiss: () -> Unit,
     onOpenBatterySettings: () -> Unit = {},
+    onOpenBtsDatabase: () -> Unit = {},
     onSaveSettings: (LoggingSettings) -> Unit
 ) {
     var isDemo by remember { mutableStateOf(settings.isDemoMode) }
@@ -36,6 +39,7 @@ fun SettingsDialog(
     var taMultiplier by remember { mutableStateOf(settings.taMultiplierMode) }
     var darkMap by remember { mutableStateOf(settings.darkMapMode) }
     var audioAlerts by remember { mutableStateOf(settings.audioAnomalyAlerts) }
+    var autoGeocodeBts by remember { mutableStateOf(settings.autoGeocodeBts) }
 
     val effectiveIsCs = remember(selectedLang, lang) {
         if (selectedLang == "SYSTEM") {
@@ -233,6 +237,33 @@ fun SettingsDialog(
                     Switch(checked = audioAlerts, onCheckedChange = { audioAlerts = it })
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Auto-Geocode Serving BTS Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (effectiveIsCs) "Automaticky dohledat GPS BTS" else "Auto-Geocode Serving BTS",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (effectiveIsCs) {
+                                "Dohledá přibližnou GPS z adresy GSMweb, pokud vysílač nemá GPS z OpenCelliD"
+                            } else {
+                                "Resolves approximate GPS from GSMweb street names when OpenCelliD coords are missing"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(checked = autoGeocodeBts, onCheckedChange = { autoGeocodeBts = it })
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = DarkSlate700)
                 Spacer(modifier = Modifier.height(12.dp))
@@ -337,8 +368,25 @@ fun SettingsDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onOpenBtsDatabase()
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(16.dp), tint = CyanTertiary)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (effectiveIsCs) "Spravovat databázi BTS ČR (T-Mobile / O2 / Vodafone)" else "Manage CZ BTS Database (T-Mobile / O2 / Vodafone)",
+                        fontSize = 11.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
                     onClick = onOpenBatterySettings,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 ) {
                     Icon(imageVector = Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp), tint = AmberWarning)
                     Spacer(modifier = Modifier.width(6.dp))
@@ -363,7 +411,8 @@ fun SettingsDialog(
                             qnhHpa = qnh,
                             taMultiplierMode = taMultiplier,
                             darkMapMode = darkMap,
-                            audioAnomalyAlerts = audioAlerts
+                            audioAnomalyAlerts = audioAlerts,
+                            autoGeocodeBts = autoGeocodeBts
                         )
                     )
                     onDismiss()

@@ -87,7 +87,7 @@ fun AboutAndHelpDialog(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Release v1.4",
+                                    text = "Release v1.5",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldSignal
@@ -157,7 +157,7 @@ fun AboutAndHelpDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Release v1.4 New Features Box
+                // Release v1.5 New Features Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -166,7 +166,7 @@ fun AboutAndHelpDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = if (isCs) "✨ Novinky verze 1.4 (Release v1.4)" else "✨ What's New in Release v1.4",
+                            text = if (isCs) "✨ Novinky verze 1.5 (Release v1.5)" else "✨ What's New in Release v1.5",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
@@ -174,19 +174,19 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "• Přesná detekce 5G NSA (EN-DC) vs. 5G SA + 5G NR sousedé: rozpoznává 5G NSA kotevní buňku i v RRC Idle (ikona 5G v liště) a aktivní 5G NR SCG větev (n1/n3/n28/n78) s odděleným filtrem 4G LTE / 5G NR\n" +
-                                "• Agregované kmitočty v Carrier Aggregation: zobrazení všech agregovaných nosných (PCC/SCC) včetně konkrétního pásma a frekvence v MHz (např. B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
-                                "• Shoda s GPS Test & SkyPlot: zobrazení fyzických unikátních družic i počtu L1+L5/E5a/B2a signálů, synchronizace legendy Skyplotu (plná barva = ve fixu, barevný kroužek = mimo fix, zelená záře okolo = L5/E5a/B2a)\n" +
-                                "• Oddělené handovery SIM 1 / SIM 2 & Indoor Fix Guard: samostatné HO počítadlo pro každou SIM, viditelný banner při zapnutém Demo režimu a nulování zastaralého fixu/rychlosti při ztrátě signálu v budově\n" +
-                                "• Upravené prahy DOP & Satelitů + Logování: nová škála PDOP (< 0,7 nejlepší, 0,7–1,5, 1,5–2,5, 2,5–3,5, > 3,5 nejhorší) a satelitů (< 5, 5–20, 21–30, 31–50, > 50); databáze (Room v4), grafy i CSV/GPX/GeoJSON nyní logují jak použité, tak viditelné satelity\n" +
-                                "• Vylepšené profily měření: nezalamující se předvolby Pěší (5s/10m), Auto (10s/50m) a Statické (10s)"
+                                "• Databáze BTS 3 českých operátorů (OpenCelliD + GSMweb): streamovaný import velkých souborů OpenCelliD (230.csv / přímo 230.csv.gz s GPS souřadnicemi pro ČR) i GSMweb CSV (Win-1250/UTF-8 bez GPS) s chytrým sloučením adresy, pásma a souřadnic\n" +
+                                "• Skutečná vzdálenost a azimut k BTS: přesný Haversine výpočet vzdálenosti z GNSS do GPS polohy vysílače (z OpenCelliD / editoru), kompasový směr, porovnání s Timing Advance (Δ TA) a útlum FSPL (dB)\n" +
+                                "• Sdílení MOCN, souběžná pásma & bezpečnostní kontrola: automatické párování sdílených vysílačů T-Mobile/O2, přehled pásem na stejném stožáru (eNodeB) a detekce nesouladu PCI/TAC proti databázi\n" +
+                                "• Offline geokódování a editace souřadnic BTS: volitelné dohledání GPS z adresy pro GSMweb záznamy bez souřadnic + ruční úprava GPS se zachováním při aktualizaci CSV\n" +
+                                "• Vrstva BTS & RF linky na mapě: barevně rozlišené značky vysílačů všech 3 operátorů na OpenStreetMap a čára spojnice od vaší polohy k obslužným vysílačům SIM 1 / SIM 2\n" +
+                                "• Rozšířené logování a export v1.5: Room databáze v5, inspektor v Historii i exporty CSV / GPX / GeoJSON ukládají název BTS, vzdálenost a azimut"
                             } else {
-                                "• Accurate 5G NSA (EN-DC) vs. 5G SA & 5G NR Neighbors: distinguishes 5G NSA LTE anchor (even when RRC Idle matches the status-bar 5G badge) from active 5G NR SCG legs (n1/n3/n28/n78) with dedicated 4G LTE / 5G NR neighbor filtering\n" +
-                                "• Component Carrier Frequencies in CA: displays all aggregated PCC/SCC carriers with exact band labels and center frequencies in MHz (e.g., B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
-                                "• GPS Test Alignment & SkyPlot Legend: reports both unique physical satellites and total L1+L5/E5a/B2a signals; Skyplot legend matches canvas 1:1 (solid fill = in fix, colored ring = unused, green glow = L5/E5a/B2a)\n" +
-                                "• Per-SIM Handovers, Demo Banner & Indoor Fix Guard: independent HO counters per SIM, clear Demo Mode top banner across all tabs, and automatic fix/speed timeout reset when moving indoors\n" +
-                                "• Recalibrated DOP & Satellite Scales + Full Sat Logging: updated PDOP (< 0.7 best to > 3.5 worst) and Satellite (< 5, 5–20, 21–30, 31–50, > 50) map/chart thresholds; Room v4, charts & CSV/GPX/GeoJSON now record both used and visible satellites\n" +
-                                "• Clean Settings Presets: non-wrapping chips for Walking (5s/10m), Driving (10s/50m), and Static (10s)"
+                                "• Czech 3-Operator BTS Database (OpenCelliD + GSMweb): memory-safe streaming import of OpenCelliD (230.csv / 230.csv.gz directly with GPS for MCC 230) and GSMweb CSV (address/band metadata without GPS) with smart bidirectional merge\n" +
+                                "• Real GPS-to-BTS Distance & Azimuth: Haversine ground distance, cardinal bearing, Timing Advance vs. real GPS delta (Δ TA), and Free-Space Path Loss (FSPL dB)\n" +
+                                "• MOCN Sharing, Co-Located Bands & PCI/TAC Security Cross-Check: supports T-Mobile/O2 shared sites, lists co-located mast bands, and alerts on PCI/TAC DB mismatches\n" +
+                                "• Geocoding & Coordinate Persistence: optional site-name geocoding for GPS-less GSMweb rows + manual GPS editor preserved across subsequent imports\n" +
+                                "• OSM Map BTS Layer & Serving RF Links: operator-colored BTS markers and dashed RF link polylines from UE position to serving SIM 1 / SIM 2 towers\n" +
+                                "• Extended Logging & v1.5 Exports: Room v5, History inspector, and CSV / GPX 1.1 / GeoJSON exports record matched BTS site, distance, and azimuth"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark
@@ -215,11 +215,11 @@ fun AboutAndHelpDialog(
                 )
 
                 HelpSection(
-                    title = if (isCs) "2. Mobily (5G NSA/SA, CA kmitočty & Spoofing)" else "2. Cellular RF (5G NSA/SA, CA Frequencies & Security)",
+                    title = if (isCs) "2. Mobily (5G NSA/SA, Databáze BTS ČR & Spoofing)" else "2. Cellular RF (5G NSA/SA, CZ BTS Registry & Security)",
                     body = if (isCs) {
-                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Rozlišuje 4G LTE, 5G NSA (EN-DC) a 5G SA, zobrazuje konkrétní agregované kmitočty CA v MHz, reálné CQI, rozpad ECI/NCI na eNodeB/gNodeB + sektor, Timing Advance vzdálenost k BTS (1× nebo 2×) a detekuje 2G downgrade či anomálie IMSI Catcheru."
+                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Páruje obslužnou buňku proti lokální databázi českých vysílačů (T-Mobile, O2, Vodafone), ukazuje lokalitu BTS, reálnou GPS vzdálenost, azimut, Δ TA, FSPL, sdílená pásma na stožáru a hlídá PCI/TAC nesoulad i 2G downgrade."
                     } else {
-                        "Dual-SIM radio analyzer distinguishing 4G LTE, 5G NSA (EN-DC), and 5G SA, displaying exact aggregated CA MHz component frequencies, real modem CQI, decoded eNodeB/gNodeB + Sector IDs, Timing Advance BTS distance, and IMSI Catcher / 2G downgrade anomaly alerts."
+                        "Dual-SIM analyzer matching serving cells against the local 3-operator Czech BTS registry (T-Mobile, O2, Vodafone), displaying site address, real GPS distance, azimuth, TA delta, FSPL, co-located mast bands, MOCN status, and PCI/TAC mismatch alerts."
                     }
                 )
 
@@ -233,11 +233,11 @@ fun AboutAndHelpDialog(
                 )
 
                 HelpSection(
-                    title = if (isCs) "4. Mapa (OpenStreetMap & Živá barevná trasa)" else "4. Map (OpenStreetMap & Live Heatmap)",
+                    title = if (isCs) "4. Mapa (OpenStreetMap, Vrstva BTS & Živá trasa)" else "4. Map (OpenStreetMap, BTS Layer & Live Track)",
                     body = if (isCs) {
-                        "OpenStreetMap bez API klíčů s tmavým/světlým režimem a auto-sledováním. Živá trasa se sbírá průběžně na pozadí od spuštění aplikace a barevně se vykresluje podle RSRP (S1/S2), rychlosti, satelitů (< 5 až > 50) i PDOP (< 0,7 až > 3,5) stejně jako záznamy z Historie."
+                        "OpenStreetMap s tmavým/světlým režimem, vrstvou známých BTS vysílačů (T-Mobile, O2, Vodafone) a přímou RF spojnicí k obslužným BTS. Barevně vykresluje trasu podle RSRP (S1/S2), rychlosti, satelitů (< 5 až > 50) i PDOP (< 0,7 až > 3,5)."
                     } else {
-                        "OpenStreetMap view with dark night-mode filter and auto-follow. Records live trail continuously from startup across tabs and renders color-coded tracks by RSRP (S1/S2), Speed, Satellites (< 5 to > 50), or PDOP (< 0.7 to > 3.5) both live and in replay."
+                        "OpenStreetMap view with dark night-mode filter, known Czech BTS tower markers (T-Mobile, O2, Vodafone), and serving RF link lines. Renders color-coded tracks by RSRP (S1/S2), Speed, Satellites (< 5 to > 50), or PDOP (< 0.7 to > 3.5) both live and in replay."
                     }
                 )
 

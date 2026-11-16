@@ -1,0 +1,936 @@
+CellID;PhysCID;TAC;Band;GSMCID;Datum;Okr;Umisteni
+20936;322;1144;2100;;23.12.2024;AB;Praha 4 - Chodov, V Lomech 2339/1, datacentrum O2
+263936;288;1320;800;53815;30.03.2020;TA;Choustník 164, příhradový stožárek na kontejneru v areálu Intersnack
+263937;439;1320;800;53815;30.03.2020;TA;Choustník 164, příhradový stožárek na kontejneru v areálu Intersnack
+266496;94;1320;800;53809;12.09.2019;TA;Bechyně, vojenské letiště, LZS
+266497;185;1320;800;53809;12.09.2019;TA;Bechyně, vojenské letiště, LZS
+271616;369;1515;800;45910;30.10.2021;CL;Zákupy - Nové Zákupy 522, komín
+271617;116;1515;800;45910;30.10.2021;CL;Zákupy - Nové Zákupy 522, komín
+271618;346;1515;800;45910;30.10.2021;CL;Zákupy - Nové Zákupy 522, komín
+274176;312;1421;800;55695;21.12.2017;RO;Cekov, betonový stožár u vodárny
+274177;460;1421;800;55695;21.12.2017;RO;Cekov, betonový stožár u vodárny
+274178;380;1421;800;55695;21.12.2017;RO;Cekov, betonový stožár u vodárny
+274266;482;1421;900;55695;27.03.2025;RO;Cekov, betonový stožár u vodárny
+274267;367;1421;900;55695;27.03.2025;RO;Cekov, betonový stožár u vodárny
+274268;228;1421;900;55695;27.03.2025;RO;Cekov, betonový stožár u vodárny
+274276;167;1421;1800;55695;26.02.2025;RO;Cekov, betonový stožár u vodárny {1404}
+274277;58;1421;1800;55695;26.02.2025;RO;Cekov, betonový stožár u vodárny {1404}
+274278;393;1421;1800;55695;26.02.2025;RO;Cekov, betonový stožár u vodárny {1404}
+274376;177;1421;2100;55695;19.02.2025;RO;Cekov, betonový stožár u vodárny
+274377;487;1421;2100;55695;19.02.2025;RO;Cekov, betonový stožár u vodárny
+274378;38;1421;2100;55695;19.02.2025;RO;Cekov, betonový stožár u vodárny
+276736;463;1622;800;16495;08.08.2019;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276737;104;1622;800;16495;08.08.2019;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276738;291;1622;800;16495;08.08.2019;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276826;428;1622;900;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276827;484;1622;900;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276828;168;1622;900;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276836;154;1622;1800;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie {1404}
+276837;47;1622;1800;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie {1404}
+276838;273;1622;1800;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie {1404}
+276936;446;1622;2100;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276937;132;1622;2100;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+276938;223;1622;2100;16495;25.03.2025;JC;Lázně Bělohrad, Lázeňská 165, Hotel Anna Marie
+315136;174;1221;800;59318;30.08.2018;BE;Beroun, Prof. Veselého 495, nemocnice
+315137;371;1221;800;59318;30.08.2018;BE;Beroun, Prof. Veselého 495, nemocnice
+315138;91;1221;800;59318;30.08.2018;BE;Beroun, Prof. Veselého 495, nemocnice
+317776;363;1622;800;36754;21.03.2025;NA;Náchod - Běloves, Kladská 69, komín
+317777;247;1622;800;36754;21.03.2025;NA;Náchod - Běloves, Kladská 69, komín
+317778;449;1622;800;36754;21.03.2025;NA;Náchod - Běloves, Kladská 69, komín
+317786;129;1622;900;36754;21.08.2025;NA;Náchod - Běloves, Kladská 69, komín
+317787;358;1622;900;36754;21.08.2025;NA;Náchod - Běloves, Kladská 69, komín
+317788;356;1622;900;36754;21.08.2025;NA;Náchod - Běloves, Kladská 69, komín
+317896;;1622;2100;36754;16.02.2026;NA;Náchod - Běloves, Kladská 69, komín (nové)
+317897;366;1622;2100;36754;16.02.2026;NA;Náchod - Běloves, Kladská 69, komín (nové)
+317898;;1622;2100;36754;16.02.2026;NA;Náchod - Běloves, Kladská 69, komín (nové)
+322816;152;1421;800;59315;13.09.2018;BE;Hořovice, K Nemocnici 1106/14, nemocnice
+322817;9;1421;800;59315;13.09.2018;BE;Hořovice, K Nemocnici 1106/14, nemocnice
+322818;25;1421;800;59315;13.09.2018;BE;Hořovice, K Nemocnici 1106/14, nemocnice
+343296;346;1414;800;57441;23.10.2019;TC;Přimda, D5/140km, betonový stožár
+343297;443;1414;800;57441;23.10.2019;TC;Přimda, D5/140km, betonový stožár
+343396;228;1414;1800;57441;27.01.2025;TC;Přimda, D5/140km, betonový stožár {1404}
+343397;217;1414;1800;57441;27.01.2025;TC;Přimda, D5/140km, betonový stožár {1404}
+343496;435;1414;2100;57441;27.01.2025;TC;Přimda, D5/140km, betonový stožár
+343497;370;1414;2100;57441;27.01.2025;TC;Přimda, D5/140km, betonový stožár
+361315;106;1414;1800;54096;02.09.2023;PJ;Přeštice, Hlávkova 1254, IAC, indoor
+394594;214;1414;1800;54097;01.09.2020;PJ;Přeštice, Průmyslová 1408, IAC, indoor
+394595;134;1414;1800;54097;01.09.2020;PJ;Přeštice, Průmyslová 1408, IAC, indoor
+397056;433;1236;800;55338;29.07.2019;PB;Dobříš, U Kodetky 1810, hala Bobcat
+397057;65;1236;800;55338;29.07.2019;PB;Dobříš, U Kodetky 1810, hala Bobcat
+397058;192;1236;800;55338;29.07.2019;PB;Dobříš, U Kodetky 1810, hala Bobcat
+397156;439;1236;1800;55338;08.12.2025;PB;Dobříš, U Kodetky 1810, hala Bobcat {1404}
+397157;260;1236;1800;55338;08.12.2025;PB;Dobříš, U Kodetky 1810, hala Bobcat {1404}
+397158;126;1236;1800;55338;08.12.2025;PB;Dobříš, U Kodetky 1810, hala Bobcat {1404}
+397256;37;1236;2100;55338;05.12.2025;PB;Dobříš, U Kodetky 1810, hala Bobcat
+397257;276;1236;2100;55338;05.12.2025;PB;Dobříš, U Kodetky 1810, hala Bobcat
+397258;260;1236;2100;55338;05.12.2025;PB;Dobříš, U Kodetky 1810, hala Bobcat
+420096;212;1514;800;25271;27.12.2018;JN;Rádlo, příhradový stožár nad I/35
+420097;381;1514;800;25271;27.12.2018;JN;Rádlo, příhradový stožár nad I/35
+420098;325;1514;800;25271;27.12.2018;JN;Rádlo, příhradový stožár nad I/35
+420196;306;1514;1800;25271;08.08.2025;JN;Rádlo, příhradový stožár nad I/35 {1404}
+420197;448;1514;1800;25271;08.08.2025;JN;Rádlo, příhradový stožár nad I/35 {1404}
+420198;83;1514;1800;25271;08.08.2025;JN;Rádlo, příhradový stožár nad I/35 {1404}
+420296;239;1514;2100;25271;02.09.2025;JN;Rádlo, příhradový stožár nad I/35
+420297;207;1514;2100;25271;02.09.2025;JN;Rádlo, příhradový stožár nad I/35
+420298;409;1514;2100;25271;02.09.2025;JN;Rádlo, příhradový stožár nad I/35
+422736;88;1312;800;59843;07.10.2025;CB;Borovany, Vodárenská 170, LB Minerals
+422737;45;1312;800;59843;07.10.2025;CB;Borovany, Vodárenská 170, LB Minerals
+438016;459;1419;800;60303;16.08.2018;PM;Plzeň, Goethova 2704/1, Komerční banka
+438017;473;1419;800;60303;16.08.2018;PM;Plzeň, Goethova 2704/1, Komerční banka
+438018;49;1419;800;60303;16.08.2018;PM;Plzeň, Goethova 2704/1, Komerční banka
+438106;402;1419;900;60303;10.11.2024;PM;Plzeň, Goethova 2704/1, Komerční banka
+438107;56;1419;900;60303;10.11.2024;PM;Plzeň, Goethova 2704/1, Komerční banka
+438108;247;1419;900;60303;10.11.2024;PM;Plzeň, Goethova 2704/1, Komerční banka
+438116;307;1419;1800;60303;29.09.2023;PM;Plzeň, Goethova 2704/1, Komerční banka {1404}
+438117;371;1419;1800;60303;29.09.2023;PM;Plzeň, Goethova 2704/1, Komerční banka {1404}
+438118;129;1419;1800;60303;29.09.2023;PM;Plzeň, Goethova 2704/1, Komerční banka {1404}
+438216;123;1419;2100;60303;29.09.2023;PM;Plzeň, Goethova 2704/1, Komerční banka
+438217;152;1419;2100;60303;29.09.2023;PM;Plzeň, Goethova 2704/1, Komerční banka
+438218;334;1419;2100;60303;29.09.2023;PM;Plzeň, Goethova 2704/1, Komerční banka
+458496;174;1513;1800;15875;02.05.2018;MO;Most, Václava Řezáče 315, Czech Coal, indoor
+458497;448;1513;1800;15875;02.05.2018;MO;Most, Václava Řezáče 315, Czech Coal, indoor
+468736;458;1232;800;2417;20.09.2018;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468737;195;1232;800;2417;20.09.2018;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468738;373;1232;800;2417;20.09.2018;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468826;85;1232;900;2417;16.04.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468827;194;1232;900;2417;16.04.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468828;267;1232;900;2417;16.04.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468836;393;1232;1800;2417;01.03.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD {1404}
+468837;427;1232;1800;2417;01.03.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD {1404}
+468838;170;1232;1800;2417;01.03.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD {1404}
+468936;196;1232;2100;2417;04.03.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468937;329;1232;2100;2417;04.03.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+468938;216;1232;2100;2417;04.03.2025;PH;Lázně Toušeň, Nádražní 519, kotvený stožár v zahradě RD
+478978;361;1311;800;59738;20.11.2023;CB;České Budějovice, České Vrbné 2327, Globus, indoor
+479083;444;1311;1800;59738;17.02.2024;CB;České Budějovice, České Vrbné 2327, Globus, indoor {1404}
+545536;351;1514;800;35335;12.07.2019;LI;Liberec - Doubí, Heyrovského 488, TOYOTA TSUSHO
+545636;462;1514;1800;35335;04.12.2025;LI;Liberec - Doubí, Heyrovského 488, TOYOTA TSUSHO {1404}
+545736;422;1514;2100;35335;06.12.2025;LI;Liberec - Doubí, Heyrovského 488, TOYOTA TSUSHO
+563456;336;1417;800;44215;23.11.2018;KV;Pstruží, příhradový stožár u dolní stanice lanovky
+563457;298;1417;800;44215;23.11.2018;KV;Pstruží, příhradový stožár u dolní stanice lanovky
+589056;182;1312;800;57612;10.12.2018;CK;Holubov 35, obecní úřad
+589057;379;1312;800;57612;10.12.2018;CK;Holubov 35, obecní úřad
+591696;134;1233;800;45551;13.11.2025;LT;Libochovice, komín cihelny Heluz
+591697;253;1233;800;45551;13.11.2025;LT;Libochovice, komín cihelny Heluz
+591698;213;1233;800;45551;13.11.2025;LT;Libochovice, komín cihelny Heluz
+591706;102;1233;900;45551;13.11.2025;LT;Libochovice, komín cihelny Heluz
+591707;46;1233;900;45551;13.11.2025;LT;Libochovice, komín cihelny Heluz
+591708;293;1233;900;45551;13.11.2025;LT;Libochovice, komín cihelny Heluz
+609635;123;1414;1800;55129;27.01.2020;DO;Horní Folmava 73, Global Free Shopping Park, indoor
+694016;5;1318;800;54406;13.01.2020;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694017;106;1318;800;54406;13.01.2020;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694018;441;1318;800;54406;13.01.2020;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694106;172;1318;900;54406;03.07.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694107;69;1318;900;54406;03.07.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694108;341;1318;900;54406;03.07.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694116;195;1318;1800;54406;21.03.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák {1404}
+694117;188;1318;1800;54406;21.03.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák {1404}
+694118;349;1318;1800;54406;21.03.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák {1404}
+694216;490;1318;2100;54406;03.07.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694217;39;1318;2100;54406;03.07.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák
+694218;101;1318;2100;54406;03.07.2025;PI;Písek - Hradiště, Zahradní 228/1, panelák
+732416;150;1520;800;25280;10.04.2022;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu
+732417;115;1520;800;25280;10.04.2022;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu
+732418;320;1520;800;25280;10.04.2022;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu
+732516;197;1520;1800;25280;06.11.2024;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu {1404}
+732517;205;1520;1800;25280;06.11.2024;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu {1404}
+732518;114;1520;1800;25280;06.11.2024;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu {1404}
+732616;325;1520;2100;25280;08.09.2022;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu
+732617;156;1520;2100;25280;08.09.2022;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu
+732618;185;1520;2100;25280;08.09.2022;JN;Jablonec nad Nisou, U Stadionu, osvětlovací stožár stadionu
+788736;343;1320;800;53820;12.09.2019;TA;Olší 55, Efaflex
+788737;353;1320;800;53820;12.09.2019;TA;Olší 55, Efaflex
+788738;150;1320;800;53820;12.09.2019;TA;Olší 55, Efaflex
+893805;60;1419;1800;;17.11.2024;PM;Plzeň, Anglické nábřeží 2434/1, výšková budova BCB, indoor {1379}
+896336;103;1231;800;2146;04.07.2025;PZ;Černošice, Poštovní 228, vila
+896337;495;1231;800;2146;04.07.2025;PZ;Černošice, Poštovní 228, vila
+896338;80;1231;800;2146;04.07.2025;PZ;Černošice, Poštovní 228, vila
+896346;481;1231;900;2146;04.09.2025;PZ;Černošice, Poštovní 228, vila
+896347;170;1231;900;2146;04.09.2025;PZ;Černošice, Poštovní 228, vila
+896348;234;1231;900;2146;04.09.2025;PZ;Černošice, Poštovní 228, vila
+906496;339;1421;800;55347;08.05.2020;RO;Radnice, Sokolská 362, sokolovna
+906497;269;1421;800;55347;08.05.2020;RO;Radnice, Sokolská 362, sokolovna
+906498;121;1421;800;55347;08.05.2020;RO;Radnice, Sokolská 362, sokolovna
+906586;119;1421;900;55347;23.11.2024;RO;Radnice, Sokolská 362, sokolovna
+906587;49;1421;900;55347;23.11.2024;RO;Radnice, Sokolská 362, sokolovna
+906588;240;1421;900;55347;23.11.2024;RO;Radnice, Sokolská 362, sokolovna
+906596;114;1421;1800;55347;22.02.2024;RO;Radnice, Sokolská 362, sokolovna {1404}
+906597;167;1421;1800;55347;22.02.2024;RO;Radnice, Sokolská 362, sokolovna {1404}
+906598;325;1421;1800;55347;22.02.2024;RO;Radnice, Sokolská 362, sokolovna {1404}
+906696;347;1421;2100;55347;22.02.2024;RO;Radnice, Sokolská 362, sokolovna
+906697;210;1421;2100;55347;22.02.2024;RO;Radnice, Sokolská 362, sokolovna
+906698;286;1421;2100;55347;22.02.2024;RO;Radnice, Sokolská 362, sokolovna
+916736;428;1311;800;59768;20.01.2022;CB;Štěpánovice, příhradový stožár S od obce
+916737;285;1311;800;59768;20.01.2022;CB;Štěpánovice, příhradový stožár S od obce
+916738;472;1311;800;59768;20.01.2022;CB;Štěpánovice, příhradový stožár S od obce
+916836;354;1311;1800;59768;02.10.2025;CB;Štěpánovice, příhradový stožár S od obce {1404}
+916837;463;1311;1800;59768;02.10.2025;CB;Štěpánovice, příhradový stožár S od obce {1404}
+916838;89;1311;1800;59768;02.10.2025;CB;Štěpánovice, příhradový stožár S od obce {1404}
+916936;285;1311;2100;59768;02.10.2025;CB;Štěpánovice, příhradový stožár S od obce
+916937;98;1311;2100;59768;02.10.2025;CB;Štěpánovice, příhradový stožár S od obce
+916938;22;1311;2100;59768;02.10.2025;CB;Štěpánovice, příhradový stožár S od obce
+929536;326;1414;1800;54098;01.09.2020;PJ;Dobřany, Osoblaho 1275, Penny DC, indoor
+1029376;71;1411;800;24350;07.09.2020;CH;Mnichov, kotvený stožár na louce u stáčírny Magnesia
+1029377;148;1411;800;24350;07.09.2020;CH;Mnichov, kotvený stožár na louce u stáčírny Magnesia
+1029378;168;1411;800;24350;07.09.2020;CH;Mnichov, kotvený stožár na louce u stáčírny Magnesia
+1031936;379;1233;800;32746;17.06.2021;ME;Obříství, betonový stožár J od obce u regulační stanice plynovodu
+1031937;30;1233;800;32746;17.06.2021;ME;Obříství, betonový stožár J od obce u regulační stanice plynovodu
+1032036;417;1233;1800;32746;13.12.2025;ME;Obříství, betonový stožár J od obce u regulační stanice plynovodu {1404}
+1032037;209;1233;1800;32746;13.12.2025;ME;Obříství, betonový stožár J od obce u regulační stanice plynovodu {1404}
+1032136;306;1233;2100;32746;13.12.2025;ME;Obříství, betonový stožár J od obce u regulační stanice plynovodu
+1032137;200;1233;2100;32746;13.12.2025;ME;Obříství, betonový stožár J od obce u regulační stanice plynovodu
+1054976;138;1519;800;35999;16.11.2020;CV;Hradec 54, rozvodna ČEPS
+1060176;49;1512;800;45594;20.05.2021;LT;Malešov, příhradový stožár u vodojemu S od obce
+1060177;333;1512;800;45594;20.05.2021;LT;Malešov, příhradový stožár u vodojemu S od obce
+1060178;410;1512;800;45594;20.05.2021;LT;Malešov, příhradový stožár u vodojemu S od obce
+1072896;1;1318;800;54230;17.02.2023;ST;Kadov, betonový stožár V od obce
+1072897;158;1318;800;54230;17.02.2023;ST;Kadov, betonový stožár V od obce
+1072898;447;1318;800;54230;17.02.2023;ST;Kadov, betonový stožár V od obce
+1072986;229;1318;900;54230;30.05.2025;ST;Kadov, betonový stožár V od obce
+1072987;408;1318;900;54230;30.05.2025;ST;Kadov, betonový stožár V od obce
+1072988;353;1318;900;54230;30.05.2025;ST;Kadov, betonový stožár V od obce
+1072996;176;1318;1800;54230;16.06.2025;ST;Kadov, betonový stožár V od obce {1404}
+1072997;487;1318;1800;54230;16.06.2025;ST;Kadov, betonový stožár V od obce {1404}
+1072998;126;1318;1800;54230;16.06.2025;ST;Kadov, betonový stožár V od obce {1404}
+1073096;280;1318;2100;54230;16.06.2025;ST;Kadov, betonový stožár V od obce
+1073097;104;1318;2100;54230;16.06.2025;ST;Kadov, betonový stožár V od obce
+1073098;405;1318;2100;54230;16.06.2025;ST;Kadov, betonový stožár V od obce
+1083136;214;1236;800;53598;08.10.2025;TA;Jistebnice, Tisová 326, Farmtec
+1083137;240;1236;800;53598;08.10.2025;TA;Jistebnice, Tisová 326, Farmtec
+1093376;460;1236;800;54411;18.10.2021;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093377;80;1236;800;54411;18.10.2021;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093378;282;1236;800;54411;18.10.2021;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093466;300;1236;900;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093467;206;1236;900;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093468;415;1236;900;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093476;101;1236;1800;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce {1404}
+1093477;24;1236;1800;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce {1404}
+1093478;28;1236;1800;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce {1404}
+1093576;172;1236;2100;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093577;434;1236;2100;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1093578;411;1236;2100;54411;14.08.2025;PB;Rybníky, příhradový stožár na kontejneru u průmyslového areálu S od obce
+1111305;109;1414;800;57445;09.06.2021;TC;Stříbro, Forstova 1596, hala Canpack, indoor
+1131776;481;1519;800;45966;30.10.2021;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131777;20;1519;800;45966;30.10.2021;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131778;399;1519;800;45966;30.10.2021;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131866;276;1519;900;45966;19.01.2025;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131867;211;1519;900;45966;19.01.2025;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131868;281;1519;900;45966;19.01.2025;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131876;305;1519;1800;45966;06.06.2024;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu {1404}
+1131877;76;1519;1800;45966;06.06.2024;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu {1404}
+1131878;99;1519;1800;45966;06.06.2024;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu {1404}
+1131976;103;1519;2100;45966;14.08.2024;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131977;2;1519;2100;45966;14.08.2024;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1131978;480;1519;2100;45966;14.08.2024;CV;Klášterec nad Ohří, Nádražní, příhradový stožár v průmyslovém areálu
+1134336;251;1320;800;53824;26.05.2021;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134337;177;1320;800;53824;26.05.2021;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134338;457;1320;800;53824;26.05.2021;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134426;146;1320;900;53824;21.03.2025;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134427;52;1320;900;53824;21.03.2025;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134428;297;1320;900;53824;21.03.2025;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134436;450;1320;1800;53824;28.03.2024;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať {1404}
+1134437;205;1320;1800;53824;28.03.2024;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať {1404}
+1134438;296;1320;1800;53824;28.03.2024;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať {1404}
+1134536;235;1320;2100;53824;11.04.2024;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134537;362;1320;2100;53824;11.04.2024;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1134538;456;1320;2100;53824;11.04.2024;TA;Veselí nad Lužnicí, Riegrova, příhradový stožár u lávky přes trať
+1167705;365;1419;800;59839;31.07.2025;PS;Sulkov, Na Perkách 608, Gühring, indoor
+1167725;473;1419;1800;59839;31.07.2025;PS;Sulkov, Na Perkách 608, Gühring, indoor {1404}
+1193323;324;1227;1800;32353;26.01.2023;KL;Buštěhrad, Třinecká 1211, sklad Lidl, indoor
+1193324;107;1227;1800;32353;26.01.2023;KL;Buštěhrad, Třinecká 1211, sklad Lidl, indoor
+1236816;4;1621;800;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236817;451;1621;800;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236818;35;1621;800;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236819;273;1621;800;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236826;231;1621;900;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236827;152;1621;900;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236828;18;1621;900;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1236829;457;1621;900;26523;05.08.2025;SM;Tuhaň, příhradový stožár J nad obcí
+1239296;70;1514;800;25480;08.07.2024;LI;Bulovka, příhradový stožár JV nad obcí
+1239297;402;1514;800;25480;08.07.2024;LI;Bulovka, příhradový stožár JV nad obcí
+1239298;98;1514;800;25480;08.07.2024;LI;Bulovka, příhradový stožár JV nad obcí
+1244496;212;1312;800;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce
+1244497;192;1312;800;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce
+1244498;340;1312;800;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce
+1244516;361;1312;1800;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce {1404}
+1244517;287;1312;1800;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce {1404}
+1244518;330;1312;1800;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce {1404}
+1244616;3;1312;2100;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce
+1244617;442;1312;2100;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce
+1244618;122;1312;2100;;03.04.2025;JH;Žíteč, stožárek na kontejneru na JV okraji obce
+1267536;257;1411;800;57447;26.01.2023;TC;Lestkov 90, rodinný dům
+1267537;174;1411;800;57447;26.01.2023;TC;Lestkov 90, rodinný dům
+1336576;241;1232;800;42754;07.05.2022;NB;Sadská, Poděbradská 1005, hala Parker
+1336666;258;1232;1800;42755;07.05.2022;NB;Sadská, Poděbradská 1005, hala Parker, indoor
+1339216;171;1519;800;45973;13.10.2022;CV;Tušimice 16, Doly Nástup Tušimice, správní budova
+1339217;101;1519;800;45973;13.10.2022;CV;Tušimice 16, Doly Nástup Tušimice, správní budova
+1339218;160;1519;800;45973;13.10.2022;CV;Tušimice 16, Doly Nástup Tušimice, správní budova
+1377536;333;1622;800;35757;29.12.2022;NA;Chvalkovice - Malá Bukovina 50, Hartmann-Rico
+1377537;346;1622;800;35757;29.12.2022;NA;Chvalkovice - Malá Bukovina 50, Hartmann-Rico
+1398223;92;1221;2100;;31.08.2022;KL;Pavlov, Logistická 100, DSV, indoor
+1398224;33;1221;2100;;31.08.2022;KL;Pavlov, Logistická 100, DSV, indoor
+1398225;457;1221;2100;;31.08.2022;KL;Pavlov, Logistická 100, DSV, indoor
+1415936;317;1519;800;45971;08.09.2022;CV;Všehrdy, věznice
+1428736;423;1513;800;35832;13.10.2022;MO;Braňany, komín ve V části obce
+1451885;198;1421;1800;59324;08.02.2025;PS;Kaznějov, Drahotínská 411, SBS Nepron, indoor
+1467245;55;1411;1800;24360;23.02.2023;CH;Obilná 24, hala DHL, indoor
+1469776;162;1419;800;;16.11.2023;PS;Bítov, příhradový stožár J od obce
+1469777;70;1419;800;;16.11.2023;PS;Bítov, příhradový stožár J od obce
+1469778;104;1419;800;;16.11.2023;PS;Bítov, příhradový stožár J od obce
+1490256;463;1225;800;2187;30.09.2025;PH;Nebřenice, betonový stožár u kapličky
+1490257;194;1225;800;2187;30.09.2025;PH;Nebřenice, betonový stožár u kapličky
+1490258;465;1225;800;2187;30.09.2025;PH;Nebřenice, betonový stožár u kapličky
+1490266;450;1225;900;2187;30.09.2025;PH;Nebřenice, betonový stožár u kapličky
+1490267;433;1225;900;2187;30.09.2025;PH;Nebřenice, betonový stožár u kapličky
+1490268;404;1225;900;2187;30.09.2025;PH;Nebřenice, betonový stožár u kapličky
+1497856;17;1621;800;26543;18.11.2022;SM;Jilemnice, Branská 329, Hilding Anders
+1497857;190;1621;800;26543;18.11.2022;SM;Jilemnice, Branská 329, Hilding Anders
+1497858;144;1621;800;26543;18.11.2022;SM;Jilemnice, Branská 329, Hilding Anders
+1497956;171;1621;1800;26543;02.09.2025;SM;Jilemnice, Branská 329, Hilding Anders {1404}
+1497957;488;1621;1800;26543;02.09.2025;SM;Jilemnice, Branská 329, Hilding Anders {1404}
+1497958;379;1621;1800;26543;02.09.2025;SM;Jilemnice, Branská 329, Hilding Anders {1404}
+1498056;159;1621;2100;26543;02.09.2025;SM;Jilemnice, Branská 329, Hilding Anders
+1498057;220;1621;2100;26543;02.09.2025;SM;Jilemnice, Branská 329, Hilding Anders
+1498058;251;1621;2100;26543;02.09.2025;SM;Jilemnice, Branská 329, Hilding Anders
+1500496;431;1232;800;2217;02.02.2026;PH;Dřevčice, příhradový stožár SZ od obce
+1500497;378;1232;800;2217;02.02.2026;PH;Dřevčice, příhradový stožár SZ od obce
+1500498;391;1232;800;2217;02.02.2026;PH;Dřevčice, příhradový stožár SZ od obce
+1500506;475;1232;900;2217;02.02.2026;PH;Dřevčice, příhradový stožár SZ od obce
+1500507;477;1232;900;2217;02.02.2026;PH;Dřevčice, příhradový stožár SZ od obce
+1500508;485;1232;900;2217;02.02.2026;PH;Dřevčice, příhradový stožár SZ od obce
+1505536;11;1511;800;40200;23.01.2023;UL;Ústí nad Labem, Hoření 2435/11, panelák
+1505537;463;1511;800;40200;23.01.2023;UL;Ústí nad Labem, Hoření 2435/11, panelák
+1505626;23;1511;900;40200;11.01.2025;UL;Ústí nad Labem, Hoření 2435/11, panelák
+1505627;174;1511;900;40200;11.01.2025;UL;Ústí nad Labem, Hoření 2435/11, panelák
+1505636;496;1511;1800;40200;18.08.2023;UL;Ústí nad Labem, Hoření 2435/11, panelák {1404}
+1505637;306;1511;1800;40200;18.08.2023;UL;Ústí nad Labem, Hoření 2435/11, panelák {1404}
+1505736;22;1511;2100;40200;31.08.2023;UL;Ústí nad Labem, Hoření 2435/11, panelák
+1505737;396;1511;2100;40200;31.08.2023;UL;Ústí nad Labem, Hoření 2435/11, panelák
+1513216;350;1419;800;;06.04.2023;PS;Lipno, příhradový stožár S od obce
+1513217;472;1419;800;;06.04.2023;PS;Lipno, příhradový stožár S od obce
+1513218;90;1419;800;;06.04.2023;PS;Lipno, příhradový stožár S od obce
+1526096;327;1421;800;54424;29.03.2023;PS;Mladotice 34, ZŠ
+1526097;355;1421;800;54424;29.03.2023;PS;Mladotice 34, ZŠ
+1526098;200;1421;800;54424;29.03.2023;PS;Mladotice 34, ZŠ
+1526106;177;1421;900;54424;01.02.2025;PS;Mladotice 34, ZŠ
+1526107;109;1421;900;54424;01.02.2025;PS;Mladotice 34, ZŠ
+1526108;242;1421;900;54424;01.02.2025;PS;Mladotice 34, ZŠ
+1533776;248;1421;800;;31.08.2023;PS;Výrov - Hadačka, příhradový stožár
+1533777;232;1421;800;;31.08.2023;PS;Výrov - Hadačka, příhradový stožár
+1533778;66;1421;800;;31.08.2023;PS;Výrov - Hadačka, příhradový stožár
+1536365;316;1419;1800;60316;16.12.2023;PM;Plzeň, K Prokopávce 1473/45, Sportovní areál, indoor
+1538816;52;1312;800;57620;08.04.2023;CK;Mříč 66, sklad Agrio MZS
+1538817;258;1312;800;57620;08.04.2023;CK;Mříč 66, sklad Agrio MZS
+1538818;479;1312;800;57620;08.04.2023;CK;Mříč 66, sklad Agrio MZS
+1538907;288;1312;900;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS
+1538908;418;1312;900;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS
+1538916;370;1312;1800;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS {1404}
+1538917;336;1312;1800;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS {1404}
+1538918;305;1312;1800;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS {1404}
+1539016;50;1312;2100;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS
+1539017;451;1312;2100;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS
+1539018;18;1312;2100;57620;03.08.2025;CK;Mříč 66, sklad Agrio MZS
+1541456;298;1414;800;54422;02.09.2023;DO;Rybník 43, Rekreační středisko
+1541457;342;1414;800;54422;02.09.2023;DO;Rybník 43, Rekreační středisko
+1549056;136;1232;800;42741;06.11.2023;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549057;407;1232;800;42741;06.11.2023;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549058;375;1232;800;42741;06.11.2023;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549146;405;1232;900;42741;09.11.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549147;109;1232;900;42741;09.11.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549148;332;1232;900;42741;09.11.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549156;125;1232;1800;42741;05.02.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky {1404}
+1549157;268;1232;1800;42741;05.02.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky {1404}
+1549158;384;1232;1800;42741;05.02.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky {1404}
+1549256;93;1232;2100;42741;11.02.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549257;116;1232;2100;42741;11.02.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1549258;40;1232;2100;42741;11.02.2024;NB;Zvěřínek, příhradový stožár V od obce na břehu Výrovky
+1556736;113;1411;800;14434;14.03.2023;SO;Ležnice, Lesnický kopec 690 m, mobilní BTS u vodárny
+1556737;328;1411;800;14434;14.03.2023;SO;Ležnice, Lesnický kopec 690 m, mobilní BTS u vodárny
+1561936;484;1511;800;40203;26.06.2023;UL;Ústí nad Labem - Sebuzín 202, dům ve svahu
+1561937;156;1511;800;40203;26.06.2023;UL;Ústí nad Labem - Sebuzín 202, dům ve svahu
+1561946;56;1511;900;40203;30.12.2024;UL;Ústí nad Labem - Sebuzín 202, dům ve svahu
+1561947;499;1511;900;40203;30.12.2024;UL;Ústí nad Labem - Sebuzín 202, dům ve svahu
+1572096;326;1233;800;2038;14.04.2023;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572097;216;1233;800;2038;14.04.2023;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572098;106;1233;800;2038;14.04.2023;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572186;130;1233;900;2038;13.11.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572187;54;1233;900;2038;13.11.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572188;182;1233;900;2038;13.11.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572196;55;1233;1800;2038;02.03.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře {1404}
+1572197;99;1233;1800;2038;02.03.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře {1404}
+1572198;326;1233;1800;2038;02.03.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře {1404}
+1572296;455;1233;2100;2038;02.03.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572297;342;1233;2100;2038;02.03.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1572298;73;1233;2100;2038;02.03.2024;PZ;Tursko, Libčická 308, mobilní BTS ve dvoře
+1574656;33;1227;800;12367;30.03.2023;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574657;259;1227;800;12367;30.03.2023;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574658;185;1227;800;12367;30.03.2023;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574746;81;1227;900;12367;19.12.2024;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574747;359;1227;900;12367;19.12.2024;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574748;361;1227;900;12367;19.12.2024;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574756;389;1227;1800;12367;11.04.2023;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce {1404}
+1574758;193;1227;1800;12367;11.04.2023;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce {1404}
+1574856;177;1227;2100;12367;22.02.2024;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1574857;271;1227;2100;12367;22.02.2024;KL;Velvary - Velká Bučina, mobilní BTS na Z okraji obce
+1587456;312;1236;800;;12.06.2024;PB;Drhovy, silo
+1587457;442;1236;800;;12.06.2024;PB;Drhovy, silo
+1590096;211;1414;800;;16.11.2023;TC;Svahy, příhradový stožár
+1590097;387;1414;800;;16.11.2023;TC;Svahy, příhradový stožár
+1590098;38;1414;800;;16.11.2023;TC;Svahy, příhradový stožár
+1590106;232;1414;900;;27.03.2025;TC;Svahy, příhradový stožár
+1590107;281;1414;900;;27.03.2025;TC;Svahy, příhradový stožár
+1590108;276;1414;900;;27.03.2025;TC;Svahy, příhradový stožár
+1597696;423;1514;800;25310;20.10.2023;LI;Všelibice - Vrtky, hydroglobus
+1597697;109;1514;800;25310;20.10.2023;LI;Všelibice - Vrtky, hydroglobus
+1597786;214;1514;900;25310;06.02.2025;LI;Všelibice - Vrtky, hydroglobus
+1597787;293;1514;900;25310;06.02.2025;LI;Všelibice - Vrtky, hydroglobus
+1600256;117;1311;800;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600257;298;1311;800;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600258;2;1311;800;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600259;395;1311;800;59795;23.12.2024;CB;Srubec - Stará Pohůrka, D3/136km, tunel Pohůrka, indoor a J portál
+1600346;467;1311;900;59792;09.06.2025;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600347;458;1311;900;59792;09.06.2025;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600355;471;1311;900;59795;09.06.2025;CB;Srubec - Stará Pohůrka, D3/136km, tunel Pohůrka, indoor a J portál
+1600356;186;1311;1800;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3 {1404}
+1600357;71;1311;1800;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3 {1404}
+1600358;134;1311;1800;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3 {1404}
+1600359;244;1311;1800;59795;23.12.2024;CB;Srubec - Stará Pohůrka, D3/136km, tunel Pohůrka, indoor a J portál {1404}
+1600456;467;1311;2100;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600457;325;1311;2100;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600458;256;1311;2100;59792;23.12.2024;CB;České Budějovice, Dobrovodská, betonový stožár u S portálu tunelu D3
+1600459;441;1311;2100;59795;23.12.2024;CB;Srubec - Stará Pohůrka, D3/136km, tunel Pohůrka, indoor a J portál
+1602896;389;1413;800;54427;24.12.2023;KT;Podmokly 66, turistická ubytovna
+1602897;111;1413;800;54427;24.12.2023;KT;Podmokly 66, turistická ubytovna
+1602906;329;1413;900;54427;10.03.2025;KT;Podmokly 66, turistická ubytovna
+1602907;252;1413;900;54427;10.03.2025;KT;Podmokly 66, turistická ubytovna
+1608016;179;1233;800;45655;16.07.2023;LT;Evaň 95, hospoda
+1608017;331;1233;800;45655;16.07.2023;LT;Evaň 95, hospoda
+1608018;15;1233;800;45655;16.07.2023;LT;Evaň 95, hospoda
+1608026;331;1233;900;45655;03.01.2025;LT;Evaň 95, hospoda
+1608027;503;1233;900;45655;03.01.2025;LT;Evaň 95, hospoda
+1608028;150;1233;900;45655;03.01.2025;LT;Evaň 95, hospoda
+1610496;53;1511;800;40206;19.12.2023;UL;Stebno, Písečný vrch 456 m, příhradový stožár
+1610497;163;1511;800;40206;19.12.2023;UL;Stebno, Písečný vrch 456 m, příhradový stožár
+1610498;96;1511;800;40206;19.12.2023;UL;Stebno, Písečný vrch 456 m, příhradový stožár
+1610586;426;1511;900;40206;01.01.2025;UL;Stebno, Písečný vrch 456 m, příhradový stožár
+1610587;203;1511;900;40206;01.01.2025;UL;Stebno, Písečný vrch 456 m, příhradový stožár
+1610588;127;1511;900;40206;01.01.2025;UL;Stebno, Písečný vrch 456 m, příhradový stožár
+1613136;151;1422;800;4399;16.11.2023;CH;Podhradí 330, vila
+1620736;313;1414;800;55120;24.12.2023;DO;Strýčkovice, budova ZD nad obcí
+1620826;306;1414;900;55120;08.01.2026;DO;Strýčkovice, budova ZD nad obcí
+1623376;199;1227;800;22366;27.12.2023;KL;Vítov 17, mobilní BTS v areálu Eurofrost
+1623377;182;1227;800;22366;27.12.2023;KL;Vítov 17, mobilní BTS v areálu Eurofrost
+1623386;405;1227;900;22366;06.01.2026;KL;Vítov 17, mobilní BTS v areálu Eurofrost
+1623387;259;1227;900;22366;06.01.2026;KL;Vítov 17, mobilní BTS v areálu Eurofrost
+1625936;259;1411;800;4000;07.06.2024;SO;Nová Ves 195, bytový dům
+1625937;347;1411;800;4000;07.06.2024;SO;Nová Ves 195, bytový dům
+1625946;437;1411;900;4000;22.02.2025;SO;Nová Ves 195, bytový dům
+1625947;345;1411;900;4000;22.02.2025;SO;Nová Ves 195, bytový dům
+1636096;217;1233;800;2093;13.02.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636097;137;1233;800;2093;13.02.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636098;96;1233;800;2093;13.02.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636186;35;1233;900;2093;13.11.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636187;231;1233;900;2093;13.11.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636188;448;1233;900;2093;13.11.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636196;59;1233;1800;2093;31.05.2024;PZ;Úholičky, příhradový stožár nad obcí {1404}
+1636197;360;1233;1800;2093;31.05.2024;PZ;Úholičky, příhradový stožár nad obcí {1404}
+1636198;493;1233;1800;2093;31.05.2024;PZ;Úholičky, příhradový stožár nad obcí {1404}
+1636296;129;1233;2100;2093;31.05.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636297;431;1233;2100;2093;31.05.2024;PZ;Úholičky, příhradový stožár nad obcí
+1636298;259;1233;2100;2093;31.05.2024;PZ;Úholičky, příhradový stožár nad obcí
+1646336;292;1622;800;6410;20.01.2024;JC;Šárovcova Lhota, komín cihelny
+1646337;278;1622;800;6410;20.01.2024;JC;Šárovcova Lhota, komín cihelny
+1646426;272;1622;900;6410;14.12.2024;JC;Šárovcova Lhota, komín cihelny
+1646427;502;1622;900;6410;14.12.2024;JC;Šárovcova Lhota, komín cihelny
+1666896;173;1418;800;60322;12.01.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1666897;399;1418;800;60322;12.01.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1666898;358;1418;800;60322;12.01.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1666906;101;1418;900;60322;12.11.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1666907;42;1418;900;60322;12.11.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1666908;172;1418;900;60322;12.11.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1666916;475;1418;1800;60322;10.04.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny {1404}
+1666917;15;1418;1800;60322;10.04.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny {1404}
+1666918;173;1418;1800;60322;10.04.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny {1404}
+1667016;454;1418;2100;60322;14.04.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1667017;134;1418;2100;60322;14.04.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1667018;351;1418;2100;60322;14.04.2024;PM;Plzeň - Doubravka, Rokycanská, příhradový stožár na kraji nákupní zóny
+1674496;326;1515;800;45920;28.12.2023;CL;Tuhanec, příhradový stožár Z nad obcí
+1674497;137;1515;800;45920;28.12.2023;CL;Tuhanec, příhradový stožár Z nad obcí
+1674586;402;1515;900;45920;09.02.2025;CL;Tuhanec, příhradový stožár Z nad obcí
+1674587;250;1515;900;45920;09.02.2025;CL;Tuhanec, příhradový stožár Z nad obcí
+1677136;324;1419;800;60319;31.10.2023;PM;Plzeň, Pallova 2813/24, bytový dům
+1677137;103;1419;800;60319;31.10.2023;PM;Plzeň, Pallova 2813/24, bytový dům
+1677138;254;1419;800;60319;31.10.2023;PM;Plzeň, Pallova 2813/24, bytový dům
+1677146;396;1419;900;60319;10.11.2024;PM;Plzeň, Pallova 2813/24, bytový dům
+1677147;158;1419;900;60319;10.11.2024;PM;Plzeň, Pallova 2813/24, bytový dům
+1677148;256;1419;900;60319;10.11.2024;PM;Plzeň, Pallova 2813/24, bytový dům
+1677156;214;1419;1800;60319;14.08.2025;PM;Plzeň, Pallova 2813/24, bytový dům {1404}
+1677157;413;1419;1800;60319;14.08.2025;PM;Plzeň, Pallova 2813/24, bytový dům {1404}
+1677158;360;1419;1800;60319;14.08.2025;PM;Plzeň, Pallova 2813/24, bytový dům {1404}
+1677256;0;1419;2100;60319;13.08.2025;PM;Plzeň, Pallova 2813/24, bytový dům
+1677257;11;1419;2100;60319;13.08.2025;PM;Plzeň, Pallova 2813/24, bytový dům
+1677258;238;1419;2100;60319;13.08.2025;PM;Plzeň, Pallova 2813/24, bytový dům
+1682256;79;1411;800;14420;07.08.2025;SO;Oloví, Tovární 226, bytový dům
+1682266;499;1411;900;14420;07.08.2025;SO;Oloví, Tovární 226, bytový dům
+1697536;177;1312;800;57624;04.01.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697537;382;1312;800;57624;04.01.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697538;260;1312;800;57624;04.01.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697626;253;1312;900;57624;04.02.2025;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697627;68;1312;900;57624;04.02.2025;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697628;63;1312;900;57624;04.02.2025;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697636;193;1312;1800;57624;13.03.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům {1404}
+1697637;77;1312;1800;57624;13.03.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům {1404}
+1697638;222;1312;1800;57624;13.03.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům {1404}
+1697736;65;1312;2100;57624;13.03.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697737;285;1312;2100;57624;13.03.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1697738;19;1312;2100;57624;13.03.2024;CK;Český Krumlov, Plešivecké náměstí 75, bytový dům
+1705216;143;1622;800;36757;07.08.2024;NA;Náchod, Purkyňova 446, nemocnice, pavilon K, indoor
+1712896;374;1612;800;56344;29.02.2024;HK;Hradec Králové, Víta Nejedlého 1161/1b, správní budova Tesla
+1712897;408;1612;800;56344;29.02.2024;HK;Hradec Králové, Víta Nejedlého 1161/1b, správní budova Tesla
+1715536;210;1419;800;60317;08.04.2024;PM;Plzeň, Klatovská třída 2866/214, bytový dům
+1715546;85;1419;900;60317;12.11.2024;PM;Plzeň, Klatovská třída 2866/214, bytový dům
+1736016;273;1411;800;24361;22.01.2024;CH;Cheb - Hradiště, Logistická 169/1, hala DHL
+1736017;146;1411;800;24361;22.01.2024;CH;Cheb - Hradiště, Logistická 169/1, hala DHL
+1736018;4;1411;800;24361;22.01.2024;CH;Cheb - Hradiště, Logistická 169/1, hala DHL
+1736036;141;1411;1800;24361;24.03.2025;CH;Cheb - Hradiště, Logistická 169/1, hala DHL {1404}
+1736037;247;1411;1800;24361;24.03.2025;CH;Cheb - Hradiště, Logistická 169/1, hala DHL {1404}
+1736038;173;1411;1800;24361;24.03.2025;CH;Cheb - Hradiště, Logistická 169/1, hala DHL {1404}
+1736136;106;1411;2100;24361;28.04.2025;CH;Cheb - Hradiště, Logistická 169/1, hala DHL
+1736137;74;1411;2100;24361;28.04.2025;CH;Cheb - Hradiště, Logistická 169/1, hala DHL
+1736138;216;1411;2100;24361;28.04.2025;CH;Cheb - Hradiště, Logistická 169/1, hala DHL
+1738576;235;1514;800;45913;19.01.2025;CL;Velký Valtinov, stodola v obci
+1738577;159;1514;800;45913;19.01.2025;CL;Velký Valtinov, stodola v obci
+1738578;431;1514;800;45913;19.01.2025;CL;Velký Valtinov, stodola v obci
+1741056;20;1511;800;40205;05.02.2024;UL;Rýdeč 17, rodinný dům
+1741146;263;1511;900;40205;11.01.2025;UL;Rýdeč 17, rodinný dům
+1746256;315;1236;800;54369;04.03.2024;PI;Probulov, příhradový stožár J od obce
+1746257;157;1236;800;54369;04.03.2024;PI;Probulov, příhradový stožár J od obce
+1746258;101;1236;800;54369;04.03.2024;PI;Probulov, příhradový stožár J od obce
+1746259;280;1236;800;54369;04.03.2024;PI;Probulov, příhradový stožár J od obce
+1746266;425;1236;900;54369;06.12.2024;PI;Probulov, příhradový stožár J od obce
+1746267;78;1236;900;54369;06.12.2024;PI;Probulov, příhradový stožár J od obce
+1746268;211;1236;900;54369;06.12.2024;PI;Probulov, příhradový stožár J od obce
+1746269;381;1236;900;54369;06.12.2024;PI;Probulov, příhradový stožár J od obce
+1746276;364;1236;1800;54369;11.12.2025;PI;Probulov, příhradový stožár J od obce {1404}
+1746277;114;1236;1800;54369;11.12.2025;PI;Probulov, příhradový stožár J od obce {1404}
+1746278;467;1236;1800;54369;11.12.2025;PI;Probulov, příhradový stožár J od obce {1404}
+1746376;448;1236;2100;54369;11.12.2025;PI;Probulov, příhradový stožár J od obce
+1746377;317;1236;2100;54369;11.12.2025;PI;Probulov, příhradový stožár J od obce
+1746378;330;1236;2100;54369;11.12.2025;PI;Probulov, příhradový stožár J od obce
+1756416;3;1311;800;59783;26.09.2024;CB;Vráto, příhradový stožár u D3
+1756417;239;1311;800;59783;26.09.2024;CB;Vráto, příhradový stožár u D3
+1756418;100;1311;800;59783;26.09.2024;CB;Vráto, příhradový stožár u D3
+1756506;461;1311;900;59783;15.04.2025;CB;Vráto, příhradový stožár u D3
+1756507;463;1311;900;59783;15.04.2025;CB;Vráto, příhradový stožár u D3
+1756508;324;1311;900;59783;15.04.2025;CB;Vráto, příhradový stožár u D3
+1756516;288;1311;1800;59783;08.10.2025;CB;Vráto, příhradový stožár u D3 {1404}
+1756517;197;1311;1800;59783;08.10.2025;CB;Vráto, příhradový stožár u D3 {1404}
+1756518;172;1311;1800;59783;08.10.2025;CB;Vráto, příhradový stožár u D3 {1404}
+1756616;155;1311;2100;59783;04.10.2025;CB;Vráto, příhradový stožár u D3
+1756617;88;1311;2100;59783;04.10.2025;CB;Vráto, příhradový stožár u D3
+1756618;18;1311;2100;59783;04.10.2025;CB;Vráto, příhradový stožár u D3
+1761536;258;1312;800;59786;26.09.2024;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761537;473;1312;800;59786;26.09.2024;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761538;424;1312;800;59786;26.09.2024;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761626;182;1312;900;59786;09.04.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761627;234;1312;900;59786;09.04.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761628;280;1312;900;59786;09.04.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761636;247;1312;1800;59786;04.10.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3 {1404}
+1761637;459;1312;1800;59786;04.10.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3 {1404}
+1761638;296;1312;1800;59786;04.10.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3 {1404}
+1761736;479;1312;2100;59786;08.10.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761737;499;1312;2100;59786;08.10.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1761738;201;1312;2100;59786;08.10.2025;CB;Kamenný Újezd - Plavnice, příhradový stožár u D3
+1764096;10;1231;800;59325;16.12.2023;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764097;249;1231;800;59325;16.12.2023;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764098;389;1231;800;59325;16.12.2023;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764186;306;1231;900;59325;03.12.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764187;40;1231;900;59325;03.12.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764188;443;1231;900;59325;03.12.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764196;286;1231;1800;59325;27.03.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN {1404}
+1764197;117;1231;1800;59325;27.03.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN {1404}
+1764198;125;1231;1800;59325;27.03.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN {1404}
+1764296;155;1231;2100;59325;27.03.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764297;273;1231;2100;59325;27.03.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1764298;70;1231;2100;59325;27.03.2024;BE;Zadní Třebaň, kotvený příhradový stožárek u stožáru VVN
+1766656;183;1231;800;59328;16.12.2023;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766657;103;1231;800;59328;16.12.2023;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766658;56;1231;800;59328;16.12.2023;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766746;187;1231;900;59328;29.03.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766747;482;1231;900;59328;29.03.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766748;363;1231;900;59328;29.03.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766756;333;1231;1800;59328;17.01.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN {1404}
+1766757;311;1231;1800;59328;17.01.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN {1404}
+1766758;490;1231;1800;59328;17.01.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN {1404}
+1766856;457;1231;2100;59328;17.01.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766857;408;1231;2100;59328;17.01.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1766858;374;1231;2100;59328;17.01.2025;BE;Trněný Újezd, kotvený příhradový stožárek u stožáru VVN
+1769216;37;1312;800;59789;17.12.2024;CB;Včelná, příhradový stožár u kruhového objezdu
+1769217;24;1312;800;59789;17.12.2024;CB;Včelná, příhradový stožár u kruhového objezdu
+1769218;98;1312;800;59789;17.12.2024;CB;Včelná, příhradový stožár u kruhového objezdu
+1769306;277;1312;900;59789;27.03.2025;CB;Včelná, příhradový stožár u kruhového objezdu
+1769307;368;1312;900;59789;27.03.2025;CB;Včelná, příhradový stožár u kruhového objezdu
+1769308;372;1312;900;59789;27.03.2025;CB;Včelná, příhradový stožár u kruhového objezdu
+1769316;404;1312;1800;59789;02.10.2025;CB;Včelná, příhradový stožár u kruhového objezdu {1404}
+1769317;139;1312;1800;59789;02.10.2025;CB;Včelná, příhradový stožár u kruhového objezdu {1404}
+1769318;354;1312;1800;59789;02.10.2025;CB;Včelná, příhradový stožár u kruhového objezdu {1404}
+1769416;222;1312;2100;59789;08.10.2025;CB;Včelná, příhradový stožár u kruhového objezdu
+1769417;362;1312;2100;59789;08.10.2025;CB;Včelná, příhradový stožár u kruhového objezdu
+1769418;496;1312;2100;59789;08.10.2025;CB;Včelná, příhradový stožár u kruhového objezdu
+1771776;272;1520;800;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1771777;73;1520;800;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1771778;75;1520;800;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1771876;64;1520;1800;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák {1404}
+1771877;309;1520;1800;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák {1404}
+1771878;200;1520;1800;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák {1404}
+1771976;366;1520;2100;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1771977;292;1520;2100;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1771978;377;1520;2100;25283;16.12.2023;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1772016;354;1520;2600;25283;20.05.2025;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1772017;425;1520;2600;25283;20.05.2025;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1772018;364;1520;2600;25283;20.05.2025;JN;Jablonec nad Nisou, Liberecká 3510/29, panelák
+1779456;460;1311;800;59780;27.12.2023;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779457;255;1311;800;59780;27.12.2023;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779458;284;1311;800;59780;27.12.2023;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779546;214;1311;900;59780;23.12.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779547;119;1311;900;59780;23.12.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779548;336;1311;900;59780;23.12.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779556;422;1311;1800;59780;23.02.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu {1404}
+1779557;78;1311;1800;59780;23.02.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu {1404}
+1779558;118;1311;1800;59780;23.02.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu {1404}
+1779656;428;1311;2100;59780;23.02.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779657;301;1311;2100;59780;23.02.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1779658;213;1311;2100;59780;23.02.2024;CB;České Budějovice, B. Němcové, mobilní BTS na parkovišti u fotbalového stadionu
+1782016;45;1622;800;46617;22.05.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782017;40;1622;800;46617;22.05.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782018;107;1622;800;46617;22.05.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782106;390;1622;900;46617;09.01.2025;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782107;328;1622;900;46617;09.01.2025;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782108;107;1622;900;46617;09.01.2025;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782116;306;1622;1800;46617;07.08.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA {1404}
+1782117;167;1622;1800;46617;07.08.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA {1404}
+1782118;88;1622;1800;46617;07.08.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA {1404}
+1782216;196;1622;2100;46617;22.05.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782217;414;1622;2100;46617;22.05.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1782218;275;1622;2100;46617;22.05.2024;TU;Dvůr Králové nad Labem - Žirecká Podstráň, Na Borkách 89, JUTA
+1802576;61;1413;800;54430;23.03.2024;KT;Budětice, příhradový stožár SV nad obcí
+1802577;102;1413;800;54430;23.03.2024;KT;Budětice, příhradový stožár SV nad obcí
+1802586;273;1413;900;54430;07.03.2025;KT;Budětice, příhradový stožár SV nad obcí
+1802587;124;1413;900;54430;07.03.2025;KT;Budětice, příhradový stožár SV nad obcí
+1817936;87;1417;800;4223;10.06.2024;KV;Jakubov 27, rodinný dům
+1817937;347;1417;800;4223;10.06.2024;KV;Jakubov 27, rodinný dům
+1817946;80;1417;900;4223;12.08.2025;KV;Jakubov 27, rodinný dům
+1817947;361;1417;900;4223;12.08.2025;KV;Jakubov 27, rodinný dům
+1830656;487;1312;800;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830657;57;1312;800;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830658;434;1312;800;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830746;457;1312;900;59796;21.03.2025;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830747;197;1312;900;59796;21.03.2025;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830748;135;1312;900;59796;21.03.2025;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830756;6;1312;1800;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3 {1404}
+1830757;163;1312;1800;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3 {1404}
+1830758;452;1312;1800;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3 {1404}
+1830856;176;1312;2100;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830857;246;1312;2100;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3
+1830858;358;1312;2100;59796;23.12.2024;CB;Roudné, příhradový stožár u ekoduktu na D3
+1840896;192;1236;800;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce
+1840897;38;1236;800;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce
+1840898;55;1236;800;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce
+1840986;121;1236;900;54432;17.04.2025;PB;Jesenice, příhradový stožár S od obce
+1840987;275;1236;900;54432;17.04.2025;PB;Jesenice, příhradový stožár S od obce
+1840988;264;1236;900;54432;17.04.2025;PB;Jesenice, příhradový stožár S od obce
+1840996;241;1236;1800;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce {1404}
+1840997;372;1236;1800;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce {1404}
+1840998;371;1236;1800;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce {1404}
+1841096;177;1236;2100;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce
+1841097;203;1236;2100;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce
+1841098;145;1236;2100;54432;04.11.2024;PB;Jesenice, příhradový stožár S od obce
+1851136;169;1520;800;16500;26.06.2024;SM;Žernov 44, hala VVISS
+1863936;172;1233;800;45544;01.08.2024;LT;Straškov-Vodochody, sýpka u nádraží
+1863937;408;1233;800;45544;01.08.2024;LT;Straškov-Vodochody, sýpka u nádraží
+1864026;487;1233;900;45544;10.04.2025;LT;Straškov-Vodochody, sýpka u nádraží
+1864027;447;1233;900;45544;10.04.2025;LT;Straškov-Vodochody, sýpka u nádraží
+1864036;489;1233;1800;45544;20.12.2025;LT;Straškov-Vodochody, sýpka u nádraží {1404}
+1864037;26;1233;1800;45544;20.12.2025;LT;Straškov-Vodochody, sýpka u nádraží {1404}
+1874256;124;1513;800;35901;11.01.2025;CV;Kalek 26, obecní úřad
+1874257;234;1513;800;35901;29.06.2025;CV;Kalek 26, obecní úřad
+1876736;274;1233;800;45534;19.09.2024;LT;Černouček 123, silo ZD
+1876737;458;1233;800;45534;19.09.2024;LT;Černouček 123, silo ZD
+1876738;237;1233;800;45534;19.09.2024;LT;Černouček 123, silo ZD
+1876826;275;1233;900;45534;10.04.2025;LT;Černouček 123, silo ZD
+1876827;424;1233;900;45534;10.04.2025;LT;Černouček 123, silo ZD
+1876828;36;1233;900;45534;10.04.2025;LT;Černouček 123, silo ZD
+1876836;100;1233;1800;45534;19.09.2024;LT;Černouček 123, silo ZD {1404}
+1876837;198;1233;1800;45534;19.09.2024;LT;Černouček 123, silo ZD {1404}
+1876838;50;1233;1800;45534;19.09.2024;LT;Černouček 123, silo ZD {1404}
+1876936;460;1233;2100;45534;19.09.2024;LT;Černouček 123, silo ZD
+1876937;437;1233;2100;45534;19.09.2024;LT;Černouček 123, silo ZD
+1876938;471;1233;2100;45534;19.09.2024;LT;Černouček 123, silo ZD
+1881936;317;1413;800;55365;08.02.2025;KT;Kovčín 57, obecní úřad
+1881937;1;1413;800;55365;08.02.2025;KT;Kovčín 57, obecní úřad
+1884416;458;1233;800;2119;04.11.2024;PH;Klíčany, U Expertu 91, K+B Elektro
+1884417;211;1233;800;2119;04.11.2024;PH;Klíčany, U Expertu 91, K+B Elektro
+1884418;189;1233;800;2119;04.11.2024;PH;Klíčany, U Expertu 91, K+B Elektro
+1884506;501;1233;900;2119;10.04.2025;PH;Klíčany, U Expertu 91, K+B Elektro
+1884507;284;1233;900;2119;10.04.2025;PH;Klíčany, U Expertu 91, K+B Elektro
+1884508;493;1233;900;2119;10.04.2025;PH;Klíčany, U Expertu 91, K+B Elektro
+1884516;419;1233;1800;2119;29.10.2024;PH;Klíčany, U Expertu 91, K+B Elektro {1404}
+1884517;217;1233;1800;2119;29.10.2024;PH;Klíčany, U Expertu 91, K+B Elektro {1404}
+1884518;111;1233;1800;2119;29.10.2024;PH;Klíčany, U Expertu 91, K+B Elektro {1404}
+1884616;342;1233;2100;2119;29.10.2024;PH;Klíčany, U Expertu 91, K+B Elektro
+1884617;203;1233;2100;2119;29.10.2024;PH;Klíčany, U Expertu 91, K+B Elektro
+1884618;64;1233;2100;2119;29.10.2024;PH;Klíčany, U Expertu 91, K+B Elektro
+1887056;127;1311;800;;18.02.2025;CB;Borek, příhradový stožár na S okraji obce
+1887057;162;1311;800;;18.02.2025;CB;Borek, příhradový stožár na S okraji obce
+1887066;187;1311;900;;22.05.2025;CB;Borek, příhradový stožár na S okraji obce
+1887067;375;1311;900;;05.03.2026;CB;Borek, příhradový stožár na S okraji obce (nové)
+1887076;336;1311;1800;;26.02.2025;CB;Borek, příhradový stožár na S okraji obce {1404}
+1887077;47;1311;1800;;26.02.2025;CB;Borek, příhradový stožár na S okraji obce {1404}
+1887176;239;1311;2100;;26.02.2025;CB;Borek, příhradový stožár na S okraji obce
+1887177;313;1311;2100;;26.02.2025;CB;Borek, příhradový stožár na S okraji obce
+1889616;446;1227;800;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889617;490;1227;800;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889626;168;1227;900;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889627;10;1227;900;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889636;345;1227;1800;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889637;436;1227;1800;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889736;122;1227;2100;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1889737;45;1227;2100;22368;17.06.2025;KL;Pchery, příhradový stožár v obci
+1897296;467;1312;800;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce
+1897297;484;1312;800;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce
+1897298;207;1312;800;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce
+1897316;278;1312;1800;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce {1404}
+1897317;153;1312;1800;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce {1404}
+1897318;322;1312;1800;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce {1404}
+1897416;306;1312;2100;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce
+1897417;320;1312;2100;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce
+1897418;43;1312;2100;;26.02.2025;CK;Suchdol, příhradový stožár Z od obce
+1910016;200;1622;800;36752;16.06.2025;NA;Hronov - Zbečník 356, tovární hala Wikow
+1910017;327;1622;800;36752;16.06.2025;NA;Hronov - Zbečník 356, tovární hala Wikow
+1910116;53;1622;1800;36752;16.06.2025;NA;Hronov - Zbečník 356, tovární hala Wikow {1404}
+1910117;373;1622;1800;36752;16.06.2025;NA;Hronov - Zbečník 356, tovární hala Wikow {1404}
+1910216;24;1622;2100;36752;16.06.2025;NA;Hronov - Zbečník 356, tovární hala Wikow
+1910217;256;1622;2100;36752;16.06.2025;NA;Hronov - Zbečník 356, tovární hala Wikow
+1912576;490;1414;800;54435;27.01.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce
+1912577;417;1414;800;54435;27.01.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce
+1912578;275;1414;800;54435;27.01.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce
+1912666;244;1414;900;54435;27.03.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce
+1912667;107;1414;900;54435;27.03.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce
+1912668;273;1414;900;54435;27.03.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce
+1912676;122;1414;1800;54435;27.01.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce {1404}
+1912677;309;1414;1800;54435;27.01.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce {1404}
+1912678;400;1414;1800;54435;27.01.2025;TC;Mlýnec, D5/136km, betonový stožár na V okraji obce {1404}
+1915216;286;1612;800;56352;24.02.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915217;234;1612;800;56352;24.02.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915218;215;1612;800;56352;24.02.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915226;390;1612;900;56352;16.04.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915227;403;1612;900;56352;16.04.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915228;497;1612;900;56352;16.04.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915236;208;1612;1800;56352;03.03.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL {1404}
+1915237;317;1612;1800;56352;03.03.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL {1404}
+1915238;174;1612;1800;56352;03.03.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL {1404}
+1915336;110;1612;2100;56352;24.02.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915337;250;1612;2100;56352;24.02.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1915338;441;1612;2100;56352;24.02.2025;HK;Hradec Králové - Plotiště nad Labem, Náchodská, příhradový stožár u haly PPL
+1917776;163;1418;800;60332;16.10.2024;PM;Plzeň - Bílá Hora, 28. října, mobilní BTS u ČS Robin Oil
+1917777;353;1418;800;60332;16.10.2024;PM;Plzeň - Bílá Hora, 28. října, mobilní BTS u ČS Robin Oil
+1917778;150;1418;800;60332;16.10.2024;PM;Plzeň - Bílá Hora, 28. října, mobilní BTS u ČS Robin Oil
+1920336;204;1221;800;22984;26.12.2024;RA;Zbečno 7, obecní úřad
+1920337;44;1221;800;22984;26.12.2024;RA;Zbečno 7, obecní úřad
+1920346;442;1221;900;22984;07.06.2025;RA;Zbečno 7, obecní úřad
+1920347;240;1221;900;22984;07.06.2025;RA;Zbečno 7, obecní úřad
+1928016;183;1221;800;59333;31.12.2024;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace
+1928017;44;1221;800;59334;17.12.2024;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace, indoor
+1928026;254;1221;900;59333;27.03.2025;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace
+1928035;244;1221;900;59334;29.03.2025;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace, indoor
+1928036;172;1221;1800;59333;17.12.2024;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace {1404}
+1928037;204;1221;1800;59334;17.12.2024;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace, indoor {1404}
+1928136;26;1221;2100;59333;20.12.2024;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace
+1928137;346;1221;2100;59334;17.12.2024;BE;Beroun, Prof. Veselého 493, Centrum duševní rehabilitace, indoor
+1930496;273;1522;800;46197;11.01.2025;DC;Sněžník 31, mobilní BTS v zahradě
+1930497;2;1522;800;46197;11.01.2025;DC;Sněžník 31, mobilní BTS v zahradě
+1935696;92;1230;800;42433;01.12.2024;MB;Horní Cetno, betonový stožár
+1935697;36;1230;800;42433;01.12.2024;MB;Horní Cetno, betonový stožár
+1935698;325;1230;800;42433;01.12.2024;MB;Horní Cetno, betonový stožár
+1935706;480;1230;900;42433;04.06.2025;MB;Horní Cetno, betonový stožár
+1935707;131;1230;900;42433;04.06.2025;MB;Horní Cetno, betonový stožár
+1935708;463;1230;900;42433;04.06.2025;MB;Horní Cetno, betonový stožár
+1935716;480;1230;1800;42433;01.12.2024;MB;Horní Cetno, betonový stožár {1404}
+1935717;494;1230;1800;42433;01.12.2024;MB;Horní Cetno, betonový stožár {1404}
+1935718;199;1230;1800;42433;01.12.2024;MB;Horní Cetno, betonový stožár {1404}
+1935816;329;1230;2100;42433;01.12.2024;MB;Horní Cetno, betonový stožár
+1935817;363;1230;2100;42433;01.12.2024;MB;Horní Cetno, betonový stožár
+1935818;40;1230;2100;42433;01.12.2024;MB;Horní Cetno, betonový stožár
+1940816;286;1233;800;32797;02.09.2025;ME;Šemanovice 48, bytový dům
+1940817;182;1233;800;32797;02.09.2025;ME;Šemanovice 48, bytový dům
+1940826;258;1233;900;32797;02.09.2025;ME;Šemanovice 48, bytový dům
+1940827;299;1233;900;32797;02.09.2025;ME;Šemanovice 48, bytový dům
+1958736;415;1413;800;55370;03.03.2025;KT;Rejštejn, Kašperskohorská 27, pošta
+1958737;228;1413;800;55370;03.03.2025;KT;Rejštejn, Kašperskohorská 27, pošta
+1958738;296;1413;800;55370;03.03.2025;KT;Rejštejn, Kašperskohorská 27, pošta
+1958746;221;1413;900;55370;27.09.2025;KT;Rejštejn, Kašperskohorská 27, pošta
+1958747;309;1413;900;55370;27.09.2025;KT;Rejštejn, Kašperskohorská 27, pošta
+1958748;244;1413;900;55370;27.09.2025;KT;Rejštejn, Kašperskohorská 27, pošta
+1961296;56;1312;800;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce
+1961297;442;1312;800;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce
+1961298;429;1312;800;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce
+1961316;371;1312;1800;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce {1404}
+1961317;279;1312;1800;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce {1404}
+1961318;328;1312;1800;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce {1404}
+1961416;502;1312;2100;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce
+1961417;221;1312;2100;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce
+1961418;312;1312;2100;59799;12.06.2025;CK;Jenín, příhradový stožár V od obce
+1971536;418;1221;800;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971537;207;1221;800;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971538;287;1221;800;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971546;321;1221;900;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971547;7;1221;900;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971548;113;1221;900;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971556;11;1221;1800;59335;07.06.2025;BE;Žloukovice, příhradový stožár {1404}
+1971557;375;1221;1800;59335;07.06.2025;BE;Žloukovice, příhradový stožár {1404}
+1971558;94;1221;1800;59335;07.06.2025;BE;Žloukovice, příhradový stožár {1404}
+1971656;59;1221;2100;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971657;195;1221;2100;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1971658;61;1221;2100;59335;07.06.2025;BE;Žloukovice, příhradový stožár
+1979136;377;1413;800;55367;07.04.2025;KT;Tržek, Hůrka 632 m, příhradový stožár S od obce
+1979137;88;1413;800;55367;07.04.2025;KT;Tržek, Hůrka 632 m, příhradový stožár S od obce
+1979138;201;1413;800;55367;07.04.2025;KT;Tržek, Hůrka 632 m, příhradový stožár S od obce
+1986816;429;1612;800;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1986817;164;1612;800;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1986818;8;1612;800;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1986906;278;1612;900;56349;20.02.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1986907;177;1612;900;56349;20.02.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1986908;475;1612;900;56349;20.02.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1986916;464;1612;1800;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD {1404}
+1986917;327;1612;1800;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD {1404}
+1986918;115;1612;1800;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD {1404}
+1987016;367;1612;2100;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1987017;264;1612;2100;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1987018;161;1612;2100;56349;25.01.2025;HK;Běleč nad Orlicí, příhradový stožár v ZD
+1992016;277;1414;800;55361;22.01.2025;PJ;Dolní Kamenice, betonový stožár V od obce
+1992017;20;1414;800;55361;22.01.2025;PJ;Dolní Kamenice, betonový stožár V od obce
+1992026;160;1414;900;55361;31.07.2025;PJ;Dolní Kamenice, betonový stožár V od obce
+1992027;467;1414;900;55361;31.07.2025;PJ;Dolní Kamenice, betonový stožár V od obce
+1992036;49;1414;1800;55361;11.11.2025;PJ;Dolní Kamenice, betonový stožár V od obce {1404}
+1992037;27;1414;1800;55361;11.11.2025;PJ;Dolní Kamenice, betonový stožár V od obce {1404}
+1992136;335;1414;2100;55361;11.11.2025;PJ;Dolní Kamenice, betonový stožár V od obce
+1992137;232;1414;2100;55361;11.11.2025;PJ;Dolní Kamenice, betonový stožár V od obce
+1999696;42;1233;800;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí
+1999697;148;1233;800;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí
+1999706;353;1233;900;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí
+1999707;267;1233;900;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí
+1999716;309;1233;1800;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí {1404}
+1999717;499;1233;1800;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí {1404}
+1999816;97;1233;2100;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí
+1999817;161;1233;2100;12701;19.06.2025;ME;Nové Ouholice, betonový stožár Z nad obcí
+2007376;154;1414;800;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2007377;120;1414;800;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2007378;458;1414;800;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2007386;289;1414;900;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2007388;42;1414;900;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2007396;489;1414;1800;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5 {1404}
+2007397;239;1414;1800;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5 {1404}
+2007398;487;1414;1800;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5 {1404}
+2007496;89;1414;2100;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2007498;366;1414;2100;54438;31.07.2025;TC;Lužná, V Lomu 513 m, příhradový stožár nad D5
+2017616;362;1413;800;55363;08.02.2025;PJ;Chlumy, betonový stožár J nad obcí
+2017617;226;1413;800;55363;08.02.2025;PJ;Chlumy, betonový stožár J nad obcí
+2017626;162;1413;900;55363;27.09.2025;PJ;Chlumy, betonový stožár J nad obcí
+2017627;467;1413;900;55363;27.09.2025;PJ;Chlumy, betonový stožár J nad obcí
+2017636;399;1413;1800;55363;20.09.2025;PJ;Chlumy, betonový stožár J nad obcí {1404}
+2017637;50;1413;1800;55363;20.09.2025;PJ;Chlumy, betonový stožár J nad obcí {1404}
+2017736;350;1413;2100;55363;27.09.2025;PJ;Chlumy, betonový stožár J nad obcí
+2017737;417;1413;2100;55363;27.09.2025;PJ;Chlumy, betonový stožár J nad obcí
+2020176;374;1621;800;26520;05.08.2025;SM;Vítkovice 28, ZŠ
+2020177;264;1621;800;26520;05.08.2025;SM;Vítkovice 28, ZŠ
+2025216;381;1411;800;24401;07.08.2025;SO;Hřebeny, příhradový stožár u vodárny J od obce
+2025217;479;1411;800;24401;07.08.2025;SO;Hřebeny, příhradový stožár u vodárny J od obce
+2025218;202;1411;800;24401;07.08.2025;SO;Hřebeny, příhradový stožár u vodárny J od obce
+2032976;270;1421;800;2996;26.12.2024;RA;Lašovice, hala ZD
+2032977;317;1421;800;2996;26.12.2024;RA;Lašovice, hala ZD
+2032986;82;1421;900;2996;07.06.2025;RA;Lašovice, hala ZD
+2032987;152;1421;900;2996;07.06.2025;RA;Lašovice, hala ZD
+2035536;167;1519;800;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035537;157;1519;800;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035538;300;1519;800;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035546;99;1519;900;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035547;292;1519;900;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035548;26;1519;900;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035556;62;1519;1800;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice {1404}
+2035557;45;1519;1800;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice {1404}
+2035558;400;1519;1800;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice {1404}
+2035656;398;1519;2100;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035657;439;1519;2100;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2035658;390;1519;2100;45980;29.06.2025;CV;Tušimice, kotvený stožár v zahradě meteorologické stanice
+2038096;39;1519;800;35980;29.06.2025;CV;Kryštofovy Hamry, kostel
+2043216;359;1520;800;26522;04.06.2025;SM;Rakousy 49, FAS kovová bižuterie
+2053456;348;1236;800;54442;23.10.2025;PI;Rakovice, Chlum 532 m, příhradový stožár
+2053457;160;1236;800;54442;23.10.2025;PI;Rakovice, Chlum 532 m, příhradový stožár
+2053458;386;1236;800;54442;23.10.2025;PI;Rakovice, Chlum 532 m, příhradový stožár
+2056016;348;1311;800;59810;03.08.2025;CB;České Budějovice, B. Němcové, nemocnice, budova CH, indoor
+2056026;326;1311;900;59810;03.08.2025;CB;České Budějovice, B. Němcové, nemocnice, budova CH, indoor
+2056036;286;1311;1800;59810;03.08.2025;CB;České Budějovice, B. Němcové, nemocnice, budova CH, indoor {1404}
+2068816;358;1511;800;46066;22.10.2025;DC;Dobkovice 103, rodinný dům
+2068817;486;1511;800;46066;22.10.2025;DC;Dobkovice 103, rodinný dům
+2068818;449;1511;800;46066;22.10.2025;DC;Dobkovice 103, rodinný dům
+2084176;212;1414;800;59814;31.07.2025;DO;Zahořany - Sedlice, příhradový stožár SZ od obce
+2084177;324;1414;800;59814;31.07.2025;DO;Zahořany - Sedlice, příhradový stožár SZ od obce
+2084178;340;1414;800;59814;31.07.2025;DO;Zahořany - Sedlice, příhradový stožár SZ od obce
+2084186;280;1414;900;59814;31.07.2025;DO;Zahořany - Sedlice, příhradový stožár SZ od obce
+2084187;209;1414;900;59814;31.07.2025;DO;Zahořany - Sedlice, příhradový stožár SZ od obce
+2084188;264;1414;900;59814;31.07.2025;DO;Zahořany - Sedlice, příhradový stožár SZ od obce
+2086736;119;1236;800;22250;02.04.2025;PZ;Černošice, Libušina, mobilní BTS na kopci
+2086756;209;1236;1800;22250;02.04.2025;PZ;Černošice, Libušina, mobilní BTS na kopci {1404}
+2086856;240;1236;2100;22250;02.04.2025;PZ;Černošice, Libušina, mobilní BTS na kopci
+2089296;446;1519;800;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny
+2089297;352;1519;800;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny
+2089298;36;1519;800;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny
+2089316;344;1519;1800;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny {1404}
+2089317;318;1519;1800;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny {1404}
+2089318;145;1519;1800;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny {1404}
+2089416;414;1519;2100;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny
+2089417;55;1519;2100;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny
+2089418;59;1519;2100;45983;29.06.2025;CV;Chomutov, Na Moráni, vyšší komín teplárny
+2094416;312;1522;800;46202;19.06.2025;DC;Hřensko 37, Hotel Praha
+2094417;478;1522;800;46202;19.06.2025;DC;Hřensko 37, Hotel Praha
+2094445;234;1522;1800;46204;19.06.2025;DC;Hřensko 37, Hotel Praha, indoor {1404}
+2099536;490;1514;800;25308;20.05.2025;LI;Nová Ves, komín Enroll CZ
+2099537;492;1514;800;25308;20.05.2025;LI;Nová Ves, komín Enroll CZ
+2104656;289;1421;800;54243;23.07.2025;RO;Ostrovec-Lhotka, betonový stožár u ZD
+2104657;318;1421;800;54243;23.07.2025;RO;Ostrovec-Lhotka, betonový stožár u ZD
+2104658;326;1421;800;54243;23.07.2025;RO;Ostrovec-Lhotka, betonový stožár u ZD
+2104666;252;1421;900;54243;23.07.2025;RO;Ostrovec-Lhotka, betonový stožár u ZD
+2104667;358;1421;900;54243;23.07.2025;RO;Ostrovec-Lhotka, betonový stožár u ZD
+2104668;503;1421;900;54243;08.01.2026;RO;Ostrovec-Lhotka, betonový stožár u ZD
+2107216;81;1236;800;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku
+2107217;179;1236;800;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku
+2107226;197;1236;900;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku
+2107227;307;1236;900;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku
+2107236;279;1236;1800;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku {1404}
+2107237;74;1236;1800;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku {1404}
+2107336;331;1236;2100;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku
+2107337;461;1236;2100;59826;30.09.2025;PI;Orlík nad Vltavou 113, budova Lesní správy u zámku
+2114896;119;1622;800;46611;28.11.2025;TU;Borovnička, příhradový stožár SZ od obce
+2114897;214;1622;800;46611;28.11.2025;TU;Borovnička, příhradový stožár SZ od obce
+2117456;182;1233;800;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem
+2117457;142;1233;800;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem
+2117466;109;1233;900;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem
+2117467;36;1233;900;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem
+2117476;471;1233;1800;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem {1404}
+2117477;347;1233;1800;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem {1404}
+2117576;125;1233;2100;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem
+2117577;496;1233;2100;22702;26.05.2025;ME;Nelahozeves, příhradový stožár nad hřbitovem
+2120016;433;1421;800;2998;02.10.2025;RA;Pustověty, zelený betonový stožár na S okraji obce
+2125136;208;1418;800;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125137;467;1418;800;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125138;195;1418;800;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125146;374;1418;900;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125147;37;1418;900;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125148;420;1418;900;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125156;451;1418;1800;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group {1404}
+2125157;326;1418;1800;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group {1404}
+2125158;330;1418;1800;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group {1404}
+2125256;432;1418;2100;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125257;412;1418;2100;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2125258;299;1418;2100;60340;20.05.2025;PM;Plzeň - Černice, Parková 1254/11a, CCA Group
+2127696;178;1317;800;54238;27.09.2025;ST;Měkynec, příhradový stožár JZ nad obcí

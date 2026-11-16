@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.PowerManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,10 +12,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
+import com.example.bts.BtsGeoUtils
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -55,7 +58,8 @@ fun OverviewTab(
     onStopLogging: () -> Unit,
     onAddWaypoint: (String) -> Unit = {},
     onOpenBatterySettings: () -> Unit = {},
-    onUpdateFieldsSelection: (LoggedFieldsSelection) -> Unit
+    onUpdateFieldsSelection: (LoggedFieldsSelection) -> Unit,
+    onOpenBtsDatabase: () -> Unit = {}
 ) {
     val isCs = lang != "EN"
     val context = LocalContext.current
@@ -550,11 +554,11 @@ fun OverviewTab(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                SimCardRow(sim = cellular.sim1, lang = lang)
+                SimCardRow(sim = cellular.sim1, lang = lang, onOpenBtsDatabase = onOpenBtsDatabase)
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider(color = DarkSlate700)
                 Spacer(modifier = Modifier.height(12.dp))
-                SimCardRow(sim = cellular.sim2, lang = lang)
+                SimCardRow(sim = cellular.sim2, lang = lang, onOpenBtsDatabase = onOpenBtsDatabase)
             }
         }
 
@@ -798,7 +802,7 @@ private fun ConstellationMiniBox(name: String, bandCaption: String, counts: Pair
 }
 
 @Composable
-private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
+private fun SimCardRow(sim: SimCellInfo, lang: String = "CS", onOpenBtsDatabase: () -> Unit = {}) {
     val isCs = lang != "EN"
 
     Column {
@@ -942,6 +946,60 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS") {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+
+        sim.btsMatch?.let { match ->
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = EmeraldSignal.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenBtsDatabase() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CellTower,
+                        contentDescription = null,
+                        tint = if (match.pciMismatch || match.tacMismatch) AmberWarning else EmeraldSignal,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        val mocnTag = if (match.isMocnShared) " [MOCN]" else ""
+                        Text(
+                            text = "${match.locationName.ifBlank { "eNB ${match.enodebId}" }}$mocnTag",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimaryDark,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val distText = match.distanceMeters?.let { dist ->
+                            val az = match.azimuthDeg?.let { deg ->
+                                " • ${deg.toInt()}° ${BtsGeoUtils.bearingToCardinal(deg, isCs)}"
+                            }.orEmpty()
+                            if (isCs) "Skutečná BTS: ${BtsGeoUtils.formatDistance(dist)}$az"
+                            else "Real BTS: ${BtsGeoUtils.formatDistance(dist)}$az"
+                        } ?: if (isCs) {
+                            "GPS BTS neznámá • klepněte pro správu DB"
+                        } else {
+                            "BTS GPS unknown • tap to manage DB"
+                        }
+                        Text(
+                            text = distText,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            fontFamily = FontFamily.Monospace,
+                            color = if (match.distanceMeters != null) EmeraldSignal else AmberWarning,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }

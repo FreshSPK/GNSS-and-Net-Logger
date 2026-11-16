@@ -2,12 +2,18 @@ package com.example
 
 import android.app.Application
 import android.content.Context
+import com.example.bts.BtsRepository
 import com.example.data.db.AppDatabase
+import com.example.model.AnomalySeverity
+import com.example.model.AnomalyType
+import com.example.model.CellularAnomaly
 import com.example.model.ChartPoint
+import com.example.model.GnssState
 import com.example.model.LoggedFieldsSelection
 import com.example.model.LogTriggerMode
 import com.example.model.LoggingSettings
 import com.example.model.MapTrailPoint
+import com.example.model.SimCellInfo
 import com.example.service.TelemetryLoggingService
 import com.example.telemetry.CellularTelemetryEngine
 import com.example.telemetry.DemoSimulationEngine
@@ -30,6 +36,7 @@ class SignalLoggerApp : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val database by lazy { AppDatabase.getInstance(this) }
+    val btsRepository by lazy { BtsRepository(this, database.btsDao()) }
     val cellularEngine by lazy { CellularTelemetryEngine(this, applicationScope) }
     val gnssEngine by lazy { GnssTelemetryEngine(this, applicationScope) }
     val environmentEngine by lazy { EnvironmentSensorEngine(this) }
@@ -67,6 +74,7 @@ class SignalLoggerApp : Application() {
         val taMode = sp.getInt("ta_multiplier_mode", 2)
         val darkMap = sp.getBoolean("dark_map_mode", true)
         val audioAlerts = sp.getBoolean("audio_anomaly_alerts", false)
+        val autoGeocode = sp.getBoolean("auto_geocode_bts", true)
 
         val fields = LoggedFieldsSelection(
             logGnss = sp.getBoolean("field_gnss", true),
@@ -88,14 +96,70 @@ class SignalLoggerApp : Application() {
             qnhHpa = qnh,
             darkMapMode = darkMap,
             audioAnomalyAlerts = audioAlerts,
+            autoGeocodeBts = autoGeocode,
             fieldsSelection = fields
         )
         _settings.value = loaded
         wasDemoMode = loaded.isDemoMode
 
+        applicationScope.launch {
+            btsRepository.seedBundledSampleIfNeeded()
+        }
+        cellularEngine.setBtsEnricher { sim ->
+            enrichSimCell(sim, gnssEngine.gnssState.value, _settings.value.isDemoMode)
+        }
+
         environmentEngine.setQnh(loaded.qnhHpa)
         cellularEngine.setTaMultiplierMode(loaded.taMultiplierMode)
         reconcileEngines()
+    }
+
+    private suspend fun enrichSimCell(
+        sim: SimCellInfo,
+        gnss: GnssState,
+        isDemo: Boolean
+    ): SimCellInfo {
+        val match = btsRepository.matchSimCell(
+            sim = sim,
+            ueLat = gnss.latitude,
+            ueLon = gnss.longitude,
+            hasGnssFix = gnss.hasFix,
+            isDemoMode = isDemo
+        ) ?: return sim
+
+        if (_settings.value.autoGeocodeBts && !isDemo && match.latitude == null && match.locationName.isNotBlank()) {
+            applicationScope.launch {
+                btsRepository.geocodeSiteIfNotAttempted(
+                    plmn = match.operatorPlmn,
+                    cellId = match.cellId,
+                    enodebId = match.enodebId,
+                    locationName = match.locationName
+                )
+            }
+        }
+
+        val updatedAnomalies = if (match.pciMismatch || match.tacMismatch) {
+            val isCs = _settings.value.language != "EN"
+            val details = buildList {
+                if (match.pciMismatch) add("PCI ${sim.pci} ≠ DB ${match.dbPci}")
+                if (match.tacMismatch) add("TAC ${sim.tac} ≠ DB ${match.dbTac}")
+            }.joinToString(", ")
+            val extra = CellularAnomaly(
+                type = AnomalyType.BTS_DB_MISMATCH,
+                severity = AnomalySeverity.WARNING,
+                title = if (isCs) "Nesoulad s databází BTS ($details)" else "BTS Database Mismatch ($details)",
+                description = if (isCs) {
+                    "Identifikátor buňky (${match.cellId}) souhlasí se známou BTS (${match.locationName}), ale PCI/TAC neodpovídá záznamu."
+                } else {
+                    "Cell ID (${match.cellId}) matches known site (${match.locationName}), but live PCI/TAC differs from database."
+                }
+            )
+            if (sim.anomalies.any { it.type == AnomalyType.BTS_DB_MISMATCH }) sim.anomalies else sim.anomalies + extra
+        } else {
+            sim.anomalies
+        }
+
+        return sim.copy(btsMatch = match, anomalies = updatedAnomalies)
     }
 
     fun setUiInForeground(inForeground: Boolean) {
@@ -149,8 +213,11 @@ class SignalLoggerApp : Application() {
         demoLoopJob = applicationScope.launch {
             while (isActive && _settings.value.isDemoMode && (isUiInForeground || TelemetryLoggingService.isLogging.value)) {
                 val step = demoEngine.nextSimulationStep(_settings.value.taMultiplierMode)
-                gnssEngine.updateDemoState(step.first)
-                cellularEngine.updateDemoData(step.second.sim1, step.second.sim2, step.second.pingRttMs)
+                val demoGnss = step.first
+                val enrichedSim1 = enrichSimCell(step.second.sim1, demoGnss, isDemo = true)
+                val enrichedSim2 = enrichSimCell(step.second.sim2, demoGnss, isDemo = true)
+                gnssEngine.updateDemoState(demoGnss)
+                cellularEngine.updateDemoData(enrichedSim1, enrichedSim2, step.second.pingRttMs)
                 environmentEngine.updateDemoPressure(step.third.pressureHpa ?: 1013.25f, step.third.baseQnhHpa)
                 val m = step.third.motion
                 environmentEngine.updateDemoMotion(m.accelX, m.accelY, m.accelZ, m.gyroX, m.gyroY, m.gyroZ, m.compassAzimuthDeg)
@@ -228,6 +295,7 @@ class SignalLoggerApp : Application() {
             .putInt("ta_multiplier_mode", newSettings.taMultiplierMode)
             .putBoolean("dark_map_mode", newSettings.darkMapMode)
             .putBoolean("audio_anomaly_alerts", newSettings.audioAnomalyAlerts)
+            .putBoolean("auto_geocode_bts", newSettings.autoGeocodeBts)
             .putBoolean("field_gnss", newSettings.fieldsSelection.logGnss)
             .putBoolean("field_cellular_rf", newSettings.fieldsSelection.logCellularRf)
             .putBoolean("field_neighbors", newSettings.fieldsSelection.logNeighbors)

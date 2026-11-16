@@ -22,7 +22,7 @@ object Exporter {
         val isoFormat = createIsoFormat()
         val writer = BufferedWriter(OutputStreamWriter(outputStream, StandardCharsets.UTF_8), 32 * 1024)
         writer.apply {
-            append("# Signal & GNSS Field Logger - Session Export (v1.4)\n")
+            append("# Signal & GNSS Field Logger - Session Export (v1.5)\n")
             append("# Author: Ing. Jan Kufa, Ph.D. (VUT FEKT UREL)\n")
             append("# Session: ${session.title} (ID: ${session.id})\n")
             append("# Start: ${isoFormat.format(Date(session.startTimeMs))}\n")
@@ -34,7 +34,8 @@ object Exporter {
                     "Sim2Operator,Sim2PLMN,Sim2Tech,Sim2TAC,Sim2CellId,Sim2eNodeB_gNodeB,Sim2Sector,Sim2PCI,Sim2ARFCN,Sim2Band," +
                     "Sim2RSRP_dBm,Sim2RSRQ_dB,Sim2RSSI_dBm,Sim2SINR_dB,Sim2TA,Sim2EstDist_m," +
                     "BestNeighborRSRP,NeighborDelta_dB,Pressure_hPa,SeaLevelPressure_hPa,BaroAlt_m,BatteryTemp_C,BatteryLevel_pct,Ping_ms,NmeaSentence," +
-                    "UniqueSatsInView,UniqueSatsUsed,UsedSatellites,VisibleSatellites,Sim1CA,Sim2CA\n"
+                    "UniqueSatsInView,UniqueSatsUsed,UsedSatellites,VisibleSatellites,Sim1CA,Sim2CA," +
+                    "Sim1BtsLocation,Sim1BtsDistance_m,Sim1BtsAzimuth_deg,Sim2BtsLocation,Sim2BtsDistance_m,Sim2BtsAzimuth_deg\n"
             )
 
             for (r in records) {
@@ -108,7 +109,13 @@ object Exporter {
                 append("\"${escapeCsv(r.usedSatellitesDetail)}\",")
                 append("\"${escapeCsv(r.visibleSatellitesDetail)}\",")
                 append("\"${escapeCsv(r.sim1CaSummary)}\",")
-                append("\"${escapeCsv(r.sim2CaSummary)}\"\n")
+                append("\"${escapeCsv(r.sim2CaSummary)}\",")
+                append("\"${escapeCsv(r.sim1BtsLocation)}\",")
+                append("${r.sim1BtsDistanceM ?: ""},")
+                append("${r.sim1BtsAzimuthDeg ?: ""},")
+                append("\"${escapeCsv(r.sim2BtsLocation)}\",")
+                append("${r.sim2BtsDistanceM ?: ""},")
+                append("${r.sim2BtsAzimuthDeg ?: ""}\n")
             }
             flush()
         }
@@ -126,7 +133,7 @@ object Exporter {
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>${escapeXml(session.title)}</name>
-    <description>Recorded by GNSS &amp; Net Logger v1.4 (Ing. Jan Kufa, Ph.D. - VUT Brno FEKT UREL)</description>
+    <description>Recorded by GNSS &amp; Net Logger v1.5 (Ing. Jan Kufa, Ph.D. - VUT Brno FEKT UREL)</description>
     <Style id="rsrpStrong"><LineStyle><color>ff81b910</color><width>5</width></LineStyle></Style>
     <Style id="rsrpGood"><LineStyle><color>ff16cc84</color><width>5</width></LineStyle></Style>
     <Style id="rsrpFair"><LineStyle><color>ff0b9ef5</color><width>5</width></LineStyle></Style>
@@ -191,7 +198,7 @@ object Exporter {
         writer.apply {
             append(
                 """<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GNSS &amp; Net Logger v1.4 - VUT FEKT UREL" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="GNSS &amp; Net Logger v1.5 - VUT FEKT UREL" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>${escapeXml(session.title)}</name>
     <time>${isoFormat.format(Date(session.startTimeMs))}</time>
@@ -229,7 +236,13 @@ object Exporter {
                 append("          <speed_kmh>${r.speedKmh}</speed_kmh>\n")
                 r.sim1Rsrp?.let { append("          <sim1_rsrp>$it</sim1_rsrp>\n") }
                 if (r.sim1Band.isNotBlank()) append("          <sim1_band>${escapeXml(r.sim1Band)}</sim1_band>\n")
+                if (r.sim1BtsLocation.isNotBlank()) append("          <sim1_bts_location>${escapeXml(r.sim1BtsLocation)}</sim1_bts_location>\n")
+                r.sim1BtsDistanceM?.let { append("          <sim1_bts_distance_m>$it</sim1_bts_distance_m>\n") }
+                r.sim1BtsAzimuthDeg?.let { append("          <sim1_bts_azimuth_deg>$it</sim1_bts_azimuth_deg>\n") }
                 r.sim2Rsrp?.let { append("          <sim2_rsrp>$it</sim2_rsrp>\n") }
+                if (r.sim2BtsLocation.isNotBlank()) append("          <sim2_bts_location>${escapeXml(r.sim2BtsLocation)}</sim2_bts_location>\n")
+                r.sim2BtsDistanceM?.let { append("          <sim2_bts_distance_m>$it</sim2_bts_distance_m>\n") }
+                r.sim2BtsAzimuthDeg?.let { append("          <sim2_bts_azimuth_deg>$it</sim2_bts_azimuth_deg>\n") }
                 append("        </extensions>\n")
                 append("      </trkpt>\n")
             }
@@ -281,6 +294,9 @@ object Exporter {
                 append("        \"sim1Pci\": ${r.sim1Pci},\n")
                 append("        \"sim1Rsrp\": ${r.sim1Rsrp ?: "null"},\n")
                 append("        \"sim1Sinr\": ${r.sim1Sinr ?: "null"},\n")
+                append("        \"sim1BtsLocation\": \"${escapeJson(r.sim1BtsLocation)}\",\n")
+                append("        \"sim1BtsDistanceM\": ${r.sim1BtsDistanceM ?: "null"},\n")
+                append("        \"sim1BtsAzimuthDeg\": ${r.sim1BtsAzimuthDeg ?: "null"},\n")
                 append("        \"sim2Operator\": \"${escapeJson(r.sim2Operator)}\",\n")
                 append("        \"sim2NetworkGen\": \"${escapeJson(r.sim2NetworkGen)}\",\n")
                 append("        \"sim2Band\": \"${escapeJson(r.sim2Band)}\",\n")
@@ -288,6 +304,9 @@ object Exporter {
                 append("        \"sim2Pci\": ${r.sim2Pci},\n")
                 append("        \"sim2Rsrp\": ${r.sim2Rsrp ?: "null"},\n")
                 append("        \"sim2Sinr\": ${r.sim2Sinr ?: "null"},\n")
+                append("        \"sim2BtsLocation\": \"${escapeJson(r.sim2BtsLocation)}\",\n")
+                append("        \"sim2BtsDistanceM\": ${r.sim2BtsDistanceM ?: "null"},\n")
+                append("        \"sim2BtsAzimuthDeg\": ${r.sim2BtsAzimuthDeg ?: "null"},\n")
                 append("        \"pingRttMs\": ${r.pingRttMs ?: "null"}\n")
                 append("      }\n")
                 append("    }${if (index < records.size - 1) "," else ""}\n")

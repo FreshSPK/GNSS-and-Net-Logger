@@ -1,13 +1,20 @@
 package com.example.ui.tabs
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.DashPathEffect
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -21,6 +28,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +39,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.bts.BtsGeoUtils
+import com.example.data.db.BtsTowerEntity
 import com.example.data.db.TelemetryRecord
 import com.example.model.CellularState
 import com.example.model.GnssState
@@ -101,6 +112,50 @@ private fun computeSegmentColor(
     }
 }
 
+private fun operatorMarkerArgb(plmn: String): Int = when (plmn) {
+    "23001" -> TMobileMagenta.toArgb()
+    "23002" -> O2Blue.toArgb()
+    "23003" -> VodafoneRed.toArgb()
+    else -> CyanTertiary.toArgb()
+}
+
+private fun createBtsMarkerDrawable(
+    context: Context,
+    fillArgb: Int,
+    strokeArgb: Int,
+    label: String,
+    isServing: Boolean = false
+): BitmapDrawable {
+    val sizePx = if (isServing) 52 else 38
+    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    val cx = sizePx / 2f
+    val cy = sizePx / 2f
+    val radius = sizePx / 2f - 4f
+
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fillArgb
+        style = Paint.Style.FILL
+    }
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = strokeArgb
+        style = Paint.Style.STROKE
+        strokeWidth = if (isServing) 4.5f else 2.5f
+    }
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        textSize = if (isServing) 18f else 13f
+        isFakeBoldText = true
+        textAlign = Paint.Align.CENTER
+    }
+
+    canvas.drawCircle(cx, cy, radius, fillPaint)
+    canvas.drawCircle(cx, cy, radius, strokePaint)
+    val baseline = cy - (textPaint.descent() + textPaint.ascent()) / 2f
+    canvas.drawText(label, cx, baseline, textPaint)
+    return BitmapDrawable(context.resources, bmp)
+}
+
 @Composable
 fun MapTab(
     gnss: GnssState,
@@ -113,9 +168,13 @@ fun MapTab(
     lang: String,
     onClearReplay: () -> Unit,
     onClearFocusedPoint: () -> Unit = {},
-    onClearLiveTrail: () -> Unit = {}
+    onClearLiveTrail: () -> Unit = {},
+    loadNearbyBts: suspend (lat: Double, lon: Double) -> List<BtsTowerEntity> = { _, _ -> emptyList() },
+    focusedBts: Triple<Double, Double, String>? = null,
+    onClearFocusedBts: () -> Unit = {}
 ) {
     val isCs = lang != "EN"
+    val context = LocalContext.current
     var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
     var locationMarker by remember { mutableStateOf<Marker?>(null) }
     var activeMode by remember { mutableStateOf(MapVisualizationMode.RSRP_SIGNAL) }
@@ -123,9 +182,11 @@ fun MapTab(
         mutableStateOf(if (cellular.sim2.isDataActive && !cellular.sim1.isDataActive) 2 else 1)
     }
     var autoFollow by remember { mutableStateOf(true) }
+    var showBtsLayer by remember { mutableStateOf(true) }
     var selectedReplayPoint by remember { mutableStateOf<TelemetryRecord?>(null) }
 
     val trackOverlays = remember { mutableListOf<org.osmdroid.views.overlay.Overlay>() }
+    val btsOverlays = remember { mutableListOf<org.osmdroid.views.overlay.Overlay>() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Lifecycle sync for OSMDroid MapView (actual detach happens in AndroidView.onRelease)
@@ -169,11 +230,21 @@ fun MapTab(
         if (replayRecords == null && gnss.hasFix && (gnss.latitude != 0.0 || gnss.longitude != 0.0)) {
             val point = GeoPoint(gnss.latitude, gnss.longitude)
             locationMarker?.position = point
-            if (autoFollow && focusedReplayPoint == null) {
+            if (autoFollow && focusedReplayPoint == null && focusedBts == null) {
                 mv.controller.animateTo(point)
             }
             mv.invalidate()
         }
+    }
+
+    // Center camera when jumping to a focused BTS tower
+    LaunchedEffect(focusedBts, mapViewInstance) {
+        val mv = mapViewInstance ?: return@LaunchedEffect
+        val target = focusedBts ?: return@LaunchedEffect
+        autoFollow = false
+        mv.controller.setZoom(16.5)
+        mv.controller.setCenter(GeoPoint(target.first, target.second))
+        mv.invalidate()
     }
 
     // Center camera when opening replay session or jumping to a specific history point
@@ -343,6 +414,154 @@ fun MapTab(
         mv.invalidate()
     }
 
+    // Render BTS Layer: Serving BTS markers, RF link lines from UE to BTS, Focused BTS, and nearby towers
+    LaunchedEffect(
+        showBtsLayer,
+        cellular.sim1.btsMatch,
+        cellular.sim2.btsMatch,
+        gnss.latitude,
+        gnss.longitude,
+        gnss.hasFix,
+        focusedBts,
+        replayRecords,
+        mapViewInstance
+    ) {
+        val mv = mapViewInstance ?: return@LaunchedEffect
+        if (btsOverlays.isNotEmpty()) {
+            mv.overlays.removeAll(btsOverlays.toSet())
+            btsOverlays.clear()
+        }
+        if (!showBtsLayer) {
+            mv.invalidate()
+            return@LaunchedEffect
+        }
+
+        val uePoint = if (gnss.hasFix && (gnss.latitude != 0.0 || gnss.longitude != 0.0)) {
+            GeoPoint(gnss.latitude, gnss.longitude)
+        } else null
+
+        val servingCoords = mutableSetOf<String>()
+
+        // 1. Serving SIM 1 & SIM 2 BTS + RF Link Line
+        val servingMatches = listOf(1 to cellular.sim1.btsMatch, 2 to cellular.sim2.btsMatch)
+        for ((slot, match) in servingMatches) {
+            if (match?.latitude != null && match.longitude != null) {
+                val btsPt = GeoPoint(match.latitude, match.longitude)
+                val siteKey = "${match.operatorPlmn}:${match.enodebId}:${match.locationName}"
+                servingCoords.add(siteKey)
+                val opArgb = operatorMarkerArgb(match.operatorPlmn)
+
+                if (uePoint != null && replayRecords == null) {
+                    val linkLine = Polyline().apply {
+                        outlinePaint.color = opArgb
+                        outlinePaint.alpha = 210
+                        outlinePaint.strokeWidth = 6f
+                        outlinePaint.pathEffect = DashPathEffect(floatArrayOf(18f, 12f), 0f)
+                        setPoints(listOf(uePoint, btsPt))
+                    }
+                    mv.overlays.add(linkLine)
+                    btsOverlays.add(linkLine)
+                }
+
+                val distStr = match.distanceMeters?.let { BtsGeoUtils.formatDistance(it) } ?: "—"
+                val azStr = match.azimuthDeg?.let {
+                    String.format(Locale.US, "%.0f° (%s)", it, BtsGeoUtils.bearingToCardinal(it, isCs))
+                } ?: "—"
+                val marker = Marker(mv).apply {
+                    position = btsPt
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = createBtsMarkerDrawable(
+                        context = context,
+                        fillArgb = opArgb,
+                        strokeArgb = AndroidColor.WHITE,
+                        label = "S$slot",
+                        isServing = true
+                    )
+                    title = "SIM $slot • ${match.operatorName} (eNB ${match.enodebId})"
+                    snippet = buildString {
+                        append(match.locationName)
+                        append("\nGPS: $distStr • Az: $azStr")
+                        if (match.coLocatedBands.isNotEmpty()) {
+                            append("\nBands: ${match.coLocatedBands.joinToString("/")}")
+                        }
+                    }
+                }
+                mv.overlays.add(marker)
+                btsOverlays.add(marker)
+            }
+        }
+
+        // 2. Focused BTS pin (opened from Search/RF tab)
+        focusedBts?.let { (lat, lon, label) ->
+            val focusMarker = Marker(mv).apply {
+                position = GeoPoint(lat, lon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = createBtsMarkerDrawable(
+                    context = context,
+                    fillArgb = AmberWarning.toArgb(),
+                    strokeArgb = AndroidColor.WHITE,
+                    label = "BTS",
+                    isServing = true
+                )
+                title = label
+                snippet = String.format(Locale.US, "%.5f, %.5f", lat, lon)
+            }
+            mv.overlays.add(focusMarker)
+            btsOverlays.add(focusMarker)
+        }
+
+        // 3. Nearby imported Czech BTS towers in database around active center
+        val queryLat = focusedBts?.first
+            ?: uePoint?.latitude
+            ?: replayRecords?.firstOrNull { it.latitude != 0.0 || it.longitude != 0.0 }?.latitude
+            ?: mv.mapCenter.latitude
+        val queryLon = focusedBts?.second
+            ?: uePoint?.longitude
+            ?: replayRecords?.firstOrNull { it.latitude != 0.0 || it.longitude != 0.0 }?.longitude
+            ?: mv.mapCenter.longitude
+
+        val nearby = runCatching { loadNearbyBts(queryLat, queryLon) }.getOrDefault(emptyList())
+        val dedupedMasts = nearby
+            .distinctBy { "${it.operatorPlmn}:${it.enodebId}:${it.locationName}" }
+            .filter { "${it.operatorPlmn}:${it.enodebId}:${it.locationName}" !in servingCoords }
+            .take(120)
+
+        for (tower in dedupedMasts) {
+            val tLat = tower.latitude ?: continue
+            val tLon = tower.longitude ?: continue
+            val shortOp = when (tower.operatorPlmn) {
+                "23001" -> "TM"
+                "23002" -> "O2"
+                "23003" -> "VF"
+                else -> "CZ"
+            }
+            val marker = Marker(mv).apply {
+                position = GeoPoint(tLat, tLon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = createBtsMarkerDrawable(
+                    context = context,
+                    fillArgb = operatorMarkerArgb(tower.operatorPlmn),
+                    strokeArgb = DarkSlate900.toArgb(),
+                    label = shortOp,
+                    isServing = false
+                )
+                title = "${BtsGeoUtils.operatorDisplayName(tower.operatorPlmn)} • ${tower.locationName}"
+                snippet = "eNB ${tower.enodebId} • CI ${tower.cellId} • PCI ${tower.pci} • ${tower.band} MHz"
+            }
+            mv.overlays.add(marker)
+            btsOverlays.add(marker)
+        }
+
+        // Keep live cursor above BTS overlays
+        if (replayRecords == null) {
+            locationMarker?.let { marker ->
+                mv.overlays.remove(marker)
+                mv.overlays.add(marker)
+            }
+        }
+        mv.invalidate()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
             modifier = Modifier.fillMaxSize().testTag("map_view_container"),
@@ -382,6 +601,7 @@ fun MapTab(
                 }
                 locationMarker = null
                 trackOverlays.clear()
+                btsOverlays.clear()
                 mv.onPause()
                 mv.overlays.clear()
                 mv.onDetach()
@@ -425,21 +645,45 @@ fun MapTab(
                 }
             }
 
-            // Dark/Light map quick toggle
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.95f))
+            // Top-right quick toggles: BTS Layer + Dark/Light map
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = { onToggleDarkMap(!darkMapMode) },
-                    modifier = Modifier.size(36.dp).testTag("toggle_dark_map_button")
-                ) {
-                    Icon(
-                        imageVector = if (darkMapMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = if (isCs) "Přepnout režim mapy" else "Toggle Dark Map",
-                        tint = if (darkMapMode) AmberWarning else CyanTertiary,
-                        modifier = Modifier.size(18.dp)
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (showBtsLayer) CyanTertiary.copy(alpha = 0.24f) else DarkSlate800.copy(alpha = 0.95f)
                     )
+                ) {
+                    IconButton(
+                        onClick = { showBtsLayer = !showBtsLayer },
+                        modifier = Modifier.size(48.dp).testTag("toggle_bts_layer_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CellTower,
+                            contentDescription = if (isCs) "Zobrazit/Skrýt vrstvu BTS" else "Toggle BTS Layer",
+                            tint = if (showBtsLayer) CyanTertiary else TextSecondaryDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.95f))
+                ) {
+                    IconButton(
+                        onClick = { onToggleDarkMap(!darkMapMode) },
+                        modifier = Modifier.size(48.dp).testTag("toggle_dark_map_button")
+                    ) {
+                        Icon(
+                            imageVector = if (darkMapMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (isCs) "Přepnout režim mapy" else "Toggle Dark Map",
+                            tint = if (darkMapMode) AmberWarning else CyanTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -681,6 +925,35 @@ fun MapTab(
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Icon(imageVector = Icons.Default.MyLocation, contentDescription = if (isCs) "Vycentrovat" else "Recenter", modifier = Modifier.size(20.dp))
+            }
+        }
+
+        if (focusedBts != null) {
+            Card(
+                modifier = Modifier
+                    .padding(start = 12.dp, bottom = 74.dp, end = 76.dp)
+                    .align(Alignment.BottomStart),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.96f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.CellTower, contentDescription = null, tint = AmberWarning, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = focusedBts.third,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimaryDark,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(onClick = onClearFocusedBts, modifier = Modifier.size(24.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = if (isCs) "Zavřít" else "Close", tint = TextSecondaryDark, modifier = Modifier.size(14.dp))
+                    }
+                }
             }
         }
     }
