@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -409,7 +410,18 @@ fun SessionCard(
                 HistoryMetricItem(label = if (isCs) "Vzorků" else "Samples", value = session.pointCount.toString(), modifier = Modifier.weight(1f))
                 HistoryMetricItem(label = if (isCs) "Vzdálenost" else "Distance", value = String.format(Locale.US, "%.2f km", session.distanceMeters / 1000.0), modifier = Modifier.weight(1f))
                 HistoryMetricItem(label = if (isCs) "Max rychlost" else "Max Speed", value = String.format(Locale.US, "%.0f km/h", session.maxSpeedKmh), modifier = Modifier.weight(1f))
-                HistoryMetricItem(label = if (isCs) "Síť" else "Net", value = "${session.primaryTech} ${session.operatorSummary}", modifier = Modifier.weight(1.4f))
+            }
+
+            if (session.primaryTech.isNotBlank() || session.operatorSummary.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                val netLabel = if (isCs) "Síť" else "Network"
+                val opPart = session.operatorSummary.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                Text(
+                    text = "$netLabel: ${session.primaryTech.ifBlank { "N/A" }}$opPart",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    color = TextSecondaryDark,
+                    maxLines = 2
+                )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -502,8 +514,10 @@ fun SessionDetailInspector(
         val r2Vals = records.mapNotNull { it.sim2Rsrp }
         val pdopVals = records.filter { it.satellitesUsedInFix >= 4 && it.pdop > 0f && it.pdop < 9f }.map { it.pdop }
         val waypoints = records.count { !it.waypointNote.isNullOrBlank() }
-        val nrCount = records.count { it.sim1NetworkGen.contains("5G") }
-        val lteCount = records.count { it.sim1NetworkGen.contains("4G") || it.sim1NetworkGen.contains("LTE") }
+        val nrCount1 = records.count { it.sim1NetworkGen.contains("5G") }
+        val lteCount1 = records.count { it.sim1NetworkGen.contains("4G") || it.sim1NetworkGen.contains("LTE") }
+        val nrCount2 = records.count { it.sim2NetworkGen.contains("5G") }
+        val lteCount2 = records.count { it.sim2NetworkGen.contains("4G") || it.sim2NetworkGen.contains("LTE") }
         val totalRec = records.size.coerceAtLeast(1)
 
         mapOf(
@@ -511,10 +525,14 @@ fun SessionDetailInspector(
             "r1Min" to r1Vals.minOrNull(),
             "r1Max" to r1Vals.maxOrNull(),
             "r2Avg" to r2Vals.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+            "r2Min" to r2Vals.minOrNull(),
+            "r2Max" to r2Vals.maxOrNull(),
             "pdopAvg" to pdopVals.takeIf { it.isNotEmpty() }?.average(),
             "waypoints" to waypoints,
-            "pct5g" to (nrCount * 100 / totalRec),
-            "pct4g" to (lteCount * 100 / totalRec)
+            "pct5g1" to (nrCount1 * 100 / totalRec),
+            "pct4g1" to (lteCount1 * 100 / totalRec),
+            "pct5g2" to (nrCount2 * 100 / totalRec),
+            "pct4g2" to (lteCount2 * 100 / totalRec)
         )
     }
 
@@ -607,21 +625,32 @@ fun SessionDetailInspector(
                         modifier = Modifier.weight(1f)
                     )
                     HistoryMetricItem(
-                        label = if (isCs) "Podíl 5G/4G" else "5G/4G Mix",
-                        value = "${stats["pct5g"]}%/${stats["pct4g"]}%",
+                        label = if (isCs) "S1 5G/4G" else "S1 5G/4G",
+                        value = "${stats["pct5g1"]}%/${stats["pct4g1"]}%",
                         modifier = Modifier.weight(1f)
                     )
                 }
                 val r1Min = stats["r1Min"] as? Int
                 val r1Max = stats["r1Max"] as? Int
+                val r2Min = stats["r2Min"] as? Int
+                val r2Max = stats["r2Max"] as? Int
+                val pct5g2 = stats["pct5g2"] as? Int ?: 0
+                val pct4g2 = stats["pct4g2"] as? Int ?: 0
                 val wpCount = stats["waypoints"] as? Int ?: 0
-                if (r1Min != null || wpCount > 0) {
+                if (r1Min != null || r2Min != null || wpCount > 0) {
                     Spacer(modifier = Modifier.height(4.dp))
+                    val s2Part = if (r2Min != null || pct5g2 > 0 || pct4g2 > 0) {
+                        if (isCs) {
+                            " • S2: ${r2Min ?: "—"}..${r2Max ?: "—"} dBm (5G/4G: $pct5g2%/$pct4g2%)"
+                        } else {
+                            " • S2: ${r2Min ?: "—"}..${r2Max ?: "—"} dBm (5G/4G: $pct5g2%/$pct4g2%)"
+                        }
+                    } else ""
                     Text(
                         text = if (isCs) {
-                            "SIM1 rozsah: ${r1Min ?: "—"} až ${r1Max ?: "—"} dBm • Značky (Waypoints): $wpCount"
+                            "S1 rozsah: ${r1Min ?: "—"} až ${r1Max ?: "—"} dBm$s2Part • Značky: $wpCount"
                         } else {
-                            "SIM1 range: ${r1Min ?: "—"} to ${r1Max ?: "—"} dBm • Waypoints: $wpCount"
+                            "S1 range: ${r1Min ?: "—"} to ${r1Max ?: "—"} dBm$s2Part • Waypoints: $wpCount"
                         },
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
@@ -636,7 +665,7 @@ fun SessionDetailInspector(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(records, key = { it.id }) { r ->
+            itemsIndexed(records, key = { _, r -> r.id }) { index, r ->
                 val timeStr = timeFormat.format(Date(r.timestampMs))
                 val hasDop = r.satellitesUsedInFix >= 4 && r.pdop > 0f && r.pdop < 9.0f
                 val hasCoords = r.latitude != 0.0 || r.longitude != 0.0
@@ -658,7 +687,7 @@ fun SessionDetailInspector(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "#${r.id} • $timeStr",
+                                    text = "#${index + 1} • $timeStr",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = TextPrimaryDark
@@ -745,25 +774,23 @@ fun SessionDetailInspector(
 
                         Spacer(modifier = Modifier.height(2.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        val s1Tech = r.sim1NetworkGen.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                        val s2Tech = r.sim2NetworkGen.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""
+                        val s1Txt = if (r.sim1Operator.isNotEmpty()) {
+                            "S1: ${r.sim1Operator}$s1Tech ${r.sim1Rsrp?.let { "$it dBm" } ?: ""}".trim()
+                        } else "S1: N/A"
+                        val s2Txt = if (r.sim2Operator.isNotEmpty() &&
+                            !r.sim2Operator.equals("No SIM", ignoreCase = true) &&
+                            !r.sim2Operator.equals("Žádná SIM", ignoreCase = true) &&
+                            !r.sim2Operator.equals("N/A", ignoreCase = true)
                         ) {
-                            val s1Txt = if (r.sim1Operator.isNotEmpty()) "S1: ${r.sim1Operator} ${r.sim1Rsrp?.let { "$it dBm" } ?: ""}".trim() else "S1: N/A"
-                            val s2Txt = if (r.sim2Operator.isNotEmpty()) "S2: ${r.sim2Operator} ${r.sim2Rsrp?.let { "$it dBm" } ?: ""}".trim() else ""
-                            Text(
-                                text = if (s2Txt.isNotEmpty()) "$s1Txt • $s2Txt" else s1Txt,
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = AmberWarning
-                            )
-                            val mainRsrp = r.sim1Rsrp ?: r.sim2Rsrp
-                            Text(
-                                text = "RSRP: ${mainRsrp?.let { "$it dBm" } ?: "N/A"}",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                fontWeight = FontWeight.Bold,
-                                color = if ((mainRsrp ?: -120) >= -85) EmeraldSignal else AmberWarning
-                            )
-                        }
+                            "S2: ${r.sim2Operator}$s2Tech ${r.sim2Rsrp?.let { "$it dBm" } ?: ""}".trim()
+                        } else ""
+                        Text(
+                            text = if (s2Txt.isNotEmpty()) "$s1Txt\n$s2Txt" else s1Txt,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = AmberWarning
+                        )
 
                         if (r.sim1CaSummary.isNotBlank() || r.sim2CaSummary.isNotBlank()) {
                             Spacer(modifier = Modifier.height(2.dp))
@@ -778,28 +805,6 @@ fun SessionDetailInspector(
                                 color = Purple5G,
                                 maxLines = 2
                             )
-                        }
-
-                        if (r.usedSatellitesDetail.isNotBlank() || r.visibleSatellitesDetail.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            if (r.usedSatellitesDetail.isNotBlank()) {
-                                Text(
-                                    text = (if (isCs) "Použité: " else "Used: ") + r.usedSatellitesDetail,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
-                                    fontFamily = FontFamily.Monospace,
-                                    color = EmeraldSignal.copy(alpha = 0.9f),
-                                    maxLines = 2
-                                )
-                            }
-                            if (r.visibleSatellitesDetail.isNotBlank()) {
-                                Text(
-                                    text = (if (isCs) "Viditelné: " else "Visible: ") + r.visibleSatellitesDetail,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
-                                    fontFamily = FontFamily.Monospace,
-                                    color = TextSecondaryDark,
-                                    maxLines = 2
-                                )
-                            }
                         }
 
                         if (r.rawDopplerHz != null || r.batteryTempC != null) {

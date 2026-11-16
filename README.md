@@ -43,18 +43,18 @@ Standalone native Android application for field RF drive-testing, multi-constell
 #### 3. Satellites (GNSS & SkyPlot)
 * **Constellations & Dual-Band:** Tracks GPS, Galileo, GLONASS, BeiDou, QZSS, SBAS, and NavIC across L1/E1/B1/G1 and L5/E5a/B2a, reporting both unique physical satellites and total signals (aligned with *GPS Test*), with live filter chips.
 * **SkyPlot Radar:** Groups multi-band signals per physical satellite with two color modes (**By Constellation** / **By C/N₀**), tap-to-inspect details, and a 1:1 synchronized legend:
-  * **Filled dot + white border** = Used in fix
-  * **Hollow ring** (gray in C/N₀ mode) = Unused
+  * **Solid fill** = In fix
+  * **Colored ring** = Unused
   * **Green glow** = Dual-band **L5 / E5a / B2a**
 * **C/N₀ Bars, Table, AGC & Raw Data:** Signal strength bar chart, full satellite table, `GnssMeasurementsEvent` AGC jamming monitor, Doppler shift, and live `$GNGGA` / `$GNRMC` NMEA view.
 
 #### 4. Map (OpenStreetMap)
-* **Live & Replay Tracks:** Continuously collects background live breadcrumbs from startup across tabs and renders color-coded tracks identically in Live and History Replay modes.
+* **Live & Replay Tracks:** Continuously collects background live breadcrumbs from startup (`since start` counter) across tabs and renders color-coded tracks identically in Live and History Replay modes.
 * **Color Layers (`S1` / `S2` toggle):**
   * **RSRP:** Green ($> -80\text{ dBm}$) to Red ($< -105\text{ dBm}$)
   * **Speed:** Blue ($< 10\text{ km/h}$) to Red ($> 90\text{ km/h}$)
-  * **Satellites:** Red ($< 5$), Orange ($5–20$), Light Green ($21–30$), Emerald ($31–50$), Cyan ($> 50$)
-  * **PDOP:** Emerald ($< 1.0$), Cyan ($1.0–2.0$), Amber ($2.0–4.0$), Red ($\ge 4.0$)
+  * **Satellites:** Red ($< 5$), Orange ($5–20$), Cyan ($21–30$), Emerald ($31–50$), Blue ($> 50$)
+  * **PDOP:** Emerald ($< 0.7$), Cyan ($0.7–1.5$), Amber ($1.5–2.5$), Orange ($2.5–3.5$), Red ($> 3.5$)
 * **Controls:** Dark/light map filter, auto-follow lock, clickable point/waypoint details, zoom controls, and trail reset.
 
 #### 5. Charts
@@ -62,11 +62,11 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
 * **Dual-SIM RSRP & SINR** (SIM 1 vs. SIM 2 side-by-side)
 * **Speed** (km/h)
 * **Satellites** (simultaneous **Used in Fix** vs. **Visible** curves)
-* **PDOP** ($0–4$ scale) & **AGC Interference**
+* **PDOP** ($< 0.7$ best, $> 3.5$ worst) & **AGC Interference**
 * **Ping RTT** (`8.8.8.8:53`), **Accelerometer**, **Gyroscope**, **Compass**, and **Battery Temperature**
 
 #### 6. History & Exports
-* **Session Management:** Search, rename, view automatic session analytics (min/avg/max RSRP, avg PDOP, 5G/4G split), open waveforms in **Charts**, or inspect individual samples with **jump-to-Map** and single-point deletion.
+* **Session Management:** Search, rename, view Dual-SIM session analytics (`S1` + `S2` RSRP ranges, `5G/4G` share, avg PDOP), open waveforms in **Charts**, or inspect 1-based numbered samples (`#1`, `#2`, …) with clear per-SIM labels, **jump-to-Map**, and single-point deletion.
 * **Export & Storage:** Save directly to `Download/GNSS_Net_Logger/` or share via Android system share sheet in four streaming formats:
   * **CSV** (full SIM 1 + SIM 2 RF parameters, `UniqueSatsInView`, `UniqueSatsUsed`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA`, `Sim2CA`, `WaypointNote`, NMEA, Doppler, sensors)
   * **3D KML** (color-coded path + waypoint `<Placemark>` pins)
@@ -121,18 +121,18 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
 #### 3. Satelity (GNSS & SkyPlot)
 * **Konstelace & Dual-Band:** Podpora GPS, Galileo, GLONASS, BeiDou, QZSS, SBAS a NavIC v pásmech L1/E1/B1/G1 a L5/E5a/B2a se zobrazením unikátních fyzických družic i celkových signálů (v souladu s *GPS Test*) a filtračními čipy.
 * **SkyPlot Radar:** Sdružuje vícepásmové signály do jedné družice se dvěma barevnými režimy (**Podle konstelace** / **Podle síly C/N₀**), detailem po klepnutí a 1:1 synchronizovanou legendou:
-  * **Plný bod + bílý okraj** = Ve fixu
-  * **Prázdný kroužek** (šedý v režimu C/N₀) = Mimo fix
-  * **Zelená záře** = Dvoupásmový příjem **L5 / E5a / B2a**
+  * **Plná barva** = Ve fixu
+  * **Barevný kroužek** = Mimo fix
+  * **Zelená záře okolo** = Dvoupásmový příjem **L5 / E5a / B2a**
 * **C/N₀ grafy, Tabulka, AGC & NMEA:** Sloupcové grafy síly signálu, kompletní tabulka, AGC monitor rušení z `GnssMeasurementsEvent`, Dopplerův posuv a živý tok `$GNGGA` / `$GNRMC`.
 
 #### 4. Mapa (OpenStreetMap)
-* **Živá trasa i přehrávání historie:** Průběžně sbírá trasu na pozadí od spuštění aplikace napříč kartami a vykresluje ji stejným enginem živě i při zpětném přehrávání.
+* **Živá trasa i přehrávání historie:** Průběžně sbírá trasu na pozadí od spuštění aplikace napříč kartami (`od startu`) a vykresluje ji stejným enginem živě i při zpětném přehrávání.
 * **Barevné vrstvy (přepínač `S1` / `S2`):**
   * **RSRP:** Zelená ($> -80\text{ dBm}$) až Červená ($< -105\text{ dBm}$)
   * **Rychlost:** Modrá ($< 10\text{ km/h}$) až Červená ($> 90\text{ km/h}$)
-  * **Satelity:** Červená ($< 5$), Oranžová ($5–20$), Světle zelená ($21–30$), Smaragdová ($31–50$), Azurová ($> 50$)
-  * **PDOP:** Smaragdová ($< 1,0$), Azurová ($1,0–2,0$), Oranžová ($2,0–4,0$), Červená ($\ge 4,0$)
+  * **Satelity:** Červená ($< 5$), Oranžová ($5–20$), Azurová ($21–30$), Smaragdová ($31–50$), Modrá ($> 50$)
+  * **PDOP:** Smaragdová ($< 0,7$), Azurová ($0,7–1,5$), Oranžová ($1,5–2,5$), Oranžovočervená ($2,5–3,5$), Červená ($> 3,5$)
 * **Ovládání:** Tmavý/světlý režim mapy, auto-follow sledování polohy, klikatelné body s detailem, přiblížení a smazání živé stopy.
 
 #### 5. Grafy
@@ -140,11 +140,11 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 * **Duální RSRP & SINR** (porovnání SIM 1 vs. SIM 2)
 * **Rychlost pohybu** (km/h)
 * **Satelity** (současné křivky **Ve fixu** a **Viditelné**)
-* **PDOP** (škála $0–4$) & **AGC rušení**
+* **PDOP** ($< 0,7$ nejlepší, $> 3,5$ nejhorší) & **AGC rušení**
 * **Ping RTT** (`8.8.8.8:53`), **Akcelerometr**, **Gyroskop**, **Kompas** a **Teplota baterie**
 
 #### 6. Historie & Exporty
-* **Správa relací:** Vyhledávání, přejmenování, automatické souhrnné statistiky (min/prům/max RSRP, průměrný PDOP, podíl 5G/4G), otevření průběhů v **Grafech** a bodový inspektor se **skokem na Mapu** i mazáním jednotlivých vzorků.
+* **Správa relací:** Vyhledávání, přejmenování, Dual-SIM souhrnné statistiky (`S1` + `S2` RSRP rozsahy, podíl `5G/4G`, průměrný PDOP), otevření průběhů v **Grafech** a přehledný bodový inspektor číslovaný v každém záznamu od **`#1`** se **skokem na Mapu** i mazáním vzorků.
 * **Uložení & Sdílení:** Přímý zápis do složky `Download/GNSS_Net_Logger/` nebo systémové sdílení ve čtyřech streamovaných formátech:
   * **CSV** (kompletní sloupce pro SIM 1 + SIM 2, `UniqueSatsInView`, `UniqueSatsUsed`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA`, `Sim2CA`, `WaypointNote`, NMEA, Doppler, senzory)
   * **3D KML** (barevná trasa + špendlíky značek)

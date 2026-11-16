@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -250,7 +251,7 @@ fun SkyPlotView(
                             }
                         } else {
                             when {
-                                !sat.usedInFix -> Color.Gray
+                                sat.cn0DbHz <= 0f -> Color.Gray
                                 sat.cn0DbHz >= 35f -> EmeraldSignal
                                 sat.cn0DbHz >= 25f -> CyanTertiary
                                 else -> AmberWarning
@@ -260,46 +261,43 @@ fun SkyPlotView(
                         if (isSelected) {
                             drawCircle(
                                 color = Color.White,
-                                radius = 11.dp.toPx(),
+                                radius = 10.5.dp.toPx(),
                                 center = Offset(sx, sy),
-                                style = Stroke(width = 2.dp.toPx())
+                                style = Stroke(width = 1.8.dp.toPx())
                             )
                         }
 
                         if (sat.isDualFreq) {
-                            val glowRadius = if (sat.usedInFix) 9.6.dp.toPx() else 8.0.dp.toPx()
+                            val glowRadius = if (sat.usedInFix) 10.5.dp.toPx() else 9.5.dp.toPx()
                             drawCircle(
-                                color = EmeraldSignal.copy(alpha = 0.28f),
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        EmeraldSignal.copy(alpha = 0.65f),
+                                        EmeraldSignal.copy(alpha = 0.28f),
+                                        Color.Transparent
+                                    ),
+                                    center = Offset(sx, sy),
+                                    radius = glowRadius
+                                ),
                                 radius = glowRadius,
                                 center = Offset(sx, sy)
-                            )
-                            drawCircle(
-                                color = EmeraldSignal.copy(alpha = 0.85f),
-                                radius = if (sat.usedInFix) 8.2.dp.toPx() else 6.8.dp.toPx(),
-                                center = Offset(sx, sy),
-                                style = Stroke(width = 1.4.dp.toPx())
                             )
                         }
 
                         if (sat.usedInFix) {
-                            // In fix: solid saturated dot + crisp white ring (matches legend)
-                            drawCircle(
-                                color = Color.White,
-                                radius = 5.6.dp.toPx(),
-                                center = Offset(sx, sy)
-                            )
+                            // In fix: solid filled color dot
                             drawCircle(
                                 color = baseColor,
-                                radius = 4.3.dp.toPx(),
+                                radius = 4.8.dp.toPx(),
                                 center = Offset(sx, sy)
                             )
                         } else {
-                            // Out of fix: hollow outline circle without solid fill (matches legend)
+                            // Out of fix: colored hollow ring
                             drawCircle(
-                                color = baseColor.copy(alpha = 0.85f),
-                                radius = 4.0.dp.toPx(),
+                                color = baseColor,
+                                radius = 4.2.dp.toPx(),
                                 center = Offset(sx, sy),
-                                style = Stroke(width = 1.6.dp.toPx())
+                                style = Stroke(width = 1.8.dp.toPx())
                             )
                         }
                     }
@@ -382,25 +380,24 @@ fun SkyPlotView(
                     Box(
                         modifier = Modifier
                             .size(9.dp)
-                            .border(1.5.dp, Color.White, CircleShape)
                             .background(CyanTertiary, CircleShape)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Plný + bílý okraj = Ve fixu" else "Filled + white border = In fix",
+                        text = if (isCs) "Plná barva = Ve fixu" else "Solid fill = In fix",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Box(
                         modifier = Modifier
                             .size(9.dp)
-                            .border(1.6.dp, TextSecondaryDark, CircleShape)
+                            .border(1.8.dp, CyanTertiary, CircleShape)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Prázdný kroužek = Mimo fix" else "Hollow ring = Unused",
+                        text = if (isCs) "Barevný kroužek = Mimo fix" else "Colored ring = Unused",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
@@ -413,13 +410,21 @@ fun SkyPlotView(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
-                            .background(EmeraldSignal.copy(alpha = 0.25f), CircleShape)
-                            .border(1.3.dp, EmeraldSignal, CircleShape)
+                            .size(14.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        EmeraldSignal.copy(alpha = 0.85f),
+                                        EmeraldSignal.copy(alpha = 0.35f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                CircleShape
+                            )
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Zelená záře = Pásmo L5/E5a/B2a" else "Green glow = L5/E5a/B2a band",
+                        text = if (isCs) "Zelená záře okolo = Pásmo L5/E5a/B2a" else "Green glow = L5/E5a/B2a band",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = EmeraldSignal
                     )
@@ -447,25 +452,24 @@ fun SkyPlotView(
                     Box(
                         modifier = Modifier
                             .size(9.dp)
-                            .border(1.5.dp, Color.White, CircleShape)
                             .background(EmeraldSignal, CircleShape)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Plný + bílý okraj = Ve fixu" else "Filled + white border = In fix",
+                        text = if (isCs) "Plná barva = Ve fixu" else "Solid fill = In fix",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Box(
                         modifier = Modifier
                             .size(9.dp)
-                            .border(1.6.dp, Color.Gray, CircleShape)
+                            .border(1.8.dp, EmeraldSignal, CircleShape)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Šedý kroužek = Mimo fix" else "Gray ring = Unused",
+                        text = if (isCs) "Barevný kroužek = Mimo fix" else "Colored ring = Unused",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
@@ -478,13 +482,21 @@ fun SkyPlotView(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
-                            .background(EmeraldSignal.copy(alpha = 0.25f), CircleShape)
-                            .border(1.3.dp, EmeraldSignal, CircleShape)
+                            .size(14.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        EmeraldSignal.copy(alpha = 0.85f),
+                                        EmeraldSignal.copy(alpha = 0.35f),
+                                        Color.Transparent
+                                    )
+                                ),
+                                CircleShape
+                            )
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isCs) "Zelená záře = Pásmo L5/E5a/B2a" else "Green glow = L5/E5a/B2a band",
+                        text = if (isCs) "Zelená záře okolo = Pásmo L5/E5a/B2a" else "Green glow = L5/E5a/B2a band",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = EmeraldSignal
                     )

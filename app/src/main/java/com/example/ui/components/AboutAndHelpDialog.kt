@@ -176,16 +176,16 @@ fun AboutAndHelpDialog(
                             text = if (isCs) {
                                 "• Přesná detekce 5G NSA (EN-DC) vs. 5G SA + 5G NR sousedé: rozpoznává 5G NSA kotevní buňku i v RRC Idle (ikona 5G v liště) a aktivní 5G NR SCG větev (n1/n3/n28/n78) s odděleným filtrem 4G LTE / 5G NR\n" +
                                 "• Agregované kmitočty v Carrier Aggregation: zobrazení všech agregovaných nosných (PCC/SCC) včetně konkrétního pásma a frekvence v MHz (např. B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
-                                "• Shoda s GPS Test & SkyPlot: zobrazení fyzických unikátních družic i počtu L1+L5/E5a/B2a signálů, synchronizace legendy Skyplotu (plný + bílý okraj = ve fixu, prázdný kroužek = mimo fix, zelená záře = L5/E5a/B2a)\n" +
+                                "• Shoda s GPS Test & SkyPlot: zobrazení fyzických unikátních družic i počtu L1+L5/E5a/B2a signálů, synchronizace legendy Skyplotu (plná barva = ve fixu, barevný kroužek = mimo fix, zelená záře okolo = L5/E5a/B2a)\n" +
                                 "• Oddělené handovery SIM 1 / SIM 2 & Indoor Fix Guard: samostatné HO počítadlo pro každou SIM, viditelný banner při zapnutém Demo režimu a nulování zastaralého fixu/rychlosti při ztrátě signálu v budově\n" +
-                                "• Upravené prahy DOP & Satelitů + Logování: nová škála PDOP (< 1,0 výborný až ≥ 4,0 kritický) a satelitů (< 5, 5–20, 21–30, 31–50, > 50); databáze (Room v4), grafy i CSV/GPX/GeoJSON nyní logují jak použité, tak viditelné satelity\n" +
+                                "• Upravené prahy DOP & Satelitů + Logování: nová škála PDOP (< 0,7 nejlepší, 0,7–1,5, 1,5–2,5, 2,5–3,5, > 3,5 nejhorší) a satelitů (< 5, 5–20, 21–30, 31–50, > 50); databáze (Room v4), grafy i CSV/GPX/GeoJSON nyní logují jak použité, tak viditelné satelity\n" +
                                 "• Vylepšené profily měření: nezalamující se předvolby Pěší (5s/10m), Auto (10s/50m) a Statické (10s)"
                             } else {
                                 "• Accurate 5G NSA (EN-DC) vs. 5G SA & 5G NR Neighbors: distinguishes 5G NSA LTE anchor (even when RRC Idle matches the status-bar 5G badge) from active 5G NR SCG legs (n1/n3/n28/n78) with dedicated 4G LTE / 5G NR neighbor filtering\n" +
                                 "• Component Carrier Frequencies in CA: displays all aggregated PCC/SCC carriers with exact band labels and center frequencies in MHz (e.g., B3 1800 MHz + B1 2100 MHz + n78 3500 MHz)\n" +
-                                "• GPS Test Alignment & SkyPlot Legend: reports both unique physical satellites and total L1+L5/E5a/B2a signals; Skyplot legend matches canvas 1:1 (filled + white border = in fix, hollow ring = unused, green glow = L5/E5a/B2a)\n" +
+                                "• GPS Test Alignment & SkyPlot Legend: reports both unique physical satellites and total L1+L5/E5a/B2a signals; Skyplot legend matches canvas 1:1 (solid fill = in fix, colored ring = unused, green glow = L5/E5a/B2a)\n" +
                                 "• Per-SIM Handovers, Demo Banner & Indoor Fix Guard: independent HO counters per SIM, clear Demo Mode top banner across all tabs, and automatic fix/speed timeout reset when moving indoors\n" +
-                                "• Recalibrated DOP & Satellite Scales + Full Sat Logging: updated PDOP (< 1.0 optimal to ≥ 4.0 poor) and Satellite (< 5, 5–20, 21–30, 31–50, > 50) map/chart thresholds; Room v4, charts & CSV/GPX/GeoJSON now record both used and visible satellites\n" +
+                                "• Recalibrated DOP & Satellite Scales + Full Sat Logging: updated PDOP (< 0.7 best to > 3.5 worst) and Satellite (< 5, 5–20, 21–30, 31–50, > 50) map/chart thresholds; Room v4, charts & CSV/GPX/GeoJSON now record both used and visible satellites\n" +
                                 "• Clean Settings Presets: non-wrapping chips for Walking (5s/10m), Driving (10s/50m), and Static (10s)"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
@@ -235,18 +235,18 @@ fun AboutAndHelpDialog(
                 HelpSection(
                     title = if (isCs) "4. Mapa (OpenStreetMap & Živá barevná trasa)" else "4. Map (OpenStreetMap & Live Heatmap)",
                     body = if (isCs) {
-                        "OpenStreetMap bez API klíčů s tmavým/světlým režimem a auto-sledováním. Živá trasa se sbírá průběžně na pozadí i při prohlížení jiných karet a barevně se vykresluje podle RSRP (S1/S2), rychlosti, satelitů (< 5 až > 50) i PDOP (< 1,0 až ≥ 4,0) stejně jako záznamy z Historie."
+                        "OpenStreetMap bez API klíčů s tmavým/světlým režimem a auto-sledováním. Živá trasa se sbírá průběžně na pozadí od spuštění aplikace a barevně se vykresluje podle RSRP (S1/S2), rychlosti, satelitů (< 5 až > 50) i PDOP (< 0,7 až > 3,5) stejně jako záznamy z Historie."
                     } else {
-                        "OpenStreetMap view with dark night-mode filter and auto-follow. Records live trail continuously in background across tabs and renders color-coded tracks by RSRP (S1/S2), Speed, Satellites (< 5 to > 50), or PDOP (< 1.0 to ≥ 4.0) both live and in replay."
+                        "OpenStreetMap view with dark night-mode filter and auto-follow. Records live trail continuously from startup across tabs and renders color-coded tracks by RSRP (S1/S2), Speed, Satellites (< 5 to > 50), or PDOP (< 0.7 to > 3.5) both live and in replay."
                     }
                 )
 
                 HelpSection(
                     title = if (isCs) "5. Grafy (Živé i Historické křivky)" else "5. Charts (Live & Historical Waveforms)",
                     body = if (isCs) {
-                        "Interaktivní grafy s dotykovým odečtem hodnot a dynamickou osou Y: RSRP (SIM 1 vs SIM 2), SINR (SIM 1 vs SIM 2), rychlost, použité i viditelné satelity, PDOP (0–4), AGC rušení, Ping RTT, IMU senzory a teplota baterie. Lze otevřít i pro libovolnou uloženou relaci z Historie."
+                        "Interaktivní grafy s dotykovým odečtem hodnot a dynamickou osou Y: RSRP (SIM 1 vs SIM 2), SINR (SIM 1 vs SIM 2), rychlost, použité i viditelné satelity, PDOP (< 0,7 až > 3,5), AGC rušení, Ping RTT, IMU senzory a teplota baterie. Lze otevřít i pro libovolnou uloženou relaci z Historie."
                     } else {
-                        "Interactive touch-scrubbing charts with dynamic Y-axis scaling: dual-SIM RSRP & SINR, speed, used & visible satellites, PDOP (0–4), AGC interference, ping latency, IMU motion, and battery temperature. Available both live and for past sessions."
+                        "Interactive touch-scrubbing charts with dynamic Y-axis scaling: dual-SIM RSRP & SINR, speed, used & visible satellites, PDOP (< 0.7 to > 3.5), AGC interference, ping latency, IMU motion, and battery temperature. Available both live and for past sessions."
                     }
                 )
 

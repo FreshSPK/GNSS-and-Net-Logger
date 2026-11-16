@@ -228,7 +228,7 @@ fun ChartsTab(
 
         // 5. PDOP Geometry Chart
         RealtimeSparklineChart(
-            title = if (isCs) "3D geometrie PDOP v čase (< 1.0 nejlepší, ≥ 4.0 nejhorší)" else "PDOP 3D Constellation Geometry (< 1.0 best, ≥ 4.0 worst)",
+            title = if (isCs) "3D geometrie PDOP v čase (< 0.7 nejlepší, > 3.5 nejhorší)" else "PDOP 3D Constellation Geometry (< 0.7 best, > 3.5 worst)",
             currentValue = lastPdop,
             unit = "PDOP",
             values = pdopValues,

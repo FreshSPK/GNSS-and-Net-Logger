@@ -26,6 +26,7 @@ import com.example.telemetry.GnssTelemetryEngine
 import com.example.ui.components.AboutAndHelpDialog
 import com.example.ui.components.SkyPlotView
 import com.example.ui.tabs.OverviewTab
+import com.example.ui.tabs.SessionDetailInspector
 import com.example.ui.theme.SignalLoggerTheme
 import com.example.util.BandMapper
 import kotlinx.coroutines.CoroutineScope
@@ -438,9 +439,9 @@ class ExampleRobolectricTest {
                 SkyPlotView(satellites = sampleSats, lang = "CS")
             }
         }
-        composeTestRule.onNodeWithText("Plný + bílý okraj = Ve fixu").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Prázdný kroužek = Mimo fix").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Zelená záře = Pásmo L5/E5a/B2a").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Plná barva = Ve fixu").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Barevný kroužek = Mimo fix").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Zelená záře okolo = Pásmo L5/E5a/B2a").assertIsDisplayed()
     }
 
     @Test
@@ -485,5 +486,30 @@ class ExampleRobolectricTest {
         }
         composeTestRule.onNodeWithText("Bez GNSS Fixu (Vyhledávání...)").assertIsDisplayed()
         composeTestRule.onNodeWithText("44.0 km/h").assertDoesNotExist()
+    }
+
+    @Test
+    fun testHistoryInspectorNumbersFromOneAndHidesSatDetails() {
+        val records = listOf(sampleRecord(id = 15247L, satsUsed = 12, pdop = 0.65f))
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SessionDetailInspector(
+                    session = sampleSession(),
+                    records = records,
+                    lang = "CS",
+                    onBack = {},
+                    onExportCsv = {},
+                    onOpenCharts = {},
+                    onDeletePoint = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("#1 •", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("#15247", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Sats: 12/24 (12/18 sat.)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("S1: Vodafone CZ (4G LTE) -82 dBm", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("S2: T-Mobile CZ (5G NSA) -91 dBm", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Použité:", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Viditelné:", substring = true).assertDoesNotExist()
     }
 }

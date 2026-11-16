@@ -575,15 +575,24 @@ class TelemetryLoggingService : Service() {
                 val dao = app.database.telemetryDao()
                 val session = dao.getSessionById(sId)
                 if (session != null) {
-                    val sim1 = app.cellularEngine.cellularState.value.sim1
+                    val cellState = app.cellularEngine.cellularState.value
+                    val sim1 = cellState.sim1
+                    val sim2 = cellState.sim2
+                    val hasSim2 = sim2.operatorAlpha.isNotBlank() &&
+                        !sim2.operatorAlpha.equals("N/A", ignoreCase = true) &&
+                        !sim2.operatorAlpha.equals("No SIM", ignoreCase = true) &&
+                        !sim2.operatorAlpha.equals("Žádná SIM", ignoreCase = true)
+                    val opSummary = if (hasSim2) "S1: ${sim1.operatorAlpha} | S2: ${sim2.operatorAlpha}" else sim1.operatorAlpha
+                    val techSummary = if (hasSim2) "${sim1.networkGen} | ${sim2.networkGen}" else sim1.networkGen
+                    val bandSummary = if (hasSim2) "${sim1.band} | ${sim2.band}" else sim1.band
                     val updated = session.copy(
                         endTimeMs = System.currentTimeMillis(),
                         pointCount = loggedCount,
                         distanceMeters = totalDistanceM,
                         maxSpeedKmh = maxSpeedKmh,
-                        operatorSummary = sim1.operatorAlpha,
-                        primaryTech = sim1.networkGen,
-                        primaryBand = sim1.band
+                        operatorSummary = opSummary,
+                        primaryTech = techSummary,
+                        primaryBand = bandSummary
                     )
                     dao.updateSession(updated)
                 }

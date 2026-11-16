@@ -425,9 +425,10 @@ fun OverviewTab(
                 val dopColor: (Float) -> Color = { v ->
                     when {
                         !hasValidDop || v <= 0f -> TextSecondaryDark
-                        v < 1.0f -> EmeraldSignal
-                        v < 2.0f -> CyanTertiary
-                        v < 4.0f -> AmberWarning
+                        v < 0.7f -> EmeraldSignal
+                        v < 1.5f -> CyanTertiary
+                        v < 2.5f -> AmberWarning
+                        v <= 3.5f -> Color(0xFFF97316)
                         else -> RoseCritical
                     }
                 }

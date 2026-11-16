@@ -334,9 +334,10 @@ fun GnssTab(
                 val dopColor: (Float) -> Color = { v ->
                     when {
                         !hasValidDop || v <= 0f -> TextSecondaryDark
-                        v < 1.0f -> EmeraldSignal
-                        v < 2.0f -> CyanTertiary
-                        v < 4.0f -> AmberWarning
+                        v < 0.7f -> EmeraldSignal
+                        v < 1.5f -> CyanTertiary
+                        v < 2.5f -> AmberWarning
+                        v <= 3.5f -> Color(0xFFF97316)
                         else -> RoseCritical
                     }
                 }
@@ -580,10 +581,11 @@ fun GnssTab(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(text = if (isCs) "• < 1.0 (Nejlepší): Mimořádná přesnost, satelity rovnoměrně rozprostřeny (venku běžně 0.6–0.8)." else "• < 1.0 (Best): Highest accuracy, satellites evenly distributed (typically 0.6–0.8 outdoors).", style = MaterialTheme.typography.bodySmall)
-                    Text(text = if (isCs) "• 1.0 - 2.0 (Výborné): Velmi dobrá kvalita pro běžné měření." else "• 1.0 - 2.0 (Excellent): Very good quality for standard surveying.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = if (isCs) "• 2.0 - 4.0 (Zhoršené): Částečné stínění zástavbou nebo stromy." else "• 2.0 - 4.0 (Fair): Partial shielding by buildings or canopy.", style = MaterialTheme.typography.bodySmall)
-                    Text(text = if (isCs) "• ≥ 4.0 (Nejhorší): Silně zhoršená geometrie satelitů nebo hluboký kaňon." else "• ≥ 4.0 (Worst): Severely degraded satellite geometry or urban canyon.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• < 0.7 (Nejlepší): Mimořádná přesnost, satelity rovnoměrně rozprostřeny po celé obloze." else "• < 0.7 (Best): Ideal accuracy, satellites evenly distributed across the sky.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 0.7 – 1.5 (Velmi dobrý): Výborná geometrie pro přesné terénní měření." else "• 0.7 – 1.5 (Very good): Excellent geometry for accurate field surveying.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 1.5 – 2.5 (Střední): Dobrá až přijatelná kvalita (částečné stínění)." else "• 1.5 – 2.5 (Moderate): Acceptable quality with minor obstructions.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• 2.5 – 3.5 (Zhoršený): Znatelné stínění zástavbou nebo stromy." else "• 2.5 – 3.5 (Degraded): Noticeable shielding by buildings or canopy.", style = MaterialTheme.typography.bodySmall)
+                    Text(text = if (isCs) "• > 3.5 (Nejhorší): Silně zhoršená geometrie satelitů nebo hluboký kaňon." else "• > 3.5 (Worst): Severely degraded satellite geometry or urban canyon.", style = MaterialTheme.typography.bodySmall)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (isCs) "HDOP = horizontální poloha (zeměpisná šířka a délka)\nVDOP = vertikální poloha (nadmořská výška)\nPDOP = celkový 3D polohový rozptyl (sqrt(HDOP² + VDOP²))" else "HDOP = Horizontal position (Lat/Lon)\nVDOP = Vertical position (Altitude)\nPDOP = 3D Spatial position dispersion (sqrt(HDOP² + VDOP²))",

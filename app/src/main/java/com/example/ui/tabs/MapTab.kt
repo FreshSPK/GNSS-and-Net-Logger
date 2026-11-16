@@ -91,9 +91,10 @@ private fun computeSegmentColor(
         MapVisualizationMode.PDOP -> {
             when {
                 satellitesUsed < 4 || pdop <= 0f || pdop >= 9.0f -> AndroidColor.parseColor("#64748B")
-                pdop < 1.0f -> AndroidColor.parseColor("#10B981")
-                pdop < 2.0f -> AndroidColor.parseColor("#06B6D4")
-                pdop < 4.0f -> AndroidColor.parseColor("#F59E0B")
+                pdop < 0.7f -> AndroidColor.parseColor("#10B981")
+                pdop < 1.5f -> AndroidColor.parseColor("#06B6D4")
+                pdop < 2.5f -> AndroidColor.parseColor("#F59E0B")
+                pdop <= 3.5f -> AndroidColor.parseColor("#F97316")
                 else -> AndroidColor.parseColor("#F43F5E")
             }
         }
@@ -260,11 +261,12 @@ fun MapTab(
             validRecords.forEachIndexed { idx, r ->
                 val isWaypoint = !r.waypointNote.isNullOrBlank()
                 val isFocused = focusedReplayPoint != null && r.id == focusedReplayPoint.id
+                val sessionIdx = replayRecords.indexOfFirst { it.id == r.id }.let { if (it >= 0) it + 1 else idx + 1 }
                 if (isFocused || isWaypoint || idx == 0 || idx == validRecords.lastIndex) {
                     val m = Marker(mv).apply {
                         position = GeoPoint(r.latitude, r.longitude)
                         title = when {
-                            isFocused -> if (isCs) "Vybraný bod #${r.id}" else "Selected #${r.id}"
+                            isFocused -> if (isCs) "Vybraný bod #$sessionIdx" else "Selected #$sessionIdx"
                             isWaypoint -> "★ ${r.waypointNote}"
                             idx == 0 -> "Start"
                             else -> if (isCs) "Konec" else "End"
@@ -494,10 +496,11 @@ fun MapTab(
                     MapVisualizationMode.PDOP -> {
                         Text(text = if (isCs) "LEGENDA PDOP" else "PDOP LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
-                        LegendRow(color = EmeraldSignal, text = if (isCs) "< 1.0 (Nejlepší)" else "< 1.0 (Best)")
-                        LegendRow(color = CyanTertiary, text = if (isCs) "1.0 až 2.0 (Výborný)" else "1.0 to 2.0 (Good)")
-                        LegendRow(color = AmberWarning, text = if (isCs) "2.0 až 4.0 (Zhoršený)" else "2.0 to 4.0 (Fair)")
-                        LegendRow(color = RoseCritical, text = if (isCs) "≥ 4.0 (Nejhorší)" else "≥ 4.0 (Worst)")
+                        LegendRow(color = EmeraldSignal, text = if (isCs) "< 0.7 (Nejlepší)" else "< 0.7 (Best)")
+                        LegendRow(color = CyanTertiary, text = if (isCs) "0.7 až 1.5 (Velmi dobrý)" else "0.7 to 1.5 (Very good)")
+                        LegendRow(color = AmberWarning, text = if (isCs) "1.5 až 2.5 (Střední)" else "1.5 to 2.5 (Moderate)")
+                        LegendRow(color = Color(0xFFF97316), text = if (isCs) "2.5 až 3.5 (Zhoršený)" else "2.5 to 3.5 (Fair)")
+                        LegendRow(color = RoseCritical, text = if (isCs) "> 3.5 (Nejhorší)" else "> 3.5 (Worst)")
                     }
                 }
             }
@@ -544,7 +547,7 @@ fun MapTab(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isCs) "Živá trasa: ${liveTrail.size} b." else "Live trail: ${liveTrail.size} pts",
+                        text = if (isCs) "Živá trasa (od startu): ${liveTrail.size} b." else "Live trail (since start): ${liveTrail.size} pts",
                         color = CyanTertiary,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
@@ -579,8 +582,9 @@ fun MapTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val ptNumber = (replayRecords?.indexOfFirst { it.id == pt.id } ?: -1).let { if (it >= 0) it + 1 else pt.id }
                         Text(
-                            text = pt.waypointNote?.let { "★ $it (Bod #${pt.id})" } ?: "Bod #${pt.id} (${tf.format(Date(pt.timestampMs))})",
+                            text = pt.waypointNote?.let { "★ $it (Bod #$ptNumber)" } ?: "Bod #$ptNumber (${tf.format(Date(pt.timestampMs))})",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
