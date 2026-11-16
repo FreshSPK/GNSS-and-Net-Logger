@@ -52,9 +52,10 @@ class CellularTelemetryEngine(
         val isPrimary: Boolean = false
     )
 
-    private val callbacksBySubId = ConcurrentHashMap<Int, Any>()
+    private val callbacksBySubId = ConcurrentHashMap<Int, Pair<TelephonyManager, List<Any>>>()
     private val overrideNetworkTypeBySubId = ConcurrentHashMap<Int, Int>()
     private val activeCarrierChannelsBySubId = ConcurrentHashMap<Int, List<ActiveCarrierChannel>>()
+    private val lastMultiCarrierCacheBySubId = ConcurrentHashMap<Int, Pair<Long, List<ActiveCarrierChannel>>>()
 
     @Volatile
     private var btsEnricher: (suspend (SimCellInfo) -> SimCellInfo)? = null
@@ -160,29 +161,47 @@ class CellularTelemetryEngine(
     }
 
     private fun registerListenerForManager(subKey: Int, targetTm: TelephonyManager, hasPhoneState: Boolean) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val cb: TelephonyCallback = if (hasPhoneState) {
-                    object : TelephonyCallback(),
-                        TelephonyCallback.CellInfoListener,
-                        TelephonyCallback.SignalStrengthsListener,
-                        TelephonyCallback.DisplayInfoListener,
-                        TelephonyCallback.PhysicalChannelConfigListener {
-                        override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>) {
-                            scheduleRead(cellInfo, force = false)
-                        }
+        val registered = mutableListOf<Any>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // 1. Core cell & signal callback (must not fail if OEM restricts DisplayInfo/PhysicalChannelConfig)
+            try {
+                val baseCb = object : TelephonyCallback(),
+                    TelephonyCallback.CellInfoListener,
+                    TelephonyCallback.SignalStrengthsListener {
+                    override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>) {
+                        scheduleRead(cellInfo, force = false)
+                    }
 
-                        override fun onSignalStrengthsChanged(signalStrength: SignalStrength) {
-                            scheduleRead(null, force = false)
-                        }
+                    override fun onSignalStrengthsChanged(signalStrength: SignalStrength) {
+                        scheduleRead(null, force = false)
+                    }
+                }
+                targetTm.registerTelephonyCallback(context.mainExecutor, baseCb)
+                registered.add(baseCb)
+            } catch (_: Exception) {
+                // Safe catch
+            }
 
+            if (hasPhoneState) {
+                // 2. DisplayInfo listener (5G NSA / LTE CA override icon) isolated from HAL restrictions
+                try {
+                    val dispCb = object : TelephonyCallback(), TelephonyCallback.DisplayInfoListener {
                         override fun onDisplayInfoChanged(telephonyDisplayInfo: TelephonyDisplayInfo) {
                             overrideNetworkTypeBySubId[subKey] = telephonyDisplayInfo.overrideNetworkType
                             scheduleRead(null, force = false)
                         }
+                    }
+                    targetTm.registerTelephonyCallback(context.mainExecutor, dispCb)
+                    registered.add(dispCb)
+                } catch (_: Exception) {
+                    // OEM may require READ_BASIC_PHONE_STATE or carrier privilege
+                }
 
+                // 3. PhysicalChannelConfig listener isolated so SecurityException never drops other listeners
+                try {
+                    val physCb = object : TelephonyCallback(), TelephonyCallback.PhysicalChannelConfigListener {
                         override fun onPhysicalChannelConfigChanged(configs: MutableList<PhysicalChannelConfig>) {
-                            activeCarrierChannelsBySubId[subKey] = configs.mapNotNull { cfg ->
+                            val parsed = configs.mapNotNull { cfg ->
                                 val bw = cfg.cellBandwidthDownlinkKhz.let { if (it == Int.MAX_VALUE || it < 0) 0 else it }
                                 val dlFreq = try { cfg.downlinkFrequencyKhz } catch (_: Exception) { 0 }
                                 val dlCh = try { cfg.downlinkChannelNumber } catch (_: Exception) { 0 }
@@ -198,25 +217,21 @@ class CellularTelemetryEngine(
                                     )
                                 } else null
                             }
+                            activeCarrierChannelsBySubId[subKey] = parsed
+                            if (parsed.size > 1) {
+                                lastMultiCarrierCacheBySubId[subKey] = SystemClock.elapsedRealtime() to parsed
+                            }
                             scheduleRead(null, force = false)
                         }
                     }
-                } else {
-                    object : TelephonyCallback(),
-                        TelephonyCallback.CellInfoListener,
-                        TelephonyCallback.SignalStrengthsListener {
-                        override fun onCellInfoChanged(cellInfo: MutableList<CellInfo>) {
-                            scheduleRead(cellInfo, force = false)
-                        }
-
-                        override fun onSignalStrengthsChanged(signalStrength: SignalStrength) {
-                            scheduleRead(null, force = false)
-                        }
-                    }
+                    targetTm.registerTelephonyCallback(context.mainExecutor, physCb)
+                    registered.add(physCb)
+                } catch (_: Exception) {
+                    // Some OEM HAL builds gate PhysicalChannelConfig behind system/privileged permissions
                 }
-                targetTm.registerTelephonyCallback(context.mainExecutor, cb)
-                callbacksBySubId[subKey] = Pair(targetTm, cb)
-            } else {
+            }
+        } else {
+            try {
                 @Suppress("DEPRECATION")
                 val listener = object : PhoneStateListener() {
                     @Deprecated("Deprecated in Java")
@@ -247,33 +262,36 @@ class CellularTelemetryEngine(
                 }
                 @Suppress("DEPRECATION")
                 targetTm.listen(listener, events)
-                callbacksBySubId[subKey] = Pair(targetTm, listener)
+                registered.add(listener)
+            } catch (_: Exception) {
+                // Safe listener catch
             }
-        } catch (_: Exception) {
-            // Safe listener catch
+        }
+        if (registered.isNotEmpty()) {
+            callbacksBySubId[subKey] = targetTm to registered
         }
     }
 
     private fun unregisterTelephonyListeners() {
         for ((_, entry) in callbacksBySubId) {
-            try {
-                @Suppress("UNCHECKED_CAST")
-                val pair = entry as? Pair<TelephonyManager, Any> ?: continue
-                val targetTm = pair.first
-                val cb = pair.second
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    (cb as? TelephonyCallback)?.let { targetTm.unregisterTelephonyCallback(it) }
-                } else {
-                    @Suppress("DEPRECATION")
-                    (cb as? PhoneStateListener)?.let { targetTm.listen(it, PhoneStateListener.LISTEN_NONE) }
+            val targetTm = entry.first
+            for (cb in entry.second) {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && cb is TelephonyCallback) {
+                        targetTm.unregisterTelephonyCallback(cb)
+                    } else if (cb is PhoneStateListener) {
+                        @Suppress("DEPRECATION")
+                        targetTm.listen(cb, PhoneStateListener.LISTEN_NONE)
+                    }
+                } catch (_: Exception) {
+                    // Safe catch
                 }
-            } catch (_: Exception) {
-                // Safe catch
             }
         }
         callbacksBySubId.clear()
         overrideNetworkTypeBySubId.clear()
         activeCarrierChannelsBySubId.clear()
+        lastMultiCarrierCacheBySubId.clear()
     }
 
     private fun startCellScanning() {
@@ -1004,13 +1022,24 @@ class CellularTelemetryEngine(
             try { it.cellBandwidths.filter { bw -> bw > 0 } } catch (_: Exception) { emptyList() }
         } ?: emptyList()
 
-        val subChannels = if (subId != -1) activeCarrierChannelsBySubId[subId].orEmpty() else emptyList()
-        val defaultChannels = if (isDataActive || isSingleSim || subId == -1) activeCarrierChannelsBySubId[-1].orEmpty() else emptyList()
+        val serviceStateDump = serviceStateObj?.toString().orEmpty()
+        val isUsingCaBySs = serviceStateDump.contains("mIsUsingCarrierAggregation=true", ignoreCase = true) ||
+            serviceStateDump.contains("isUsingCarrierAggregation=true", ignoreCase = true)
+
+        val rawSubChannels = if (subId != -1) activeCarrierChannelsBySubId[subId].orEmpty() else emptyList()
+        val rawDefaultChannels = if (isDataActive || isSingleSim || subId == -1) activeCarrierChannelsBySubId[-1].orEmpty() else emptyList()
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val cachedMulti = listOfNotNull(
+            if (subId != -1) lastMultiCarrierCacheBySubId[subId] else null,
+            if (isDataActive || isSingleSim || subId == -1) lastMultiCarrierCacheBySubId[-1] else null
+        ).firstOrNull { nowElapsed - it.first <= 12_000L }?.second.orEmpty()
+
         val channelsSnapshot = when {
-            subChannels.size > 1 -> subChannels
-            defaultChannels.size > subChannels.size -> defaultChannels
-            subChannels.isNotEmpty() -> subChannels
-            else -> defaultChannels
+            rawSubChannels.size > 1 -> rawSubChannels
+            rawDefaultChannels.size > rawSubChannels.size -> rawDefaultChannels
+            cachedMulti.size > 1 && (rawSubChannels.size <= 1 && rawDefaultChannels.size <= 1) -> cachedMulti
+            rawSubChannels.isNotEmpty() -> rawSubChannels
+            else -> rawDefaultChannels
         }
 
         val nrPhysChannel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1220,12 +1249,17 @@ class CellularTelemetryEngine(
         val aggregatedCarriersList: List<String> = if (
             mergedCarriers.size > 1 ||
             effectiveTotalAggBwKhz != null ||
+            (tech == "5G NSA" && (hasNrSignalData || isNrConnectedBySs)) ||
             subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA ||
             subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
             subOverrideType == 4 ||
             subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED
         ) {
-            mergedCarriers.distinct()
+            if (tech == "5G NSA" && (hasNrSignalData || isNrConnectedBySs) && nrBand.isNullOrBlank() && mergedCarriers.none { it.contains("5G NR") }) {
+                (mergedCarriers + "SCG: 5G NR (EN-DC aktivní)").distinct()
+            } else {
+                mergedCarriers.distinct()
+            }
         } else {
             emptyList()
         }
@@ -1257,9 +1291,9 @@ class CellularTelemetryEngine(
             subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA
 
         val caSummary: String? = when {
-            tech == "5G NSA" && (isNsaOverride || registeredNrSecondaryCell != null || nrPhysChannel != null) -> {
+            tech == "5G NSA" && (isNsaOverride || registeredNrSecondaryCell != null || nrPhysChannel != null || hasNrSignalData || isNrConnectedBySs) -> {
                 val anchor = band.substringBefore(" ")
-                val nrTag = nrBand?.substringBefore(" ")
+                val nrTag = nrBand?.substringBefore(" ") ?: if (hasNrSignalData || isNrConnectedBySs) "NR" else null
                 val nsaBands = if (combinedCaBands.size > 1) combinedCaBands
                 else listOfNotNull(anchor.takeIf { it.isNotBlank() && it != "N/A" }, nrTag).distinct()
                 if (nsaBands.size > 1) "5G NSA EN-DC (${nsaBands.joinToString("+")}$totalBwSuffix)"
@@ -1273,7 +1307,7 @@ class CellularTelemetryEngine(
                 if (combinedCaBands.size > 1) "5G+ NR CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
                 else "5G+ NR Carrier Aggregation$totalBwSuffix"
             }
-            isLteCaOverride -> {
+            isLteCaOverride || isUsingCaBySs -> {
                 if (combinedCaBands.size > 1) "LTE-A ${combinedCaBands.size}CA (${combinedCaBands.joinToString("+")}$totalBwSuffix)"
                 else "LTE-A Carrier Aggregation$totalBwSuffix"
             }

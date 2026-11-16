@@ -3,6 +3,7 @@ package com.example
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.room.Room
@@ -32,8 +33,10 @@ import com.example.telemetry.DemoSimulationEngine
 import com.example.telemetry.GnssTelemetryEngine
 import com.example.ui.components.AboutAndHelpDialog
 import com.example.ui.components.SkyPlotView
+import com.example.ui.tabs.CellularRfTab
 import com.example.ui.tabs.OverviewTab
 import com.example.ui.tabs.SessionDetailInspector
+import com.example.ui.tabs.SettingsDialog
 import com.example.ui.theme.SignalLoggerTheme
 import com.example.util.BandMapper
 import kotlinx.coroutines.CoroutineScope
@@ -769,5 +772,70 @@ class ExampleRobolectricTest {
         } finally {
             db.close()
         }
+    }
+
+    @Test
+    fun testFindSiteCellsSettingsSlidersAndOperatorLabels() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.btsDao()
+            val csv = """
+                CellID;PhysCID;TAC;Band;GSMCID;Datum;Okr;Umisteni
+                155161857;287;24656;1800;3297;13.12.2018;BM;Brno - Purkyňova 2850/105
+                155161858;288;24656;800;3298;13.12.2018;BM;Brno - Purkyňova 2850/105
+                155161859;289;24656;2600;3299;13.12.2018;BM;Brno - Purkyňova 2850/105
+            """.trimIndent()
+            BtsCsvImporter.importStream(ByteArrayInputStream(csv.toByteArray()), dao, "23001", "tlte.csv")
+
+            val enb = 155161857L / 256L
+            val siteCells = dao.findSiteCells("23001", enb, 155161857L)
+            assertEquals(3, siteCells.size)
+            assertTrue(siteCells.any { it.band == "1800" })
+            assertTrue(siteCells.any { it.band == "800" })
+            assertTrue(siteCells.any { it.band == "2600" })
+        } finally {
+            db.close()
+        }
+
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                CellularRfTab(
+                    cellular = CellularState(
+                        sim1 = SimCellInfo(slotIndex = 0, displayName = "Vodafone CZ", plmn = "23003"),
+                        sim2 = SimCellInfo(slotIndex = 1, displayName = "T-Mobile CZ", plmn = "23001", isDataActive = true)
+                    ),
+                    lang = "CS"
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("S1: Vodafone").assertIsDisplayed()
+        composeTestRule.onNodeWithText("S2: T-Mobile").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Vodafone C", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("T-Mobile C", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun testSettingsDialogShowsTimeAndDistanceSlidersWithAutoPreset() {
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SettingsDialog(
+                    settings = com.example.model.LoggingSettings(
+                        triggerMode = com.example.model.LogTriggerMode.HYBRID,
+                        timeIntervalSeconds = 10,
+                        distanceThresholdMeters = 50f
+                    ),
+                    lang = "CS",
+                    onDismiss = {},
+                    onSaveSettings = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("time_interval_slider").assertExists()
+        composeTestRule.onNodeWithTag("distance_step_slider").assertExists()
+        assertTrue(composeTestRule.onAllNodesWithText("10s").fetchSemanticsNodes().isNotEmpty())
+        assertTrue(composeTestRule.onAllNodesWithText("50m").fetchSemanticsNodes().size >= 2)
     }
 }

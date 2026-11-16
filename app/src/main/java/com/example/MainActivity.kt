@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -158,6 +159,21 @@ class MainActivity : ComponentActivity() {
             }
 
             SignalLoggerTheme(darkTheme = true) {
+                BackHandler(
+                    enabled = !showSettingsDialog &&
+                        !showHelpDialog &&
+                        !showBtsDatabaseDialog &&
+                        !showExitConfirmDialog &&
+                        ((currentTab == AppTab.CHARTS && historicalChartRecords != null) || currentTab != AppTab.OVERVIEW)
+                ) {
+                    if (currentTab == AppTab.CHARTS && historicalChartRecords != null) {
+                        historicalChartTitle = null
+                        historicalChartRecords = null
+                    } else if (currentTab != AppTab.OVERVIEW) {
+                        currentTab = AppTab.OVERVIEW
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
@@ -466,6 +482,11 @@ class MainActivity : ComponentActivity() {
                                     onClearFocusedPoint = { focusedReplayPoint = null },
                                     onClearLiveTrail = { TelemetryLoggingService.clearLiveMapTrail() },
                                     loadNearbyBts = { lat, lon -> app.btsRepository.findNearbyTowers(lat, lon) },
+                                    loadSiteCells = { plmn, enb, ci -> app.btsRepository.getSiteCells(plmn, enb, ci) },
+                                    onInspectBtsInDb = { query ->
+                                        btsDialogInitialQuery = query
+                                        showBtsDatabaseDialog = true
+                                    },
                                     focusedBts = focusedBtsCoord,
                                     onClearFocusedBts = { focusedBtsCoord = null }
                                 )

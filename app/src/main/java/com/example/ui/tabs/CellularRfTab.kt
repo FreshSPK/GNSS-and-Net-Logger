@@ -41,6 +41,13 @@ import com.example.model.SimCellInfo
 import com.example.ui.theme.*
 import java.util.Locale
 
+private fun shortOperatorLabel(raw: String): String {
+    val cleaned = raw
+        .replace(Regex("""\s*[-–]?\s*CZ$""", RegexOption.IGNORE_CASE), "")
+        .trim()
+    return cleaned.ifEmpty { raw }
+}
+
 @Composable
 fun CellularRfTab(
     cellular: CellularState,
@@ -214,7 +221,7 @@ fun CellularRfTab(
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "SIM 1: ${cellular.sim1.displayName.take(10)}",
+                        text = "S1: ${shortOperatorLabel(cellular.sim1.displayName)}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -233,7 +240,7 @@ fun CellularRfTab(
                     contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "SIM 2: ${cellular.sim2.displayName.take(10)}",
+                        text = "S2: ${shortOperatorLabel(cellular.sim2.displayName)}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -288,10 +295,12 @@ fun CellularRfTab(
                         val r1 = cellular.sim1.rsrp
                         val r2 = cellular.sim2.rsrp
                         if (r1 != null && r2 != null) {
+                            val s1Name = shortOperatorLabel(cellular.sim1.displayName)
+                            val s2Name = shortOperatorLabel(cellular.sim2.displayName)
                             val diff = r1 - r2
                             val comparisonText = when {
-                                diff > 0 -> if (isCs) "${cellular.sim1.displayName} je o +${diff} dB silnější než ${cellular.sim2.displayName}" else "${cellular.sim1.displayName} is +${diff} dB stronger than ${cellular.sim2.displayName}"
-                                diff < 0 -> if (isCs) "${cellular.sim2.displayName} je o +${-diff} dB silnější než ${cellular.sim1.displayName}" else "${cellular.sim2.displayName} is +${-diff} dB stronger than ${cellular.sim1.displayName}"
+                                diff > 0 -> if (isCs) "$s1Name je o +${diff} dB silnější než $s2Name" else "$s1Name is +${diff} dB stronger than $s2Name"
+                                diff < 0 -> if (isCs) "$s2Name je o +${-diff} dB silnější než $s1Name" else "$s2Name is +${-diff} dB stronger than $s1Name"
                                 else -> if (isCs) "Oba operátoři mají identickou úroveň signálu ($r1 dBm)" else "Both operators have identical signal level ($r1 dBm)"
                             }
                             Text(
@@ -301,8 +310,9 @@ fun CellularRfTab(
                                 color = if (diff >= 0) CyanTertiary else AmberWarning
                             )
                         } else {
+                            val activeName = shortOperatorLabel(if (cellular.sim2.isDataActive) cellular.sim2.displayName else cellular.sim1.displayName)
                             Text(
-                                text = if (isCs) "Paralelní měření obou slotů současně. Data: ${if (cellular.sim2.isDataActive) cellular.sim2.displayName else cellular.sim1.displayName}" else "Parallel real-time measurements for both SIM slots.",
+                                text = if (isCs) "Paralelní měření obou slotů současně. Data: $activeName" else "Parallel real-time measurements for both SIM slots.",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = TextPrimaryDark
                             )
@@ -794,11 +804,12 @@ private fun SimModeBanner(sim: SimCellInfo, simLabel: String, accentColor: Color
                 fontWeight = FontWeight.Bold,
                 color = if (sim.isDataActive) EmeraldSignal else accentColor
             )
+            val simOpName = shortOperatorLabel(sim.displayName)
             Text(
                 text = if (sim.isDataActive) {
-                    if (isCs) "Tato SIM karta přenáší mobilní data na síti ${sim.displayName}. Modem udržuje aktivní spojení s vysílačem." else "This SIM carries active mobile data on ${sim.displayName}. Modem maintains RRC Connected state."
+                    if (isCs) "Tato SIM karta přenáší mobilní data na síti $simOpName. Modem udržuje aktivní spojení s vysílačem." else "This SIM carries active mobile data on $simOpName. Modem maintains RRC Connected state."
                 } else {
-                    if (isCs) "$simLabel je na příjmu pro hovory a SMS na síti ${sim.displayName}. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "$simLabel is idling on ${sim.displayName} for incoming calls/SMS. Radio measures real-time RSRP and SNR."
+                    if (isCs) "$simLabel je na příjmu pro hovory a SMS na síti $simOpName. Vlastní RF přijímač měří úroveň signálu RSRP a odstup šumu." else "$simLabel is idling on $simOpName for incoming calls/SMS. Radio measures real-time RSRP and SNR."
                 },
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                 color = TextPrimaryDark
@@ -847,7 +858,7 @@ fun DetailedSimCard(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = sim.displayName,
+                        text = shortOperatorLabel(sim.displayName),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -1190,6 +1201,18 @@ fun DetailedSimCard(
                             }
                         }
                     }
+                    if (sim.aggregatedCarriers.size <= 1) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isCs) {
+                                "Pozn.: Při nízkém provozu nebo omezení Android HAL systém hlásí jen hlavní nosnou (PCC); další SCC naskočí při stahování."
+                            } else {
+                                "Note: In low traffic or OEM HAL restriction, Android exposes only PCC; secondary SCC carriers appear under DL load."
+                            },
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = TextSecondaryDark
+                        )
+                    }
                 } else {
                     val fallbackFreq = sim.dlFreqMhz?.takeIf { it > 0.0 }?.let {
                         String.format(Locale.US, "%.1f MHz", it)
@@ -1228,7 +1251,7 @@ fun DetailedSimCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isCs) "ZNÁMÝ VYSÍLAČ BTS (${match.operatorName})" else "KNOWN BTS SITE (${match.operatorName})",
+                            text = if (isCs) "ZNÁMÝ VYSÍLAČ BTS (${shortOperatorLabel(match.operatorName)})" else "KNOWN BTS SITE (${shortOperatorLabel(match.operatorName)})",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                             fontWeight = FontWeight.Bold,
                             color = if (match.pciMismatch || match.tacMismatch) AmberWarning else EmeraldSignal
@@ -1308,9 +1331,12 @@ fun DetailedSimCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (match.latitude != null && match.longitude != null) {
-                    Row(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         MetricItem(
-                            label = if (isCs) "Skutečná vzdál. BTS" else "Real BTS Dist.",
+                            label = if (isCs) "Vzdálenost BTS" else "Real BTS Dist.",
                             value = match.distanceMeters?.let { BtsGeoUtils.formatDistance(it) } ?: "Bez GNSS",
                             modifier = Modifier.weight(1f),
                             color = EmeraldSignal

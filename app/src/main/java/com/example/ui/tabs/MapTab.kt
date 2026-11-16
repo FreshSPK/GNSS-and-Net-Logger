@@ -8,10 +8,16 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.Point
 import android.graphics.drawable.BitmapDrawable
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CellTower
@@ -23,6 +29,7 @@ import androidx.compose.material.icons.filled.GpsNotFixed
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -46,20 +54,54 @@ import com.example.model.CellularState
 import com.example.model.GnssState
 import com.example.model.MapTrailPoint
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
+import org.osmdroid.events.DelayedMapListener
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.hypot
 
 enum class MapVisualizationMode {
     RSRP_SIGNAL,
     SPEED,
     SATELLITES,
-    PDOP
+    PDOP,
+    BTS_ONLY
+}
+
+private data class SelectedBtsSite(
+    val plmn: String,
+    val operatorName: String,
+    val locationName: String,
+    val enodebId: Long,
+    val primaryCellId: Long,
+    val primaryBand: String,
+    val primaryPci: Int,
+    val primaryTac: Int,
+    val latitude: Double,
+    val longitude: Double,
+    val coordSource: String,
+    val districtCode: String,
+    val updatedDate: String,
+    val bandsSummary: List<String>,
+    val isServingSlot: Int? = null,
+    val siteCells: List<BtsTowerEntity> = emptyList(),
+    val isLoadingCells: Boolean = false
+)
+
+private fun shortMapOperatorName(raw: String): String {
+    val cleaned = raw.replace(Regex("""\s*[-–]?\s*CZ$""", RegexOption.IGNORE_CASE), "").trim()
+    return cleaned.ifEmpty { raw }
 }
 
 private fun computeSegmentColor(
@@ -109,6 +151,7 @@ private fun computeSegmentColor(
                 else -> AndroidColor.parseColor("#F43F5E")
             }
         }
+        MapVisualizationMode.BTS_ONLY -> AndroidColor.TRANSPARENT
     }
 }
 
@@ -117,6 +160,13 @@ private fun operatorMarkerArgb(plmn: String): Int = when (plmn) {
     "23002" -> O2Blue.toArgb()
     "23003" -> VodafoneRed.toArgb()
     else -> CyanTertiary.toArgb()
+}
+
+private fun operatorComposeColor(plmn: String): Color = when (plmn) {
+    "23001" -> TMobileMagenta
+    "23002" -> O2Blue
+    "23003" -> VodafoneRed
+    else -> CyanTertiary
 }
 
 private fun createBtsMarkerDrawable(
@@ -170,13 +220,17 @@ fun MapTab(
     onClearFocusedPoint: () -> Unit = {},
     onClearLiveTrail: () -> Unit = {},
     loadNearbyBts: suspend (lat: Double, lon: Double) -> List<BtsTowerEntity> = { _, _ -> emptyList() },
+    loadSiteCells: suspend (plmn: String, enodebId: Long, cellId: Long) -> List<BtsTowerEntity> = { _, _, _ -> emptyList() },
+    onInspectBtsInDb: (query: String) -> Unit = {},
     focusedBts: Triple<Double, Double, String>? = null,
     onClearFocusedBts: () -> Unit = {}
 ) {
     val isCs = lang != "EN"
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
     var locationMarker by remember { mutableStateOf<Marker?>(null) }
+    var selectedPointMarker by remember { mutableStateOf<Marker?>(null) }
     var activeMode by remember { mutableStateOf(MapVisualizationMode.RSRP_SIGNAL) }
     var mapRsrpSimSlot by remember {
         mutableStateOf(if (cellular.sim2.isDataActive && !cellular.sim1.isDataActive) 2 else 1)
@@ -184,10 +238,34 @@ fun MapTab(
     var autoFollow by remember { mutableStateOf(true) }
     var showBtsLayer by remember { mutableStateOf(true) }
     var selectedReplayPoint by remember { mutableStateOf<TelemetryRecord?>(null) }
+    var selectedBtsSite by remember { mutableStateOf<SelectedBtsSite?>(null) }
+    var mapViewportCenter by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+
+    val latestReplayRecords by rememberUpdatedState(replayRecords)
+    val latestActiveMode by rememberUpdatedState(activeMode)
+    val latestContext by rememberUpdatedState(context)
 
     val trackOverlays = remember { mutableListOf<org.osmdroid.views.overlay.Overlay>() }
     val btsOverlays = remember { mutableListOf<org.osmdroid.views.overlay.Overlay>() }
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Intercept system Back gesture inside MapTab before MainActivity handles tab switching
+    BackHandler(
+        enabled = selectedBtsSite != null || selectedReplayPoint != null || focusedBts != null || replayRecords != null
+    ) {
+        when {
+            selectedBtsSite != null -> selectedBtsSite = null
+            selectedReplayPoint != null -> {
+                selectedReplayPoint = null
+                onClearFocusedPoint()
+            }
+            focusedBts != null -> onClearFocusedBts()
+            replayRecords != null -> {
+                onClearFocusedPoint()
+                onClearReplay()
+            }
+        }
+    }
 
     // Lifecycle sync for OSMDroid MapView (actual detach happens in AndroidView.onRelease)
     DisposableEffect(lifecycleOwner) {
@@ -225,9 +303,9 @@ fun MapTab(
     }
 
     // Update live position marker & auto-follow smoothly in Live mode (no zoom reset)
-    LaunchedEffect(gnss.latitude, gnss.longitude, replayRecords, focusedReplayPoint, autoFollow, mapViewInstance) {
+    LaunchedEffect(gnss.latitude, gnss.longitude, replayRecords, focusedReplayPoint, autoFollow, activeMode, mapViewInstance) {
         val mv = mapViewInstance ?: return@LaunchedEffect
-        if (replayRecords == null && gnss.hasFix && (gnss.latitude != 0.0 || gnss.longitude != 0.0)) {
+        if (replayRecords == null && activeMode != MapVisualizationMode.BTS_ONLY && gnss.hasFix && (gnss.latitude != 0.0 || gnss.longitude != 0.0)) {
             val point = GeoPoint(gnss.latitude, gnss.longitude)
             locationMarker?.position = point
             if (autoFollow && focusedReplayPoint == null && focusedBts == null) {
@@ -242,6 +320,7 @@ fun MapTab(
         val mv = mapViewInstance ?: return@LaunchedEffect
         val target = focusedBts ?: return@LaunchedEffect
         autoFollow = false
+        showBtsLayer = true
         mv.controller.setZoom(16.5)
         mv.controller.setCenter(GeoPoint(target.first, target.second))
         mv.invalidate()
@@ -252,12 +331,19 @@ fun MapTab(
         val mv = mapViewInstance ?: return@LaunchedEffect
         if (focusedReplayPoint != null && (focusedReplayPoint.latitude != 0.0 || focusedReplayPoint.longitude != 0.0)) {
             autoFollow = false
+            selectedBtsSite = null
             selectedReplayPoint = focusedReplayPoint
+            if (activeMode == MapVisualizationMode.BTS_ONLY) {
+                activeMode = MapVisualizationMode.RSRP_SIGNAL
+            }
             mv.controller.setZoom(17.5)
             mv.controller.setCenter(GeoPoint(focusedReplayPoint.latitude, focusedReplayPoint.longitude))
             mv.invalidate()
         } else if (replayRecords != null && replayRecords.isNotEmpty()) {
             selectedReplayPoint = null
+            if (activeMode == MapVisualizationMode.BTS_ONLY) {
+                activeMode = MapVisualizationMode.RSRP_SIGNAL
+            }
             val firstValid = replayRecords.firstOrNull { it.latitude != 0.0 || it.longitude != 0.0 }
             if (firstValid != null) {
                 mv.controller.setZoom(15.5)
@@ -269,13 +355,46 @@ fun MapTab(
         }
     }
 
-    // Unified colored polyline renderer for BOTH Live trail AND Historical Replay
+    // Highlight marker for tapped replay route point
+    LaunchedEffect(selectedReplayPoint, activeMode, mapViewInstance) {
+        val mv = mapViewInstance ?: return@LaunchedEffect
+        selectedPointMarker?.let { mv.overlays.remove(it) }
+        selectedPointMarker = null
+
+        val pt = selectedReplayPoint
+        if (pt != null && activeMode != MapVisualizationMode.BTS_ONLY && (pt.latitude != 0.0 || pt.longitude != 0.0)) {
+            val idx = (replayRecords?.indexOfFirst { it.id == pt.id } ?: -1).let { if (it >= 0) "#${it + 1}" else "•" }
+            val highlight = Marker(mv).apply {
+                position = GeoPoint(pt.latitude, pt.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = createBtsMarkerDrawable(
+                    context = context,
+                    fillArgb = CyanTertiary.toArgb(),
+                    strokeArgb = AndroidColor.WHITE,
+                    label = idx,
+                    isServing = true
+                )
+                setOnMarkerClickListener { _, _ -> true }
+            }
+            mv.overlays.add(highlight)
+            selectedPointMarker = highlight
+        }
+        mv.invalidate()
+    }
+
+    // Unified colored polyline renderer for BOTH Live trail AND Historical Replay (suppressed in BTS_ONLY)
     LaunchedEffect(replayRecords, liveTrail, activeMode, mapRsrpSimSlot, focusedReplayPoint, mapViewInstance) {
         val mv = mapViewInstance ?: return@LaunchedEffect
 
         if (trackOverlays.isNotEmpty()) {
             mv.overlays.removeAll(trackOverlays.toSet())
             trackOverlays.clear()
+        }
+
+        if (activeMode == MapVisualizationMode.BTS_ONLY) {
+            locationMarker?.let { mv.overlays.remove(it) }
+            mv.invalidate()
+            return@LaunchedEffect
         }
 
         if (replayRecords != null && replayRecords.isNotEmpty()) {
@@ -344,6 +463,7 @@ fun MapTab(
                         }
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                         setOnMarkerClickListener { _, _ ->
+                            selectedBtsSite = null
                             selectedReplayPoint = r
                             true
                         }
@@ -417,6 +537,7 @@ fun MapTab(
     // Render BTS Layer: Serving BTS markers, RF link lines from UE to BTS, Focused BTS, and nearby towers
     LaunchedEffect(
         showBtsLayer,
+        activeMode,
         cellular.sim1.btsMatch,
         cellular.sim2.btsMatch,
         gnss.latitude,
@@ -424,6 +545,8 @@ fun MapTab(
         gnss.hasFix,
         focusedBts,
         replayRecords,
+        mapViewportCenter,
+        autoFollow,
         mapViewInstance
     ) {
         val mv = mapViewInstance ?: return@LaunchedEffect
@@ -442,7 +565,7 @@ fun MapTab(
 
         val servingCoords = mutableSetOf<String>()
 
-        // 1. Serving SIM 1 & SIM 2 BTS + RF Link Line
+        // 1. Serving SIM 1 & SIM 2 BTS + RF Link Line (skip dashed link line in BTS_ONLY pure map mode)
         val servingMatches = listOf(1 to cellular.sim1.btsMatch, 2 to cellular.sim2.btsMatch)
         for ((slot, match) in servingMatches) {
             if (match?.latitude != null && match.longitude != null) {
@@ -451,7 +574,7 @@ fun MapTab(
                 servingCoords.add(siteKey)
                 val opArgb = operatorMarkerArgb(match.operatorPlmn)
 
-                if (uePoint != null && replayRecords == null) {
+                if (uePoint != null && replayRecords == null && activeMode != MapVisualizationMode.BTS_ONLY) {
                     val linkLine = Polyline().apply {
                         outlinePaint.color = opArgb
                         outlinePaint.alpha = 210
@@ -463,10 +586,6 @@ fun MapTab(
                     btsOverlays.add(linkLine)
                 }
 
-                val distStr = match.distanceMeters?.let { BtsGeoUtils.formatDistance(it) } ?: "—"
-                val azStr = match.azimuthDeg?.let {
-                    String.format(Locale.US, "%.0f° (%s)", it, BtsGeoUtils.bearingToCardinal(it, isCs))
-                } ?: "—"
                 val marker = Marker(mv).apply {
                     position = btsPt
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -477,13 +596,36 @@ fun MapTab(
                         label = "S$slot",
                         isServing = true
                     )
-                    title = "SIM $slot • ${match.operatorName} (eNB ${match.enodebId})"
-                    snippet = buildString {
-                        append(match.locationName)
-                        append("\nGPS: $distStr • Az: $azStr")
-                        if (match.coLocatedBands.isNotEmpty()) {
-                            append("\nBands: ${match.coLocatedBands.joinToString("/")}")
+                    setOnMarkerClickListener { _, _ ->
+                        selectedReplayPoint = null
+                        val initial = SelectedBtsSite(
+                            plmn = match.operatorPlmn,
+                            operatorName = shortMapOperatorName(match.operatorName),
+                            locationName = match.locationName,
+                            enodebId = match.enodebId,
+                            primaryCellId = match.cellId,
+                            primaryBand = match.dbBand,
+                            primaryPci = 0,
+                            primaryTac = 0,
+                            latitude = match.latitude,
+                            longitude = match.longitude,
+                            coordSource = match.coordSource,
+                            districtCode = match.districtCode,
+                            updatedDate = match.updatedDate,
+                            bandsSummary = match.coLocatedBands,
+                            isServingSlot = slot,
+                            isLoadingCells = true
+                        )
+                        selectedBtsSite = initial
+                        coroutineScope.launch {
+                            val cells = runCatching {
+                                loadSiteCells(match.operatorPlmn, match.enodebId, match.cellId)
+                            }.getOrDefault(emptyList())
+                            if (selectedBtsSite?.enodebId == match.enodebId && selectedBtsSite?.primaryCellId == match.cellId) {
+                                selectedBtsSite = initial.copy(siteCells = cells, isLoadingCells = false)
+                            }
                         }
+                        true
                     }
                 }
                 mv.overlays.add(marker)
@@ -511,11 +653,13 @@ fun MapTab(
         }
 
         // 3. Nearby imported Czech BTS towers in database around active center
-        val queryLat = focusedBts?.first
+        val queryLat = (if (!autoFollow || activeMode == MapVisualizationMode.BTS_ONLY) mapViewportCenter?.first else null)
+            ?: focusedBts?.first
             ?: uePoint?.latitude
             ?: replayRecords?.firstOrNull { it.latitude != 0.0 || it.longitude != 0.0 }?.latitude
             ?: mv.mapCenter.latitude
-        val queryLon = focusedBts?.second
+        val queryLon = (if (!autoFollow || activeMode == MapVisualizationMode.BTS_ONLY) mapViewportCenter?.second else null)
+            ?: focusedBts?.second
             ?: uePoint?.longitude
             ?: replayRecords?.firstOrNull { it.latitude != 0.0 || it.longitude != 0.0 }?.longitude
             ?: mv.mapCenter.longitude
@@ -524,7 +668,7 @@ fun MapTab(
         val dedupedMasts = nearby
             .distinctBy { "${it.operatorPlmn}:${it.enodebId}:${it.locationName}" }
             .filter { "${it.operatorPlmn}:${it.enodebId}:${it.locationName}" !in servingCoords }
-            .take(120)
+            .take(220)
 
         for (tower in dedupedMasts) {
             val tLat = tower.latitude ?: continue
@@ -535,6 +679,7 @@ fun MapTab(
                 "23003" -> "VF"
                 else -> "CZ"
             }
+            val opLabel = shortMapOperatorName(BtsGeoUtils.operatorDisplayName(tower.operatorPlmn))
             val marker = Marker(mv).apply {
                 position = GeoPoint(tLat, tLon)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -545,19 +690,58 @@ fun MapTab(
                     label = shortOp,
                     isServing = false
                 )
-                title = "${BtsGeoUtils.operatorDisplayName(tower.operatorPlmn)} • ${tower.locationName}"
-                snippet = "eNB ${tower.enodebId} • CI ${tower.cellId} • PCI ${tower.pci} • ${tower.band} MHz"
+                setOnMarkerClickListener { _, _ ->
+                    selectedReplayPoint = null
+                    val initial = SelectedBtsSite(
+                        plmn = tower.operatorPlmn,
+                        operatorName = opLabel,
+                        locationName = tower.locationName,
+                        enodebId = tower.enodebId,
+                        primaryCellId = tower.cellId,
+                        primaryBand = tower.band,
+                        primaryPci = tower.pci,
+                        primaryTac = tower.tac,
+                        latitude = tLat,
+                        longitude = tLon,
+                        coordSource = tower.coordSource,
+                        districtCode = tower.districtCode,
+                        updatedDate = tower.updatedDate,
+                        bandsSummary = listOfNotNull(tower.band.takeIf { it.isNotBlank() }),
+                        isServingSlot = null,
+                        isLoadingCells = true
+                    )
+                    selectedBtsSite = initial
+                    coroutineScope.launch {
+                        val cells = runCatching {
+                            loadSiteCells(tower.operatorPlmn, tower.enodebId, tower.cellId)
+                        }.getOrDefault(emptyList())
+                        if (selectedBtsSite?.enodebId == tower.enodebId && selectedBtsSite?.primaryCellId == tower.cellId) {
+                            val collectedBands = cells.mapNotNull { it.band.takeIf { b -> b.isNotBlank() } }.distinct()
+                            selectedBtsSite = initial.copy(
+                                siteCells = cells,
+                                bandsSummary = collectedBands.ifEmpty { initial.bandsSummary },
+                                isLoadingCells = false
+                            )
+                        }
+                    }
+                    true
+                }
             }
             mv.overlays.add(marker)
             btsOverlays.add(marker)
         }
 
-        // Keep live cursor above BTS overlays
-        if (replayRecords == null) {
+        // Keep live cursor above BTS overlays when not in BTS_ONLY or replay
+        if (replayRecords == null && activeMode != MapVisualizationMode.BTS_ONLY) {
             locationMarker?.let { marker ->
                 mv.overlays.remove(marker)
                 mv.overlays.add(marker)
             }
+        }
+        // Keep highlighted replay point marker on top of everything
+        selectedPointMarker?.let { sel ->
+            mv.overlays.remove(sel)
+            mv.overlays.add(sel)
         }
         mv.invalidate()
     }
@@ -583,6 +767,48 @@ fun MapTab(
                     }
                     controller.setCenter(initPos)
 
+                    // Bottom overlay (index 0): detect taps on historical replay polyline points
+                    val tapEventsOverlay = MapEventsOverlay(object : MapEventsReceiver {
+                        override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                            if (p == null) return false
+                            val recs = latestReplayRecords
+                            if (recs != null && recs.isNotEmpty() && latestActiveMode != MapVisualizationMode.BTS_ONLY) {
+                                val proj = projection
+                                val tapPx = proj.toPixels(p, Point())
+                                val maxTapDistPx = 44f * latestContext.resources.displayMetrics.density
+                                val candPx = Point()
+                                var bestRecord: TelemetryRecord? = null
+                                var bestDistPx = Double.MAX_VALUE
+                                for (r in recs) {
+                                    if (r.latitude == 0.0 && r.longitude == 0.0) continue
+                                    proj.toPixels(GeoPoint(r.latitude, r.longitude), candPx)
+                                    val d = hypot(
+                                        (candPx.x - tapPx.x).toDouble(),
+                                        (candPx.y - tapPx.y).toDouble()
+                                    )
+                                    if (d < bestDistPx) {
+                                        bestDistPx = d
+                                        bestRecord = r
+                                    }
+                                }
+                                if (bestRecord != null && bestDistPx <= maxTapDistPx) {
+                                    selectedBtsSite = null
+                                    selectedReplayPoint = bestRecord
+                                    return true
+                                }
+                            }
+                            if (selectedBtsSite != null || selectedReplayPoint != null) {
+                                selectedBtsSite = null
+                                selectedReplayPoint = null
+                                return true
+                            }
+                            return false
+                        }
+
+                        override fun longPressHelper(p: GeoPoint?): Boolean = false
+                    })
+                    overlays.add(0, tapEventsOverlay)
+
                     val marker = Marker(this).apply {
                         position = initPos
                         title = if (isCs) "Aktuální pozice" else "Current position"
@@ -590,6 +816,18 @@ fun MapTab(
                     }
                     overlays.add(marker)
                     locationMarker = marker
+                    addMapListener(DelayedMapListener(object : MapListener {
+                        override fun onScroll(event: ScrollEvent?): Boolean {
+                            val c = mapCenter
+                            mapViewportCenter = c.latitude to c.longitude
+                            return false
+                        }
+                        override fun onZoom(event: ZoomEvent?): Boolean {
+                            val c = mapCenter
+                            mapViewportCenter = c.latitude to c.longitude
+                            return false
+                        }
+                    }, 350L))
                     onResume()
 
                     mapViewInstance = this
@@ -600,6 +838,7 @@ fun MapTab(
                     mapViewInstance = null
                 }
                 locationMarker = null
+                selectedPointMarker = null
                 trackOverlays.clear()
                 btsOverlays.clear()
                 mv.onPause()
@@ -618,10 +857,15 @@ fun MapTab(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Card(
+                modifier = Modifier.weight(1f, fill = false),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.95f))
             ) {
-                Row(modifier = Modifier.padding(4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(4.dp)
+                ) {
                     ModeButton(
                         label = "RSRP",
                         selected = activeMode == MapVisualizationMode.RSRP_SIGNAL,
@@ -642,8 +886,22 @@ fun MapTab(
                         selected = activeMode == MapVisualizationMode.PDOP,
                         onClick = { activeMode = MapVisualizationMode.PDOP }
                     )
+                    ModeButton(
+                        label = if (isCs) "Jen BTS" else "BTS Only",
+                        selected = activeMode == MapVisualizationMode.BTS_ONLY,
+                        onClick = {
+                            activeMode = MapVisualizationMode.BTS_ONLY
+                            showBtsLayer = true
+                            autoFollow = false
+                            mapViewInstance?.let { mv ->
+                                mapViewportCenter = mv.mapCenter.latitude to mv.mapCenter.longitude
+                            }
+                        }
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
 
             // Top-right quick toggles: BTS Layer + Dark/Light map
             Row(
@@ -657,7 +915,13 @@ fun MapTab(
                     )
                 ) {
                     IconButton(
-                        onClick = { showBtsLayer = !showBtsLayer },
+                        onClick = {
+                            val next = !showBtsLayer
+                            showBtsLayer = next
+                            if (!next && activeMode == MapVisualizationMode.BTS_ONLY) {
+                                activeMode = MapVisualizationMode.RSRP_SIGNAL
+                            }
+                        },
                         modifier = Modifier.size(48.dp).testTag("toggle_bts_layer_button")
                     ) {
                         Icon(
@@ -688,7 +952,7 @@ fun MapTab(
             }
         }
 
-        // Floating Legend Box in Top-Left (S1/S2 toggle available in both Live & Replay)
+        // Floating Legend Box in Top-Left
         Card(
             modifier = Modifier
                 .padding(start = 12.dp, top = 66.dp)
@@ -746,113 +1010,386 @@ fun MapTab(
                         LegendRow(color = Color(0xFFF97316), text = if (isCs) "2.5 až 3.5 (Zhoršený)" else "2.5 to 3.5 (Fair)")
                         LegendRow(color = RoseCritical, text = if (isCs) "> 3.5 (Nejhorší)" else "> 3.5 (Worst)")
                     }
-                }
-            }
-        }
-
-        // Bottom-left status banner: Replay mode OR Live trail point count + Clear button
-        if (replayRecords != null) {
-            Card(
-                modifier = Modifier
-                    .padding(start = 12.dp, bottom = 24.dp, end = 76.dp)
-                    .align(Alignment.BottomStart),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = CyanSecondary)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isCs) "Záznam relace (${replayRecords.size} bodů)" else "Replay track (${replayRecords.size} pts)",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    IconButton(onClick = {
-                        onClearFocusedPoint()
-                        onClearReplay()
-                    }, modifier = Modifier.size(28.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = if (isCs) "Zrušit" else "Close", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-        } else if (liveTrail.isNotEmpty()) {
-            Card(
-                modifier = Modifier
-                    .padding(start = 12.dp, bottom = 24.dp, end = 76.dp)
-                    .align(Alignment.BottomStart),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.92f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isCs) "Živá trasa (od startu): ${liveTrail.size} b." else "Live trail (since start): ${liveTrail.size} pts",
-                        color = CyanTertiary,
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(onClick = onClearLiveTrail, modifier = Modifier.size(22.dp).testTag("clear_live_trail_button")) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = if (isCs) "Vymazat živou stopu" else "Clear live trail",
-                            tint = TextSecondaryDark,
-                            modifier = Modifier.size(15.dp)
+                    MapVisualizationMode.BTS_ONLY -> {
+                        Text(text = if (isCs) "MAPA VYSÍLAČŮ BTS" else "BTS TOWER MAP", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = CyanTertiary)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LegendRow(color = TMobileMagenta, text = "TM • T-Mobile (23001)")
+                        LegendRow(color = O2Blue, text = "O2 • O2 / CETIN (23002)")
+                        LegendRow(color = VodafoneRed, text = "VF • Vodafone (23003)")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isCs) "Posuňte mapu • klepněte na BTS pro detail" else "Pan map • tap any BTS for detail",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = TextSecondaryDark
                         )
                     }
                 }
             }
         }
 
-        // Selected Marker Inspector Card (from clicking marker OR deep-linking from History point)
-        selectedReplayPoint?.let { pt ->
-            val tf = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+        val hasBottomBanner = activeMode != MapVisualizationMode.BTS_ONLY && (replayRecords != null || liveTrail.isNotEmpty())
+
+        // Bottom-left status banner: Replay mode OR Live trail point count + Clear button (hidden in BTS_ONLY)
+        if (activeMode != MapVisualizationMode.BTS_ONLY) {
+            if (replayRecords != null) {
+                Card(
+                    modifier = Modifier
+                        .padding(start = 12.dp, bottom = 24.dp, end = 76.dp)
+                        .align(Alignment.BottomStart),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = CyanSecondary)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
+                            Text(
+                                text = if (isCs) "Záznam relace (${replayRecords.size} bodů)" else "Replay track (${replayRecords.size} pts)",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = if (isCs) "Klepnutím na trasu zobrazíte bod" else "Tap anywhere on track for point info",
+                                color = Color.White.copy(alpha = 0.82f),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        IconButton(onClick = {
+                            selectedReplayPoint = null
+                            onClearFocusedPoint()
+                            onClearReplay()
+                        }, modifier = Modifier.size(28.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = if (isCs) "Zrušit" else "Close", tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            } else if (liveTrail.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .padding(start = 12.dp, bottom = 24.dp, end = 76.dp)
+                        .align(Alignment.BottomStart),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.92f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isCs) "Živá trasa (od startu): ${liveTrail.size} b." else "Live trail (since start): ${liveTrail.size} pts",
+                            color = CyanTertiary,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        IconButton(onClick = onClearLiveTrail, modifier = Modifier.size(22.dp).testTag("clear_live_trail_button")) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = if (isCs) "Vymazat živou stopu" else "Clear live trail",
+                                tint = TextSecondaryDark,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Rich Tapped BTS Site Detail Card (bottom sheet overlay)
+        selectedBtsSite?.let { site ->
+            val opColor = operatorComposeColor(site.plmn)
+            val distFromUe = if (gnss.hasFix && (gnss.latitude != 0.0 || gnss.longitude != 0.0)) {
+                BtsGeoUtils.haversineDistanceMeters(gnss.latitude, gnss.longitude, site.latitude, site.longitude)
+            } else null
+            val azFromUe = if (gnss.hasFix && (gnss.latitude != 0.0 || gnss.longitude != 0.0)) {
+                BtsGeoUtils.bearingDegrees(gnss.latitude, gnss.longitude, site.latitude, site.longitude)
+            } else null
+
             Card(
                 modifier = Modifier
-                    .padding(start = 12.dp, bottom = 74.dp, end = 76.dp)
-                    .align(Alignment.BottomStart),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.96f)),
-                border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(CyanTertiary))
+                    .padding(start = 12.dp, bottom = if (hasBottomBanner) 78.dp else 24.dp, end = 76.dp)
+                    .align(Alignment.BottomStart)
+                    .testTag("selected_bts_detail_card"),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.97f)),
+                border = BorderStroke(1.2.dp, opColor.copy(alpha = 0.8f))
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val ptNumber = (replayRecords?.indexOfFirst { it.id == pt.id } ?: -1).let { if (it >= 0) it + 1 else pt.id }
-                        Text(
-                            text = pt.waypointNote?.let { "★ $it (Bod #$ptNumber)" } ?: "Bod #$ptNumber (${tf.format(Date(pt.timestampMs))})",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = CyanTertiary
-                        )
-                        IconButton(onClick = {
-                            selectedReplayPoint = null
-                            onClearFocusedPoint()
-                        }, modifier = Modifier.size(20.dp)) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = null, tint = TextSecondaryDark, modifier = Modifier.size(14.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = opColor
+                            ) {
+                                Text(
+                                    text = "${site.operatorName} (${site.plmn})",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                            }
+                            site.isServingSlot?.let { slot ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = EmeraldSignal.copy(alpha = 0.22f)
+                                ) {
+                                    Text(
+                                        text = if (isCs) "SLOUŽÍCÍ S$slot" else "SERVING S$slot",
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = EmeraldSignal
+                                    )
+                                }
+                            }
+                        }
+                        IconButton(
+                            onClick = { selectedBtsSite = null },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = if (isCs) "Zavřít detail BTS" else "Close BTS detail",
+                                tint = TextSecondaryDark,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
-                        text = "S1: ${pt.sim1Rsrp ?: "N/A"} dBm (${pt.sim1Band}) • S2: ${pt.sim2Rsrp ?: "N/A"} dBm",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        fontFamily = FontFamily.Monospace,
-                        color = TextPrimaryDark
+                        text = site.locationName.ifBlank { "eNodeB ${site.enodebId} • CI ${site.primaryCellId}" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimaryDark,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    val hasValidPdop = pt.satellitesUsedInFix >= 4 && pt.pdop > 0f && pt.pdop < 9.0f
-                    val pdopText = if (hasValidPdop) String.format(Locale.US, "%.2f", pt.pdop) else "—"
+
+                    val metaLine = buildList {
+                        if (site.enodebId > 0) add("eNB ${site.enodebId}") else add("CI ${site.primaryCellId}")
+                        if (site.districtCode.isNotBlank()) add("${if (isCs) "Okres" else "Dist"} ${site.districtCode}")
+                        if (site.updatedDate.isNotBlank()) add(site.updatedDate)
+                        if (site.coordSource.isNotBlank()) add(site.coordSource)
+                    }.joinToString(" • ")
                     Text(
-                        text = "${String.format(Locale.US, "%.1f", pt.speedKmh)} km/h • Sat: ${pt.satellitesUsedInFix}/${pt.satellitesInView} • PDOP: $pdopText",
+                        text = metaLine,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = TextSecondaryDark
                     )
+
+                    Text(
+                        text = buildString {
+                            append(String.format(Locale.US, "GPS: %.5f, %.5f", site.latitude, site.longitude))
+                            if (distFromUe != null && azFromUe != null) {
+                                append(" • ${BtsGeoUtils.formatDistance(distFromUe)} (${azFromUe.toInt()}° ${BtsGeoUtils.bearingToCardinal(azFromUe, isCs)})")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        fontFamily = FontFamily.Monospace,
+                        color = CyanTertiary
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (site.isLoadingCells) {
+                        Text(
+                            text = if (isCs) "Načítám sektory a pásma stožáru..." else "Loading mast sectors & bands...",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = TextSecondaryDark
+                        )
+                    } else if (site.siteCells.isNotEmpty()) {
+                        Text(
+                            text = if (isCs) "Buňky na vysílači (${site.siteCells.size}):" else "Cells at mast (${site.siteCells.size}):",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = TextSecondaryDark
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 96.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            site.siteCells.take(12).forEach { cell ->
+                                val bandTxt = if (cell.band.isNotBlank()) {
+                                    if (cell.band.all { it.isDigit() }) "${cell.band} MHz" else cell.band
+                                } else "—"
+                                val pciTxt = if (cell.pci > 0) "PCI ${cell.pci}" else "PCI —"
+                                val tacTxt = if (cell.tac > 0) "TAC ${cell.tac}" else "TAC —"
+                                Text(
+                                    text = "CI ${cell.cellId} • $bandTxt • $pciTxt • $tacTxt",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TextPrimaryDark
+                                )
+                            }
+                        }
+                    } else {
+                        val bandLabel = if (site.primaryBand.isNotBlank()) "${site.primaryBand} MHz" else "—"
+                        val pciLabel = if (site.primaryPci > 0) "PCI ${site.primaryPci}" else "PCI —"
+                        val tacLabel = if (site.primaryTac > 0) "TAC ${site.primaryTac}" else "TAC —"
+                        Text(
+                            text = "CI ${site.primaryCellId} • $bandLabel • $pciLabel • $tacLabel",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimaryDark
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val query = if (site.enodebId > 0) site.enodebId.toString() else site.primaryCellId.toString()
+                                onInspectBtsInDb(query)
+                            },
+                            modifier = Modifier.weight(1f).heightIn(min = 38.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isCs) "Detail / Upravit v DB" else "View / Edit in DB",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = DarkSlate900
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                autoFollow = false
+                                mapViewInstance?.controller?.animateTo(GeoPoint(site.latitude, site.longitude))
+                            },
+                            modifier = Modifier.heightIn(min = 38.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.MyLocation, contentDescription = if (isCs) "Vycentrovat" else "Center", modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Selected Replay Point Inspector Card (from tapping any point on track, marker, or deep-linking from History)
+        if (selectedBtsSite == null) {
+            selectedReplayPoint?.let { pt ->
+                val tf = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+                Card(
+                    modifier = Modifier
+                        .padding(start = 12.dp, bottom = 78.dp, end = 76.dp)
+                        .align(Alignment.BottomStart)
+                        .testTag("selected_replay_point_card"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.97f)),
+                    border = BorderStroke(1.2.dp, CyanTertiary)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val ptNumber = (replayRecords?.indexOfFirst { it.id == pt.id } ?: -1).let { if (it >= 0) it + 1 else pt.id }
+                            Text(
+                                text = pt.waypointNote?.let { "★ $it (Bod #$ptNumber • ${tf.format(Date(pt.timestampMs))})" }
+                                    ?: (if (isCs) "Bod #$ptNumber (${tf.format(Date(pt.timestampMs))})" else "Point #$ptNumber (${tf.format(Date(pt.timestampMs))})"),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = CyanTertiary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = {
+                                selectedReplayPoint = null
+                                onClearFocusedPoint()
+                            }, modifier = Modifier.size(24.dp)) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = if (isCs) "Zavřít" else "Close", tint = TextSecondaryDark, modifier = Modifier.size(15.dp))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        val s1Op = shortMapOperatorName(pt.sim1Operator)
+                        val s1Sinr = pt.sim1Sinr?.let { String.format(Locale.US, " SINR %.0fdB", it) } ?: ""
+                        Text(
+                            text = "S1 $s1Op (${pt.sim1NetworkGen} ${pt.sim1Band}): ${pt.sim1Rsrp ?: "N/A"} dBm$s1Sinr • PCI ${if (pt.sim1Pci > 0) pt.sim1Pci else "—"}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimaryDark
+                        )
+                        if (pt.sim2Rsrp != null || pt.sim2Operator.isNotBlank()) {
+                            val s2Op = shortMapOperatorName(pt.sim2Operator.ifBlank { "SIM 2" })
+                            val s2Sinr = pt.sim2Sinr?.let { String.format(Locale.US, " SINR %.0fdB", it) } ?: ""
+                            Text(
+                                text = "S2 $s2Op (${pt.sim2NetworkGen} ${pt.sim2Band}): ${pt.sim2Rsrp ?: "N/A"} dBm$s2Sinr • PCI ${if (pt.sim2Pci > 0) pt.sim2Pci else "—"}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                fontFamily = FontFamily.Monospace,
+                                color = TextPrimaryDark
+                            )
+                        }
+
+                        val btsInfo = listOfNotNull(
+                            pt.sim1BtsLocation?.let { loc ->
+                                val d = pt.sim1BtsDistanceM?.let { " (${BtsGeoUtils.formatDistance(it)})" } ?: ""
+                                "S1 BTS: $loc$d"
+                            },
+                            pt.sim2BtsLocation?.let { loc ->
+                                val d = pt.sim2BtsDistanceM?.let { " (${BtsGeoUtils.formatDistance(it)})" } ?: ""
+                                "S2 BTS: $loc$d"
+                            }
+                        )
+                        if (btsInfo.isNotEmpty()) {
+                            Text(
+                                text = btsInfo.joinToString(" | "),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                color = EmeraldSignal,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(3.dp))
+                        val hasValidPdop = pt.satellitesUsedInFix >= 4 && pt.pdop > 0f && pt.pdop < 9.0f
+                        val pdopText = if (hasValidPdop) String.format(Locale.US, "%.2f", pt.pdop) else "—"
+                        Text(
+                            text = String.format(
+                                Locale.US,
+                                "%.5f, %.5f • %.1f km/h • Sat %d/%d • PDOP %s • %dm",
+                                pt.latitude,
+                                pt.longitude,
+                                pt.speedKmh,
+                                pt.satellitesUsedInFix,
+                                pt.satellitesInView,
+                                pdopText,
+                                pt.altitudeMsl.toInt()
+                            ),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = TextSecondaryDark
+                        )
+                    }
                 }
             }
         }
@@ -865,7 +1402,7 @@ fun MapTab(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (replayRecords == null) {
+            if (replayRecords == null && activeMode != MapVisualizationMode.BTS_ONLY) {
                 SmallFloatingActionButton(
                     onClick = { autoFollow = !autoFollow },
                     containerColor = if (autoFollow) EmeraldSignal else DarkSlate800,
@@ -928,10 +1465,10 @@ fun MapTab(
             }
         }
 
-        if (focusedBts != null) {
+        if (focusedBts != null && selectedBtsSite == null && selectedReplayPoint == null) {
             Card(
                 modifier = Modifier
-                    .padding(start = 12.dp, bottom = 74.dp, end = 76.dp)
+                    .padding(start = 12.dp, bottom = if (hasBottomBanner) 78.dp else 24.dp, end = 76.dp)
                     .align(Alignment.BottomStart),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkSlate800.copy(alpha = 0.96f))
@@ -970,7 +1507,13 @@ private fun ModeButton(label: String, selected: Boolean, onClick: () -> Unit) {
         shape = RoundedCornerShape(20.dp),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
     ) {
-        Text(text = label, fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 

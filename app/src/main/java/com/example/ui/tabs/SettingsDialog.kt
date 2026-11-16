@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -322,37 +323,107 @@ fun SettingsDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 if (triggerMode != LogTriggerMode.DISTANCE) {
-                    Text(
-                        text = if (effectiveIsCs) "Časový interval: ${interval}s" else "Time interval: ${interval}s",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf(1, 2, 5, 10, 30).forEach { sec ->
-                            FilterChip(
-                                selected = interval == sec,
-                                onClick = { interval = sec },
-                                label = { Text("${sec}s") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (effectiveIsCs) "Časový interval" else "Time interval",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = CyanSecondary.copy(alpha = 0.25f)
+                        ) {
+                            Text(
+                                text = "${interval}s",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = CyanTertiary
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Slider(
+                        value = interval.coerceIn(1, 60).toFloat(),
+                        onValueChange = { v ->
+                            interval = kotlin.math.round(v).toInt().coerceIn(1, 60)
+                        },
+                        valueRange = 1f..60f,
+                        steps = 58,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("time_interval_slider"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = CyanTertiary,
+                            activeTrackColor = CyanTertiary,
+                            inactiveTrackColor = DarkSlate700
+                        )
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("1s", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        Text("15s", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        Text("30s", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        Text("60s", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
 
                 if (triggerMode != LogTriggerMode.TIME) {
-                    Text(
-                        text = if (effectiveIsCs) "Vzdálenostní krok: ${distThreshold.toInt()}m" else "Distance step: ${distThreshold.toInt()}m",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf(5f, 10f, 15f, 25f, 50f).forEach { meters ->
-                            FilterChip(
-                                selected = distThreshold == meters,
-                                onClick = { distThreshold = meters },
-                                label = { Text("${meters.toInt()}m") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (effectiveIsCs) "Vzdálenostní krok" else "Distance step",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = CyanSecondary.copy(alpha = 0.25f)
+                        ) {
+                            Text(
+                                text = "${distThreshold.toInt()}m",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = CyanTertiary
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Slider(
+                        value = distThreshold.coerceIn(5f, 200f),
+                        onValueChange = { v ->
+                            distThreshold = (kotlin.math.round(v / 5f) * 5f).coerceIn(5f, 200f)
+                        },
+                        valueRange = 5f..200f,
+                        steps = 38,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("distance_step_slider"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = CyanTertiary,
+                            activeTrackColor = CyanTertiary,
+                            inactiveTrackColor = DarkSlate700
+                        )
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("5m", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        Text("50m", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        Text("100m", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        Text("200m", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))

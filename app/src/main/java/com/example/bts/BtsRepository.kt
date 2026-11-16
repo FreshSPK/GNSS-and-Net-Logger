@@ -362,14 +362,16 @@ class BtsRepository(
     suspend fun findNearbyTowers(
         lat: Double,
         lon: Double,
-        radiusKm: Double = 4.0,
-        limit: Int = 250
+        radiusKm: Double = 6.0,
+        limit: Int = 220
     ): List<BtsTowerEntity> = withContext(Dispatchers.IO) {
         if (!BtsGeoUtils.isValidCzechCoord(lat, lon)) return@withContext emptyList()
         val latDelta = radiusKm / 111.32
         val cosLat = cos(Math.toRadians(lat)).coerceAtLeast(0.2)
         val lonDelta = radiusKm / (111.32 * cosLat)
         btsDao.findNearbyWithCoords(
+            centerLat = lat,
+            centerLon = lon,
             minLat = lat - latDelta,
             maxLat = lat + latDelta,
             minLon = lon - lonDelta,
@@ -381,6 +383,11 @@ class BtsRepository(
     suspend fun searchTowers(query: String, plmnFilter: String? = null, limit: Int = 120): List<BtsTowerEntity> =
         withContext(Dispatchers.IO) {
             btsDao.searchTowers(query.trim(), plmnFilter, limit)
+        }
+
+    suspend fun getSiteCells(plmn: String, enodebId: Long, cellId: Long): List<BtsTowerEntity> =
+        withContext(Dispatchers.IO) {
+            btsDao.findSiteCells(plmn, enodebId, cellId)
         }
 
     suspend fun deleteOperator(plmn: String) = withContext(Dispatchers.IO) {

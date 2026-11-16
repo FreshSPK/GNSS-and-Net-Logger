@@ -53,14 +53,14 @@ Standalone native Android application for field RF drive-testing, multi-constell
 * **C/N₀ Bars, Table, AGC & Raw Data:** Signal strength bar chart, full satellite table, `GnssMeasurementsEvent` AGC jamming monitor, Doppler shift, and live `$GNGGA` / `$GNRMC` NMEA view.
 
 #### 4. Map (OpenStreetMap, BTS Layer & Live/Replay Tracks)
-* **BTS Towers & Serving RF Link Layer:** Toggleable OpenStreetMap overlay displaying operator-colored BTS markers (T-Mobile, O2, Vodafone), serving SIM 1 / SIM 2 towers, and dashed RF link lines from UE GPS to the serving BTS.
+* **BTS Towers, BTS-Only Mode & Serving RF Link Layer:** Toggleable OpenStreetMap overlay plus a dedicated **BTS Only** browsing mode displaying operator-colored BTS markers (T-Mobile, O2, Vodafone), serving SIM 1 / SIM 2 towers, clickable mast details (all co-located cells/bands/PCIs/TACs + DB shortcut), and dashed RF link lines from UE GPS to the serving BTS.
 * **Live & Replay Tracks:** Continuously collects background live breadcrumbs from startup (`since start` counter) across tabs and renders color-coded tracks identically in Live and History Replay modes.
 * **Color Layers (`S1` / `S2` toggle):**
   * **RSRP:** Green ($> -80\text{ dBm}$) to Red ($< -105\text{ dBm}$)
   * **Speed:** Blue ($< 10\text{ km/h}$) to Red ($> 90\text{ km/h}$)
   * **Satellites:** Red ($< 5$), Orange ($5–20$), Cyan ($21–30$), Emerald ($31–50$), Blue ($> 50$)
   * **PDOP:** Emerald ($< 0.7$), Cyan ($0.7–1.5$), Amber ($1.5–2.5$), Orange ($2.5–3.5$), Red ($> 3.5$)
-* **Controls:** BTS overlay toggle, dark/light map filter, auto-follow lock, clickable point/waypoint/tower details, zoom controls, and trail reset.
+* **Controls:** BTS-only mode, BTS overlay toggle, dark/light map filter, auto-follow lock, clickable replay route points, clickable BTS mast details, zoom controls, and trail reset.
 
 #### 5. Charts
 Interactive touch-scrubbing Canvas waveforms (available live and for historical sessions):
@@ -81,7 +81,7 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
 ### Settings & Demo Mode
 * **Language:** Czech, English, or System default.
 * **Simulation / Demo Mode:** Generates synthetic drive-test telemetry around Brno FEKT VUT with a visible `DEMO` top-bar badge and persistent banner across all tabs; disabling it cleanly resets synthetic state.
-* **Sampling & Calibration:** Presets for **Walking (`5s / 10m`)**, **Driving (`10s / 50m`)**, and **Static (`10s`)**; TA multiplier (`1× 78.12 m` / `2× 156.24 m`); and QNH reference pressure (`1013.25 hPa` default).
+* **Sampling & Calibration:** Presets for **Walking (`5s / 10m`)**, **Driving (`10s / 50m`)**, and **Static (`10s`)** alongside continuous sliders for time (`1–60s`) and distance (`5–200m`); TA multiplier (`1× 78.12 m` / `2× 156.24 m`); and QNH reference pressure (`1013.25 hPa` default).
 
 ### Permissions & Privacy
 | Permission | Purpose |
@@ -137,14 +137,14 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
 * **C/N₀ grafy, Tabulka, AGC & NMEA:** Sloupcové grafy síly signálu, kompletní tabulka, AGC monitor rušení z `GnssMeasurementsEvent`, Dopplerův posuv a živý tok `$GNGGA` / `$GNRMC`.
 
 #### 4. Mapa (OpenStreetMap, Vrstva BTS & Živá trasa)
-* **Vrstva BTS & RF spojnice:** Přepínatelná vrstva na OpenStreetMap zobrazující barevně rozlišené vysílače T-Mobile, O2 a Vodafone, obslužné vysílače SIM 1 / SIM 2 a čárkovanou přímou RF linku od vaší polohy k obslužné BTS.
-* **Živá trasa i přehrávání historie:** Průběžně sbírá trasu na pozadí od spuštění aplikace napříč kartami (`od startu`) a vykresluje ji stejným enginem živě i při zpětném přehrávání.
+* **Vrstva BTS, režim „Jen BTS“ & RF spojnice:** Přepínatelná vrstva na OpenStreetMap i samostatný režim **Jen BTS** zobrazující barevně rozlišené vysílače T-Mobile, O2 a Vodafone, obslužné vysílače SIM 1 / SIM 2, klikatelný detail stožáru (všechny buňky, pásma, PCI, TAC + odkaz do DB) a čárkovanou přímou RF linku od vaší polohy k obslužné BTS.
+* **Živá trasa i přehrávání historie:** Průběžně sbírá trasu na pozadí od spuštění aplikace napříč kartami (`od startu`) a vykresluje ji stejným enginem živě i při zpětném přehrávání, s možností kliknout na libovolný bod trasy pro zobrazení jeho detailů.
 * **Barevné vrstvy (přepínač `S1` / `S2`):**
   * **RSRP:** Zelená ($> -80\text{ dBm}$) až Červená ($< -105\text{ dBm}$)
   * **Rychlost:** Modrá ($< 10\text{ km/h}$) až Červená ($> 90\text{ km/h}$)
   * **Satelity:** Červená ($< 5$), Oranžová ($5–20$), Azurová ($21–30$), Smaragdová ($31–50$), Modrá ($> 50$)
   * **PDOP:** Smaragdová ($< 0,7$), Azurová ($0,7–1,5$), Oranžová ($1,5–2,5$), Oranžovočervená ($2,5–3,5$), Červená ($> 3,5$)
-* **Ovládání:** Přepínač vrstvy BTS, tmavý/světlý režim mapy, auto-follow sledování polohy, klikatelné body s detailem, přiblížení a smazání živé stopy.
+* **Ovládání:** Režim Jen BTS, přepínač vrstvy BTS, tmavý/světlý režim mapy, auto-follow sledování polohy, klikatelné body na trase i vysílače s detailem, přiblížení a smazání živé stopy.
 
 #### 5. Grafy
 Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro historické relace):
@@ -165,7 +165,7 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 ### Nastavení a Demo režim
 * **Jazyk:** Čeština, Angličtina nebo dle systému.
 * **Simulační / Demo režim:** Generuje testovací jízdu kolem kampusu FEKT VUT v Brně se štítkem `DEMO` v horní liště a trvalým bannerem; při vypnutí automaticky vymaže syntetický stav.
-* **Vzorkování & Kalibrace:** Profily **Pěší (`5s / 10m`)**, **Auto (`10s / 50m`)** a **Statické (`10s`)**, násobič TA (`1× 78,12 m` / `2× 156,24 m`), referenční tlak QNH (`1013,25 hPa`) a přepínač automatického geokódování BTS.
+* **Vzorkování & Kalibrace:** Profily **Pěší (`5s / 10m`)**, **Auto (`10s / 50m`)** a **Statické (`10s`)** plus plynulé posuvníky pro vlastní časový (`1–60s`) a vzdálenostní krok (`5–200m`), násobič TA (`1× 78,12 m` / `2× 156,24 m`), referenční tlak QNH (`1013,25 hPa`) a přepínač automatického geokódování BTS.
 
 ### Oprávnění a soukromí
 | Oprávnění | Účel |

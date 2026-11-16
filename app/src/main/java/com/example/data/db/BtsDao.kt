@@ -107,18 +107,29 @@ interface BtsDao {
     suspend fun findCoLocatedByLocation(plmn: String, locationName: String): List<BtsTowerEntity>
 
     @Query(
+        "SELECT * FROM bts_towers WHERE operatorPlmn = :plmn " +
+            "AND ((:enodebId > 0 AND enodebId = :enodebId) OR cellId = :cellId) " +
+            "ORDER BY band, sectorId"
+    )
+    suspend fun findSiteCells(plmn: String, enodebId: Long, cellId: Long): List<BtsTowerEntity>
+
+    @Query(
         "SELECT * FROM bts_towers " +
             "WHERE latitude IS NOT NULL AND longitude IS NOT NULL " +
             "AND latitude BETWEEN :minLat AND :maxLat " +
             "AND longitude BETWEEN :minLon AND :maxLon " +
+            "GROUP BY operatorPlmn, CASE WHEN enodebId > 0 THEN enodebId ELSE cellId END " +
+            "ORDER BY ((latitude - :centerLat) * (latitude - :centerLat) + 0.42 * (longitude - :centerLon) * (longitude - :centerLon)) ASC " +
             "LIMIT :limit"
     )
     suspend fun findNearbyWithCoords(
+        centerLat: Double,
+        centerLon: Double,
         minLat: Double,
         maxLat: Double,
         minLon: Double,
         maxLon: Double,
-        limit: Int = 350
+        limit: Int = 220
     ): List<BtsTowerEntity>
 
     @Query(
