@@ -7,7 +7,7 @@
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4.svg?style=flat&logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Room](https://img.shields.io/badge/Database-Room%20SQLite-FFA000.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OSMDroid-7EBC6F.svg?style=flat&logo=openstreetmap)](https://github.com/osmdroid/osmdroid)
-[![Release](https://img.shields.io/badge/Release-v1.5-10B981.svg?style=flat)](RELEASE_v1.5.md)
+[![Release](https://img.shields.io/badge/Release-v1.6-10B981.svg?style=flat)](RELEASE_v1.6.md)
 [![VUT FEKT](https://img.shields.io/badge/VUT-FEKT%20Brno-E4002B.svg?style=flat)](https://www.fekt.vut.cz/)
 
 Standalone native Android application for field RF drive-testing, multi-constellation GNSS satellite diagnostics, Dual-SIM (4G LTE / 5G NSA / 5G SA) network telemetry logging, and offline Czech 3-operator BTS registry matching. Runs 100% locally with zero external API keys, cloud accounts, or tracking SDKs.
@@ -42,7 +42,7 @@ Standalone native Android application for field RF drive-testing, multi-constell
   * **Coordinate Editor & Optional Geocoding:** Lets you set exact tower coordinates manually or optionally geocode GPS-less GSMweb addresses.
 * **5G NSA (EN-DC) vs. 5G SA Detection:** Per-SIM `TelephonyCallback` distinguishes `4G LTE`, `5G NSA` (`EN-DC LTE Anchor (Idle)` matching the status bar 5G icon vs. `EN-DC NR Active`), and `5G SA`, including `SS-RSRP/RSRQ/SINR` and `CSI-RSRP/RSRQ/SINR`.
 * **Carrier Aggregation & Cell Decoding:** Exact DL/UL MHz frequencies, `Total CA` bandwidth, and **per-carrier PCC/SCC/SCG component badges with bands & MHz frequencies** (e.g., `PCC B3 1800 MHz + SCC B1 2100 MHz + SCG n78 3500 MHz`), plus PLMN, TAC, PCI, `eNodeB/gNodeB + Sector ID`, real modem CQI, and Timing Advance BTS distance (`1×` / `2×`).
-* **Neighbors & Anomaly Detector:** Per-SIM neighbor tables with **`All` | `4G LTE` | `5G NR`** filter chips, handover candidate highlighting ($\Delta \le 3\text{ dB}$), and alerts for **2G Downgrade Attacks**, **Isolated BTS**, **Co-Channel Interference**, and **BTS DB PCI/TAC Mismatch**.
+* **Neighbors & DB Mismatch:** Per-SIM neighbor tables with **`All` | `4G LTE` | `5G NR`** filter chips, handover candidate highlighting ($\Delta \le 3\text{ dB}$), and BTS DB PCI/TAC mismatch indicators (full RF/GNSS anti-spoofing & jamming diagnostics moved to the dedicated **Spoofing** tab).
 
 #### 3. Satellites (GNSS & SkyPlot)
 * **Constellations & Dual-Band:** Tracks GPS, Galileo, GLONASS, BeiDou, QZSS, SBAS, and NavIC across L1/E1/B1/G1 and L5/E5a/B2a, reporting both unique physical satellites and total signals (aligned with *GPS Test*), with live filter chips.
@@ -70,10 +70,17 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
 * **PDOP** ($< 0.7$ best, $> 3.5$ worst) & **AGC Interference**
 * **Ping RTT** (`8.8.8.8:53`), **Accelerometer**, **Gyroscope**, **Compass**, and **Battery Temperature**
 
-#### 6. History & Exports
+#### 6. Spoofing & Jamming Shield *(New in v1.6)*
+* **Threat Risk Index (`0–100%`) & Sub-Scores:** Real-time fused risk gauge across **GNSS**, **Cell RF**, and **Clock**, with bottom-bar warning badge, **Deep Scan**, and a timestamped **Incident Log**.
+* **Multi-Source UTC Time Audit (`GNSS · NITZ · NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `time.cloudflare.com`) with RTT compensation compared against hardware `GnssClock` UTC (`timeNanos − fullBiasNanos`) and cellular NITZ wall-clock time, plus hardware clock discontinuity & drift tracking.
+* **RF Propagation Physics (`TA vs. RSRP` & `BTS Distance`):** Validates Timing Advance against known BTS Haversine distance ($\Delta\text{TA}$), checks measured RSRP against empirical path-loss for TA distance, flags wideband LTE jamming via `RSSI − RSRP > 38 dB` + SINR, 2G GSM downgrades, isolated SIB cells, TAC oscillations, and strong-RF ping blackholes.
+* **Deep GNSS Anti-Spoofing & Sensor Fusion:** Checks `Location.isMock`, hardware AGC vs. C/N₀ discrimination, uniform C/N₀ & zenith-vs-horizon elevation inversion, orbital Doppler spread collapse ($\sigma_v < 45\text{ m/s}$), L1-only spoofing (vanishing L5/E5a), IMU stationary kinematics, barometer $\Delta h$, teleport jumps, and GNSS-vs-BTS distance (`> 45 km`).
+* **Demo Attack Simulator:** Interactive classroom/lab verification scenarios in Demo Mode (*GNSS Spoof*, *GNSS Jamming*, *2G IMSI Catcher*, *TA + Power*, *Time Drift*).
+
+#### 7. History & Exports
 * **Session Management:** Search, rename, view Dual-SIM session analytics (`S1` + `S2` RSRP ranges, `5G/4G` share, avg PDOP), open waveforms in **Charts**, or inspect 1-based numbered samples (`#1`, `#2`, …) with clear per-SIM labels, **jump-to-Map**, and single-point deletion.
 * **Export & Storage:** Save directly to `Download/GNSS_Net_Logger/` or share via Android system share sheet in four streaming formats:
-  * **CSV** (v1.5 schema including full SIM 1 + SIM 2 RF parameters, `Sim1BtsLocation`, `Sim1BtsDistance_m`, `Sim1BtsAzimuth_deg`, `Sim2BtsLocation`, `Sim2BtsDistance_m`, `Sim2BtsAzimuth_deg`, `UniqueSatsInView`, `UniqueSatsUsed`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA`, `Sim2CA`, `WaypointNote`, NMEA, Doppler, sensors)
+  * **CSV** (v1.6 schema including full SIM 1 + SIM 2 RF parameters, `Sim1BtsLocation`, `Sim1BtsDistance_m`, `Sim1BtsAzimuth_deg`, `Sim2BtsLocation`, `Sim2BtsDistance_m`, `Sim2BtsAzimuth_deg`, `UniqueSatsInView`, `UniqueSatsUsed`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA`, `Sim2CA`, `WaypointNote`, NMEA, Doppler, sensors)
   * **3D KML** (color-coded path + waypoint `<Placemark>` pins)
   * **GPX 1.1** (`<trkpt>`, `<wpt>`, RF, BTS, and `used_satellites` / `visible_satellites` `<extensions>`)
   * **GeoJSON** (QGIS/ArcGIS-ready features with BTS distance/azimuth, satellite, and CA metadata)
@@ -94,7 +101,10 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
 
 > All telemetry stays strictly on-device in Room/SQLite storage. Zero cloud uploads or analytics SDKs are used.
 
+* **Illustrated PDF User & Technical Manual:** Tap the top-right **Info (`ⓘ`)** icon to download or open a 6-page vector-illustrated PDF handbook (`Download/GNSS_Net_Logger/GNSS_Net_Logger_v1.6_Manual_*.pdf`) explaining every GNSS, RF, BTS, TA, and anti-spoofing model.
+
 ### Releases
+* [Release v1.6 Notes](RELEASE_v1.6.md) · Binary: [`APK/GNSS_Net_Logger_v1.6.apk.zip`](APK/GNSS_Net_Logger_v1.6.apk.zip)
 * [Release v1.5 Notes](RELEASE_v1.5.md) · Binary: [`APK/GNSS_Net_Logger_v1.5.apk.zip`](APK/GNSS_Net_Logger_v1.5.apk.zip)
 * [Release v1.4 Notes](RELEASE_v1.4.md) · Binary: [`APK/GNSS_Net_Logger_v1.4.apk.zip`](APK/GNSS_Net_Logger_v1.4.apk.zip)
 * [Release v1.3 Notes](RELEASE_v1.3.md) · Binary: [`APK/GNSS_Net_Logger_v1.3.apk.zip`](APK/GNSS_Net_Logger_v1.3.apk.zip)
@@ -126,7 +136,7 @@ Interactive touch-scrubbing Canvas waveforms (available live and for historical 
   * **Editor souřadnic & volitelné geokódování:** Umožňuje ruční zadání přesných GPS souřadnic nebo volitelné dohledání GPS z adres GSMweb bez souřadnic.
 * **Detekce 5G NSA (EN-DC) vs. 5G SA:** Per-SIM `TelephonyCallback` rozlišuje `4G LTE`, `5G NSA` (`EN-DC LTE Kotva (Idle)` odpovídající 5G ikoně v liště vs. `EN-DC NR Aktivní`) a `5G SA`, včetně metrik `SS-RSRP/RSRQ/SINR` a `CSI-RSRP/RSRQ/SINR`.
 * **Carrier Aggregation & Dekódování buněk:** Přesné DL/UL frekvence v MHz, celková šířka pásma `Celkem CA` a **přehled všech agregovaných PCC/SCC/SCG nosných s pásmem a frekvencí v MHz** (např. `PCC B3 1800 MHz + SCC B1 2100 MHz + n78 3500 MHz`), PLMN, TAC, PCI, `eNodeB/gNodeB + Sektor`, reálné CQI z modemu a vzdálenost BTS dle Timing Advance (`1×` / `2×`).
-* **Sousední buňky & Detektor anomálií:** Oddělené seznamy sousedů pro každou SIM s filtrem **`Vše` | `4G LTE` | `5G NR`**, zvýrazněním kandidátů na handover ($\Delta \le 3\text{ dB}$) a varováním před **2G Downgrade útokem**, **izolovanou BTS**, **soukanálovým zarušením** i **nesouladem PCI/TAC proti databázi BTS**.
+* **Sousední buňky & křížová kontrola DB:** Oddělené seznamy sousedů pro každou SIM s filtrem **`Vše` | `4G LTE` | `5G NR`**, zvýrazněním kandidátů na handover ($\Delta \le 3\text{ dB}$) a kontrolou **nesouladu PCI/TAC proti databázi BTS** (kompletní detekce spoofingu a rušení byla přesunuta na novou záložku **Podvody**).
 
 #### 3. Satelity (GNSS & SkyPlot)
 * **Konstelace & Dual-Band:** Podpora GPS, Galileo, GLONASS, BeiDou, QZSS, SBAS a NavIC v pásmech L1/E1/B1/G1 a L5/E5a/B2a se zobrazením unikátních fyzických družic i celkových signálů (v souladu s *GPS Test*) a filtračními čipy.
@@ -154,10 +164,17 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 * **PDOP** ($< 0,7$ nejlepší, $> 3,5$ nejhorší) & **AGC rušení**
 * **Ping RTT** (`8.8.8.8:53`), **Akcelerometr**, **Gyroskop**, **Kompas** a **Teplota baterie**
 
-#### 6. Historie & Exporty
+#### 6. Podvody (Detekce spoofingu, rušení & přesného času) *(Novinka ve v1.6)*
+* **Threat Risk Index (`0–100 %`) & dílčí skóre:** Souhrnný ukazatel rizika pro **GNSS**, **RF Sítě** a **Čas**, indikátor varování ve spodní liště, **Hloubkový sken** a chronologický **Deník incidentů**.
+* **Srovnání přesného času (`GNSS · NITZ · NTP`):** Vestavěný RFC 4330 SNTP UDP:123 klient (`time.google.com`, `tik.cesnet.cz`, `time.cloudflare.com`) s kompenzací RTT oproti hardwarovému času `GnssClock` UTC (`timeNanos − fullBiasNanos`) a času mobilní sítě NITZ + sledování diskontinuit a driftu oscilátoru.
+* **RF Fyzika (`TA vs. RSRP` & `Poloha BTS`):** Ověřuje vzdálenost dle Timing Advance proti reálné poloze BTS ($\Delta\text{TA}$), hlídá očekávaný útlum trasy (odhalí blízké IMSI Catchery při `TA=0–1` i opakovače při velkém TA), detekuje širokopásmové rušení (`RSSI − RSRP > 38 dB` + SINR), vynucený 2G GSM downgrade, izolovanou buňku bez sousedů, oscilaci TAC a výpadky pingu při silném signálu.
+* **GNSS Anti-Spoofing & Fúze senzorů:** Kontroluje `Location.isMock`, pokles zisku AGC vs. C/N₀, uniformní výkon C/N₀ ($\sigma < 2{,}3\text{ dB-Hz}$) i inverzi elevace, kolaps Dopplerova rozptylu ($\sigma_v < 45\text{ m/s}$), zmizení pásma L5/E5a při silném L1, nesoulad s nehybným IMU a barometrem, skoky polohy i vzdálenost GNSS vs. BTS (`> 45 km`).
+* **Demo Simulátor útoků:** V Demo režimu dovoluje jedním klepnutím otestovat scénáře *GNSS Spoof*, *GNSS Jamming*, *2G IMSI Catcher*, *TA + Výkon* a *Časový útok*.
+
+#### 7. Historie & Exporty
 * **Správa relací:** Vyhledávání, přejmenování, Dual-SIM souhrnné statistiky (`S1` + `S2` RSRP rozsahy, podíl `5G/4G`, průměrný PDOP), otevření průběhů v **Grafech** a přehledný bodový inspektor číslovaný v každém záznamu od **`#1`** se **skokem na Mapu** i mazáním vzorků.
 * **Uložení & Sdílení:** Přímý zápis do složky `Download/GNSS_Net_Logger/` nebo systémové sdílení ve čtyřech streamovaných formátech:
-  * **CSV** (kompletní sloupce v1.5 pro SIM 1 + SIM 2 včetně `Sim1BtsLocation`, `Sim1BtsDistance_m`, `Sim1BtsAzimuth_deg`, `Sim2Bts*`, `UniqueSatsInView`, `UniqueSatsUsed`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA`, `Sim2CA`, `WaypointNote`, NMEA, Doppler, senzory)
+  * **CSV** (kompletní sloupce v1.6 pro SIM 1 + SIM 2 včetně `Sim1BtsLocation`, `Sim1BtsDistance_m`, `Sim1BtsAzimuth_deg`, `Sim2Bts*`, `UniqueSatsInView`, `UniqueSatsUsed`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA`, `Sim2CA`, `WaypointNote`, NMEA, Doppler, senzory)
   * **3D KML** (barevná trasa + špendlíky značek)
   * **GPX 1.1** (`<trkpt>`, `<wpt>`, RF, BTS a satelitní `<extensions>` včetně `used_satellites` a `visible_satellites`)
   * **GeoJSON** (vrstva pro QGIS/ArcGIS včetně BTS vzdálenosti/azimutu, seznamů satelitů a CA souhrnů)
@@ -178,7 +195,10 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 
 > Veškerá data zůstávají výhradně v lokální databázi zařízení bez jakéhokoli cloudu či analytických SDK.
 
+* **Ilustrovaný PDF manuál přímo v mobilu:** Po klepnutí na ikonu **Info (`ⓘ`)** vpravo nahoře lze přímo do složky `Download/GNSS_Net_Logger/` stáhnout nebo otevřít 6stránkovou PDF příručku s vektorovými schématy a grafy popisující všechny modely aplikace.
+
 ### Vydání (Releases)
+* [Poznámky k vydání v1.6](RELEASE_v1.6.md) · APK: [`APK/GNSS_Net_Logger_v1.6.apk.zip`](APK/GNSS_Net_Logger_v1.6.apk.zip)
 * [Poznámky k vydání v1.5](RELEASE_v1.5.md) · APK: [`APK/GNSS_Net_Logger_v1.5.apk.zip`](APK/GNSS_Net_Logger_v1.5.apk.zip)
 * [Poznámky k vydání v1.4](RELEASE_v1.4.md) · APK: [`APK/GNSS_Net_Logger_v1.4.apk.zip`](APK/GNSS_Net_Logger_v1.4.apk.zip)
 * [Poznámky k vydání v1.3](RELEASE_v1.3.md) · APK: [`APK/GNSS_Net_Logger_v1.3.apk.zip`](APK/GNSS_Net_Logger_v1.3.apk.zip)

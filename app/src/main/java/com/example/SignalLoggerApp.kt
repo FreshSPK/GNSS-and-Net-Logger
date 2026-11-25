@@ -14,6 +14,7 @@ import com.example.model.LogTriggerMode
 import com.example.model.LoggingSettings
 import com.example.model.MapTrailPoint
 import com.example.model.SimCellInfo
+import com.example.security.SecurityMonitorEngine
 import com.example.service.TelemetryLoggingService
 import com.example.telemetry.CellularTelemetryEngine
 import com.example.telemetry.DemoSimulationEngine
@@ -40,6 +41,7 @@ class SignalLoggerApp : Application() {
     val cellularEngine by lazy { CellularTelemetryEngine(this, applicationScope) }
     val gnssEngine by lazy { GnssTelemetryEngine(this, applicationScope) }
     val environmentEngine by lazy { EnvironmentSensorEngine(this) }
+    val securityEngine by lazy { SecurityMonitorEngine(this, applicationScope) }
     val demoEngine by lazy { DemoSimulationEngine() }
 
     private val _settings = MutableStateFlow(LoggingSettings())
@@ -174,6 +176,7 @@ class SignalLoggerApp : Application() {
             gnssEngine.resetState()
             cellularEngine.resetState()
             environmentEngine.resetToLiveDefaults()
+            securityEngine.resetSessionBaselines()
             TelemetryLoggingService.clearLiveMapTrail()
             TelemetryLoggingService.clearRecentChartPoints()
         }
@@ -235,7 +238,15 @@ class SignalLoggerApp : Application() {
                 }
                 val c = cellularEngine.cellularState.value
                 val g = gnssEngine.gnssState.value
+                val e = environmentEngine.envState.value
                 val now = System.currentTimeMillis()
+
+                securityEngine.evaluateNow(
+                    gnss = g,
+                    cellular = c,
+                    env = e,
+                    isDemoMode = _settings.value.isDemoMode
+                )
 
                 if (g.hasFix && (g.latitude != 0.0 || g.longitude != 0.0)) {
                     TelemetryLoggingService.addMapTrailPoint(
@@ -254,7 +265,6 @@ class SignalLoggerApp : Application() {
                 }
 
                 if (!TelemetryLoggingService.isLogging.value) {
-                    val e = environmentEngine.envState.value
                     TelemetryLoggingService.addChartPoint(
                         ChartPoint(
                             timestampMs = now,
@@ -280,6 +290,18 @@ class SignalLoggerApp : Application() {
                 delay(1000)
             }
         }
+    }
+
+    fun runDeepSecurityScan() {
+        if (!_settings.value.isDemoMode) {
+            securityEngine.syncNtpNow(force = true)
+        }
+        securityEngine.evaluateNow(
+            gnss = gnssEngine.gnssState.value,
+            cellular = cellularEngine.cellularState.value,
+            env = environmentEngine.envState.value,
+            isDemoMode = _settings.value.isDemoMode
+        )
     }
 
     fun updateSettings(newSettings: LoggingSettings) {

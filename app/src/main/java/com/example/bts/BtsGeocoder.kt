@@ -83,7 +83,7 @@ object BtsGeocoder {
                     requestMethod = "GET"
                     connectTimeout = 5000
                     readTimeout = 5000
-                    setRequestProperty("User-Agent", "$packageName/1.5 (VUT-FEKT-SignalLogger)")
+                    setRequestProperty("User-Agent", "$packageName/1.6 (VUT-FEKT-SignalLogger)")
                 }
                 if (conn.responseCode == 200) {
                     val body = conn.inputStream.bufferedReader().use { it.readText() }

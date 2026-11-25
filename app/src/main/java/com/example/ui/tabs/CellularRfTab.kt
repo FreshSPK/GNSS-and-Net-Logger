@@ -9,10 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CellTower
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationSearching
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Verified
@@ -34,7 +32,6 @@ import androidx.compose.foundation.layout.FlowRow
 import com.example.R
 import com.example.bts.BtsGeoUtils
 import com.example.data.db.OperatorBtsStats
-import com.example.model.AnomalySeverity
 import com.example.model.BtsMatchInfo
 import com.example.model.CellularState
 import com.example.model.SimCellInfo
@@ -62,13 +59,6 @@ fun CellularRfTab(
     onShowBtsOnMap: (BtsMatchInfo) -> Unit = {}
 ) {
     val isCs = lang != "EN"
-    var showSpoofingInfoDialog by remember { mutableStateOf(false) }
-
-    val allAnomalies = remember(cellular.sim1.anomalies, cellular.sim2.anomalies) {
-        cellular.sim1.anomalies + cellular.sim2.anomalies
-    }
-    val hasCritical = allAnomalies.any { it.severity == AnomalySeverity.CRITICAL }
-    val hasWarning = allAnomalies.any { it.severity == AnomalySeverity.WARNING }
 
     Column(
         modifier = Modifier
@@ -316,125 +306,6 @@ fun CellularRfTab(
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = TextPrimaryDark
                             )
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // DETEKTOR SPOOFINGU A BEZPEČNOST RF SÍTĚ
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = when {
-                    hasCritical -> RoseCritical.copy(alpha = 0.18f)
-                    hasWarning -> AmberWarning.copy(alpha = 0.16f)
-                    else -> DarkSlate800
-                }
-            ),
-            border = CardDefaults.outlinedCardBorder().copy(
-                brush = androidx.compose.ui.graphics.SolidColor(
-                    when {
-                        hasCritical -> RoseCritical
-                        hasWarning -> AmberWarning
-                        else -> EmeraldSignal.copy(alpha = 0.6f)
-                    }
-                )
-            )
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (allAnomalies.isNotEmpty()) Icons.Default.Warning else Icons.Default.Security,
-                            contentDescription = null,
-                            tint = if (hasCritical) RoseCritical else if (hasWarning) AmberWarning else EmeraldSignal,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isCs) "DETEKCE SPOOFINGU & INTEGRITA RF SÍTĚ" else "SPOOFING DETECTION & RF INTEGRITY",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (hasCritical) RoseCritical else if (hasWarning) AmberWarning else EmeraldSignal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    IconButton(
-                        onClick = { showSpoofingInfoDialog = true },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Spoofing Info",
-                            tint = CyanTertiary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                if (allAnomalies.isEmpty()) {
-                    Text(
-                        text = if (isCs) "✔ Síť je autentická • Žádné známky IMSI Catcheru (falešné BTS)" else "✔ Network authentic • No rogue BTS / IMSI Catcher signatures",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = EmeraldSignal
-                    )
-                    Text(
-                        text = if (isCs) "Ověřeny platné sousedské buňky v SIB tabulce, bezpečné LTE/5G šifrování a konzistentní směrovací oblast TAC." else "Verified valid SIB neighbor relations, secure LTE/5G mutual ciphering, and consistent TAC routing area.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                        color = TextSecondaryDark
-                    )
-                } else {
-                    allAnomalies.forEach { anomaly ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        if (anomaly.severity == AnomalySeverity.CRITICAL) RoseCritical else AmberWarning,
-                                        RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = anomaly.severity.name,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = DarkSlate900
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = anomaly.title,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimaryDark
-                                )
-                                Text(
-                                    text = anomaly.description,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                    color = TextSecondaryDark
-                                )
-                            }
                         }
                     }
                 }
@@ -691,91 +562,6 @@ fun CellularRfTab(
                     .width(90.dp)
             )
         }
-    }
-
-    if (showSpoofingInfoDialog) {
-        AlertDialog(
-            onDismissRequest = { showSpoofingInfoDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = CyanTertiary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isCs) "Detekce spoofingu mobilní sítě (BTS)" else "Cellular Spoofing & Fake BTS Info",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(
-                        text = if (isCs) {
-                            "Modul analyzuje rádiové parametry a odhaluje útoky typu IMSI Catcher (Stingray), podvržené BTS a anomálie:"
-                        } else {
-                            "Analyzes real-time radio telemetry to detect IMSI Catchers (Stingrays), rogue BTS, and anomalies:"
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = if (isCs) "1. Vynucený downgrade na 2G GSM:" else "1. Forced 2G GSM Downgrade Attack:",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RoseCritical
-                    )
-                    Text(
-                        text = if (isCs) {
-                            "Útočník vysílá vysoký výkon na 2G frekvenci nebo ruší LTE/5G pásma, aby donutil telefon přepnout na 2G, kde chybí vzájemná autentizace mezi sítí a telefonem a lze odposlouchávat provoz."
-                        } else {
-                            "Attacker floods or jams LTE/5G bands to force device to 2G GSM, where mutual network authentication is absent, exposing IMSI and traffic."
-                        },
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                        color = TextSecondaryDark
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = if (isCs) "2. Izolovaná buňka bez sousedů (SIB Anomálie):" else "2. Isolated Cell (SIB Anomaly):",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AmberWarning
-                    )
-                    Text(
-                        text = if (isCs) {
-                            "Legitimní komerční buňky vždy vysílají v SIB (System Information Block) seznam sousedních buněk pro handover. Podvržené BTS obvykle žádné sousedy nevysílají."
-                        } else {
-                            "Legitimate cellular towers always broadcast neighbor cell relations in SIB for handover. Fake BTS typically omit neighbor lists."
-                        },
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                        color = TextSecondaryDark
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = if (isCs) "3. Soukanálové rušení a jamming:" else "3. Co-channel Jamming / Low SINR:",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CyanTertiary
-                    )
-                    Text(
-                        text = if (isCs) {
-                            "Silný RSRP signál při prudce zhoršeném odstupu šumu (SINR < -3 dB) indikuje přítomnost rušičky nebo kolizního nekvalitního vysílače."
-                        } else {
-                            "Strong RSRP power paired with severely degraded SINR (< -3 dB) indicates nearby RF jamming or co-channel transmission conflict."
-                        },
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                        color = TextSecondaryDark
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = { showSpoofingInfoDialog = false }) {
-                    Text(if (isCs) "Rozumím" else "Understood")
-                }
-            }
-        )
     }
 }
 

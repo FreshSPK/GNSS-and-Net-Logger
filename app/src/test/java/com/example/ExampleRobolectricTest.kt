@@ -6,6 +6,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import com.example.ui.tabs.SecurityTab
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.bts.BtsCsvImporter
@@ -461,13 +464,13 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testAboutDialogShowsRelease15AndGithubRepoLink() {
+    fun testAboutDialogShowsRelease16AndGithubRepoLink() {
         composeTestRule.setContent {
             SignalLoggerTheme(darkTheme = true) {
                 AboutAndHelpDialog(lang = "CS", onDismiss = {})
             }
         }
-        composeTestRule.onNodeWithText("Release v1.5").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Release v1.6").assertIsDisplayed()
         composeTestRule.onNodeWithTag("author_github_link").assertIsDisplayed()
         composeTestRule.onNodeWithText("GitHub: https://github.com/FreshSPK/GNSS-and-Net-Logger").assertIsDisplayed()
     }
@@ -837,5 +840,62 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("distance_step_slider").assertExists()
         assertTrue(composeTestRule.onAllNodesWithText("10s").fetchSemanticsNodes().isNotEmpty())
         assertTrue(composeTestRule.onAllNodesWithText("50m").fetchSemanticsNodes().size >= 2)
+    }
+
+    @Test
+    fun testSecurityTabDisplaysChecksClocksAndPhysicsSubTabs() {
+        val sampleState = com.example.security.SecurityAnalyzer.evaluate(
+            gnssInput = GnssState(hasFix = true, satellitesInView = 8, satellitesUsedInFix = 6),
+            cellularInput = CellularState(),
+            timeDiagInput = com.example.model.TimeSyncDiagnostics(
+                ntpTimeMs = 1700000000000L,
+                ntpServer = "time.google.com",
+                ntpRttMs = 18L,
+                ntpStratum = 1,
+                systemTimeMs = 1700000000010L,
+                gnssFixTimeMs = 1700000000005L
+            ),
+            ctx = com.example.security.SecurityContextSnapshot()
+        )
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SecurityTab(
+                    security = sampleState,
+                    isDemoMode = true,
+                    lang = "CS",
+                    onSyncNtpNow = {},
+                    onRunDeepScan = {},
+                    onClearIncidents = {},
+                    onSelectSimulatedAttack = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("● DETEKCE PODVODŮ & RUŠENÍ").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("security_deep_scan_button").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Čas UTC").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("SROVNÁNÍ PŘESNÉHO ČASU (UTC)").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Fyzika TA").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("FYZIKA SIGNÁLU GNSS & FÚZE SENZORŮ").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun testAboutDialogShowsPdfManualButtonsAndLocalizedFilenames() {
+        assertEquals(
+            "GNSS_Net_Logger_v1.6_Manual_CS.pdf",
+            com.example.export.UserManualPdfGenerator.manualFilename(isCs = true)
+        )
+        assertEquals(
+            "GNSS_Net_Logger_v1.6_Manual_EN.pdf",
+            com.example.export.UserManualPdfGenerator.manualFilename(isCs = false)
+        )
+
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                AboutAndHelpDialog(lang = "CS", onDismiss = {})
+            }
+        }
+        composeTestRule.onNodeWithTag("download_pdf_manual_button").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("open_pdf_manual_button").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Uživatelský & technický manuál (PDF)").performScrollTo().assertIsDisplayed()
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -37,6 +38,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.db.TelemetryRecord
+import com.example.model.ThreatSeverity
 import com.example.service.TelemetryLoggingService
 import com.example.ui.components.AboutAndHelpDialog
 import com.example.ui.components.BtsDatabaseDialog
@@ -55,6 +57,7 @@ enum class AppTab(val title: String, val icon: ImageVector) {
     GNSS("Satelity", Icons.Default.SatelliteAlt),
     MAP("Mapa", Icons.Default.Map),
     CHARTS("Grafy", Icons.Default.ShowChart),
+    SECURITY("Podvody", Icons.Default.Security),
     HISTORY("Historie", Icons.Default.History)
 }
 
@@ -82,6 +85,7 @@ class MainActivity : ComponentActivity() {
             val gnssState by app.gnssEngine.gnssState.collectAsStateWithLifecycle()
             val cellularState by app.cellularEngine.cellularState.collectAsStateWithLifecycle()
             val envState by app.environmentEngine.envState.collectAsStateWithLifecycle()
+            val securityState by app.securityEngine.securityState.collectAsStateWithLifecycle()
 
             val isLogging by TelemetryLoggingService.isLogging.collectAsStateWithLifecycle()
             val isPaused by TelemetryLoggingService.isPaused.collectAsStateWithLifecycle()
@@ -267,16 +271,47 @@ class MainActivity : ComponentActivity() {
                                 val tabTitle = when (tab) {
                                     AppTab.OVERVIEW -> if (isCs) "Měření" else "Overview"
                                     AppTab.CELLULAR_RF -> if (isCs) "Mobily" else "Cellular"
-                                    AppTab.GNSS -> if (isCs) "Satelity" else "Satellites"
+                                    AppTab.GNSS -> if (isCs) "Satelity" else "GNSS"
                                     AppTab.MAP -> if (isCs) "Mapa" else "Map"
                                     AppTab.CHARTS -> if (isCs) "Grafy" else "Charts"
+                                    AppTab.SECURITY -> if (isCs) "Podvody" else "Spoofing"
                                     AppTab.HISTORY -> if (isCs) "Historie" else "History"
                                 }
                                 NavigationBarItem(
                                     selected = currentTab == tab,
                                     onClick = { currentTab = tab },
-                                    icon = { Icon(imageVector = tab.icon, contentDescription = tabTitle) },
-                                    label = { Text(text = tabTitle, fontSize = 11.sp, fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal) },
+                                    icon = {
+                                        if (tab == AppTab.SECURITY &&
+                                            (securityState.overallStatus == ThreatSeverity.WARNING ||
+                                                securityState.overallStatus == ThreatSeverity.CRITICAL)
+                                        ) {
+                                            BadgedBox(
+                                                badge = {
+                                                    Badge(
+                                                        containerColor = if (securityState.overallStatus == ThreatSeverity.CRITICAL) {
+                                                            RoseCritical
+                                                        } else {
+                                                            AmberWarning
+                                                        }
+                                                    )
+                                                }
+                                            ) {
+                                                Icon(imageVector = tab.icon, contentDescription = tabTitle)
+                                            }
+                                        } else {
+                                            Icon(imageVector = tab.icon, contentDescription = tabTitle)
+                                        }
+                                    },
+                                    label = {
+                                        Text(
+                                            text = tabTitle,
+                                            fontSize = 9.5.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis,
+                                            fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
                                     modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
                                 )
                             }
@@ -501,6 +536,20 @@ class MainActivity : ComponentActivity() {
                                         historicalChartRecords = null
                                     },
                                     lang = currentLang
+                                )
+                            }
+                            AppTab.SECURITY -> {
+                                SecurityTab(
+                                    security = securityState,
+                                    isDemoMode = settings.isDemoMode,
+                                    lang = currentLang,
+                                    onSyncNtpNow = { app.securityEngine.syncNtpNow(force = true) },
+                                    onRunDeepScan = { app.runDeepSecurityScan() },
+                                    onClearIncidents = { app.securityEngine.clearIncidents() },
+                                    onSelectSimulatedAttack = { attack ->
+                                        app.securityEngine.setSimulatedAttack(attack)
+                                        app.runDeepSecurityScan()
+                                    }
                                 )
                             }
                             AppTab.HISTORY -> {

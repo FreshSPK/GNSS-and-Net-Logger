@@ -40,6 +40,9 @@ class GnssTelemetryEngine(
     private var lastFixElapsedMs: Long = 0L
     private var measuredTtffSec: Float? = null
     private var latestGeoidSepM: Double? = null
+    private var hasEverSeenDualFreq = false
+    private var jumpEventsCount = 0
+    private var lastJumpSpeedMs: Float? = null
     private var gnssThread: android.os.HandlerThread? = null
     private var gnssHandler: android.os.Handler? = null
 
@@ -141,6 +144,9 @@ class GnssTelemetryEngine(
         lastFixElapsedMs = 0L
         measuredTtffSec = null
         latestGeoidSepM = null
+        hasEverSeenDualFreq = false
+        jumpEventsCount = 0
+        lastJumpSpeedMs = null
         _gnssState.value = GnssState()
     }
 
@@ -183,6 +189,17 @@ class GnssTelemetryEngine(
         // Must be GPS provider
         if (loc.provider != null && loc.provider != LocationManager.GPS_PROVIDER) return false
 
+        // Track mock location status even before filtering
+        val isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            loc.isMock
+        } else {
+            @Suppress("DEPRECATION")
+            loc.isFromMockProvider
+        }
+        if (isMock) {
+            _gnssState.value = _gnssState.value.copy(isMockLocation = true)
+        }
+
         // Coordinate validity
         if (loc.latitude == 0.0 && loc.longitude == 0.0) return false
         if (loc.latitude < -90.0 || loc.latitude > 90.0 || loc.longitude < -180.0 || loc.longitude > 180.0) return false
@@ -197,8 +214,14 @@ class GnssTelemetryEngine(
             val dtSec = (loc.time - last.time) / 1000.0
             if (dtSec in 0.1..15.0) {
                 val impliedSpeedMs = distM / dtSec
-                // If jump is > 65 m/s (234 km/h) without high-speed tag, it is a multipath spike
+                // If jump is > 65 m/s (234 km/h) without high-speed tag, it is a multipath/spoof spike
                 if (impliedSpeedMs > 65.0 && (!loc.hasSpeed() || loc.speed < 45f)) {
+                    jumpEventsCount++
+                    lastJumpSpeedMs = impliedSpeedMs.toFloat()
+                    _gnssState.value = _gnssState.value.copy(
+                        jumpEventsCount = jumpEventsCount,
+                        lastJumpSpeedMs = lastJumpSpeedMs
+                    )
                     return false
                 }
             }
@@ -213,6 +236,13 @@ class GnssTelemetryEngine(
         lastFixElapsedMs = nowElapsed
         if (measuredTtffSec == null && startElapsedMs > 0L) {
             measuredTtffSec = ((nowElapsed - startElapsedMs) / 1000f).coerceAtLeast(0.1f)
+        }
+
+        val isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            loc.isMock
+        } else {
+            @Suppress("DEPRECATION")
+            loc.isFromMockProvider
         }
 
         val speedMs = if (loc.hasSpeed()) loc.speed else 0f
@@ -243,7 +273,11 @@ class GnssTelemetryEngine(
             ttffSeconds = measuredTtffSec,
             bearingDeg = if (loc.hasBearing()) loc.bearing else current.bearingDeg,
             horizontalAccuracyM = hAcc,
-            verticalAccuracyM = vAcc
+            verticalAccuracyM = vAcc,
+            isMockLocation = isMock,
+            fixTimestampMs = loc.time.takeIf { it > 0L },
+            jumpEventsCount = jumpEventsCount,
+            lastJumpSpeedMs = lastJumpSpeedMs
         )
     }
 
@@ -430,6 +464,10 @@ class GnssTelemetryEngine(
             (satCount - dualFreqViewCount).coerceAtLeast(0)
         }
 
+        if (dualFreqViewCount > 0) {
+            hasEverSeenDualFreq = true
+        }
+
         val current = _gnssState.value
         _gnssState.value = current.copy(
             hasFix = fixStillValid,
@@ -450,7 +488,8 @@ class GnssTelemetryEngine(
             l5Count = effectiveL5Count,
             l5InViewCount = dualFreqViewCount,
             dualFrequencyRatioPct = dualRatio,
-            constellationCountMap = constellationMap
+            constellationCountMap = constellationMap,
+            hasEverSeenDualFreq = hasEverSeenDualFreq
         )
     }
 
@@ -480,7 +519,9 @@ class GnssTelemetryEngine(
             val current = _gnssState.value
             _gnssState.value = current.copy(
                 agcInterferenceScore = interferenceScore,
-                jammingAlert = jamming
+                jammingAlert = jamming,
+                avgAgcDb = avgAgc,
+                agcBaselineDb = baseline
             )
         }
     }
@@ -489,31 +530,62 @@ class GnssTelemetryEngine(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
 
         var adrValidCount = 0
+        var multipathCount = 0
         var sumDopplerHz = 0.0
         var dopplerCount = 0
+        val prRates = mutableListOf<Double>()
 
         for (m in event.measurements) {
             val state = m.accumulatedDeltaRangeState
             if ((state and android.location.GnssMeasurement.ADR_STATE_VALID) != 0) {
                 adrValidCount++
             }
+            if (m.multipathIndicator == android.location.GnssMeasurement.MULTIPATH_INDICATOR_DETECTED) {
+                multipathCount++
+            }
 
             val prRate = m.pseudorangeRateMetersPerSecond
             if (prRate in -6000.0..6000.0 && prRate != 0.0) {
+                prRates.add(prRate)
                 val carrierHz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && m.hasCarrierFrequencyHz()) {
                     m.carrierFrequencyHz.toDouble()
                 } else 1575420000.0
-                val dopplerHz = - (prRate * carrierHz / 299792458.0)
+                val dopplerHz = -(prRate * carrierHz / 299792458.0)
                 sumDopplerHz += dopplerHz
                 dopplerCount++
             }
         }
 
+        val dopplerSpreadMps = if (prRates.size >= 2) {
+            val mean = prRates.average()
+            val variance = prRates.sumOf { (it - mean) * (it - mean) } / prRates.size
+            sqrt(variance).toFloat()
+        } else null
+
+        // Extract GnssClock hardware UTC, drift, uncertainty, and discontinuity count
+        val clock = event.clock
+        val discontinuityCount = clock.hardwareClockDiscontinuityCount
+        val driftNps = if (clock.hasDriftNanosPerSecond()) clock.driftNanosPerSecond else null
+        val biasUncNanos = if (clock.hasBiasUncertaintyNanos()) clock.biasUncertaintyNanos else null
+        val gnssHardwareUtcMs: Long? = if (clock.hasFullBiasNanos()) {
+            val biasNanos = if (clock.hasBiasNanos()) clock.biasNanos else 0.0
+            val gpsNanos = clock.timeNanos.toDouble() - clock.fullBiasNanos.toDouble() - biasNanos
+            val leapSec = if (clock.hasLeapSecond()) clock.leapSecond else 18
+            val utcMs = (gpsNanos / 1_000_000.0).toLong() + 315964800000L - (leapSec * 1000L)
+            if (utcMs > 1577836800000L) utcMs else null // Sanity > 2020-01-01
+        } else null
+
         val avgDoppler = if (dopplerCount > 0) (sumDopplerHz / dopplerCount).toFloat() else null
         val current = _gnssState.value
         _gnssState.value = current.copy(
             rawDopplerHz = avgDoppler,
-            adrValidCount = adrValidCount
+            adrValidCount = adrValidCount,
+            multipathCount = multipathCount,
+            dopplerSpreadMps = dopplerSpreadMps,
+            clockDiscontinuityCount = discontinuityCount,
+            clockDriftNanosPerSec = driftNps,
+            clockBiasUncertaintyNanos = biasUncNanos,
+            gnssHardwareUtcMs = gnssHardwareUtcMs ?: current.gnssHardwareUtcMs
         )
     }
 

@@ -10,6 +10,7 @@ object Strings {
             "tab_gnss" -> if (isCs) "GNSS" else "GNSS"
             "tab_map" -> if (isCs) "Mapa" else "Map"
             "tab_charts" -> if (isCs) "Grafy" else "Charts"
+            "tab_security" -> if (isCs) "Podvody" else "Spoofing"
             "tab_history" -> if (isCs) "Historie" else "History"
 
             // Overview

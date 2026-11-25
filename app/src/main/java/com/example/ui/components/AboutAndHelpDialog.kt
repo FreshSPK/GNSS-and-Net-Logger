@@ -2,6 +2,8 @@ package com.example.ui.components
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,12 +13,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,8 +29,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.example.R
+import com.example.export.UserManualPdfGenerator
 import com.example.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AboutAndHelpDialog(
@@ -35,6 +44,9 @@ fun AboutAndHelpDialog(
 ) {
     val context = LocalContext.current
     val isCs = lang != "EN"
+    val coroutineScope = rememberCoroutineScope()
+    var isGeneratingPdf by remember { mutableStateOf(false) }
+    var pdfSavedStatus by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -87,7 +99,7 @@ fun AboutAndHelpDialog(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Release v1.5",
+                                    text = "Release v1.6",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldSignal
@@ -155,9 +167,195 @@ fun AboutAndHelpDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Illustrated PDF User & Technical Manual Download Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = EmeraldSignal.copy(alpha = 0.12f)),
+                    border = BorderStroke(1.dp, EmeraldSignal.copy(alpha = 0.55f))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.PictureAsPdf,
+                                contentDescription = null,
+                                tint = EmeraldSignal,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isCs) "Uživatelský & technický manuál (PDF)" else "User & Technical Manual (PDF)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = EmeraldSignal
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isCs) {
+                                "Ilustrovaná 6stránková příručka s grafy a schématy: vysvětluje modely GNSS (L1/L5, SkyPlot, DOP), 5G NSA/SA, fyziku TA vs. RSRP a BTS, kontrolu 3 časů UTC i detekci spoofingu a rušení."
+                            } else {
+                                "Illustrated 6-page handbook with technical diagrams explaining GNSS models (L1/L5, SkyPlot, DOP), 5G NSA/SA, TA vs. RSRP & BTS physics, 3-clock UTC auditing, and anti-spoofing detectors."
+                            },
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = TextPrimaryDark
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (isGeneratingPdf) return@Button
+                                    isGeneratingPdf = true
+                                    coroutineScope.launch {
+                                        val result = withContext(Dispatchers.IO) {
+                                            UserManualPdfGenerator.saveManualToDownloads(context, lang)
+                                        }
+                                        isGeneratingPdf = false
+                                        if (result.success) {
+                                            pdfSavedStatus = result.displayPath
+                                            Toast.makeText(
+                                                context,
+                                                if (isCs) "✓ PDF manuál uložen: ${result.displayPath}" else "✓ PDF manual saved: ${result.displayPath}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                if (isCs) "Chyba při ukládání PDF: ${result.errorMessage ?: ""}" else "PDF save failed: ${result.errorMessage ?: ""}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                },
+                                enabled = !isGeneratingPdf,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 48.dp)
+                                    .testTag("download_pdf_manual_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldSignal),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                if (isGeneratingPdf) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(15.dp),
+                                        strokeWidth = 2.dp,
+                                        color = DarkSlate900
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Download,
+                                        contentDescription = null,
+                                        tint = DarkSlate900,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isCs) "Stáhnout PDF" else "Download PDF",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DarkSlate900,
+                                    maxLines = 1
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    if (isGeneratingPdf) return@OutlinedButton
+                                    isGeneratingPdf = true
+                                    coroutineScope.launch {
+                                        val fileResult = withContext(Dispatchers.IO) {
+                                            runCatching { UserManualPdfGenerator.createShareableOrViewableManualFile(context, lang) }
+                                        }
+                                        isGeneratingPdf = false
+                                        fileResult.onSuccess { file ->
+                                            try {
+                                                val uri = FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    file
+                                                )
+                                                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(uri, "application/pdf")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                try {
+                                                    context.startActivity(viewIntent)
+                                                } catch (_: Exception) {
+                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = "application/pdf"
+                                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                                        putExtra(Intent.EXTRA_SUBJECT, file.name)
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(
+                                                        Intent.createChooser(
+                                                            shareIntent,
+                                                            if (isCs) "Otevřít / Sdílet PDF manuál" else "Open / Share PDF Manual"
+                                                        )
+                                                    )
+                                                }
+                                            } catch (e: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    if (isCs) "Nepodařilo se otevřít PDF: ${e.message}" else "Could not open PDF: ${e.message}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }.onFailure { err ->
+                                            Toast.makeText(
+                                                context,
+                                                if (isCs) "Chyba PDF: ${err.message}" else "PDF error: ${err.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                },
+                                enabled = !isGeneratingPdf,
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .testTag("open_pdf_manual_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, CyanTertiary),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = null,
+                                    tint = CyanTertiary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isCs) "Otevřít" else "Open",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyanTertiary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        pdfSavedStatus?.let { path ->
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = if (isCs) "✓ Uloženo do: $path" else "✓ Saved to: $path",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = EmeraldSignal
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Release v1.5 New Features Box
+                // Release v1.6 New Features Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -166,7 +364,7 @@ fun AboutAndHelpDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = if (isCs) "✨ Novinky verze 1.5 (Release v1.5)" else "✨ What's New in Release v1.5",
+                            text = if (isCs) "✨ Novinky verze 1.6 (Release v1.6)" else "✨ What's New in Release v1.6",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
@@ -174,19 +372,19 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "• Databáze BTS 3 českých operátorů (OpenCelliD + GSMweb): streamovaný import velkých souborů OpenCelliD (230.csv / přímo 230.csv.gz s GPS souřadnicemi pro ČR) i GSMweb CSV (Win-1250/UTF-8 bez GPS) s chytrým sloučením adresy, pásma a souřadnic\n" +
-                                "• Skutečná vzdálenost a azimut k BTS: přesný Haversine výpočet vzdálenosti z GNSS do GPS polohy vysílače (z OpenCelliD / editoru), kompasový směr, porovnání s Timing Advance (Δ TA) a útlum FSPL (dB)\n" +
-                                "• Sdílení MOCN, souběžná pásma & bezpečnostní kontrola: automatické párování sdílených vysílačů T-Mobile/O2, přehled pásem na stejném stožáru (eNodeB) a detekce nesouladu PCI/TAC proti databázi\n" +
-                                "• Offline geokódování a editace souřadnic BTS: volitelné dohledání GPS z adresy pro GSMweb záznamy bez souřadnic + ruční úprava GPS se zachováním při aktualizaci CSV\n" +
-                                "• Vrstva BTS & RF linky na mapě: barevně rozlišené značky vysílačů všech 3 operátorů na OpenStreetMap a čára spojnice od vaší polohy k obslužným vysílačům SIM 1 / SIM 2\n" +
-                                "• Rozšířené logování a export v1.5: Room databáze v5, inspektor v Historii i exporty CSV / GPX / GeoJSON ukládají název BTS, vzdálenost a azimut"
+                                "• Nová záložka Podvody (Anti-Spoofing, Jamming & Bezpečnostní štít): souhrnný Threat Risk Index (0–100 %), živé indikátory GNSS/RF/Času a deník bezpečnostních incidentů\n" +
+                                "• Srovnání přesného času (GNSS · Mobilní síť NITZ · Internet NTP): vestavěný SNTP UDP:123 klient s kompenzací RTT proti hardwarovému času GnssClock a síťovému času pro odhalení replay útoků (meaconing) a podvržení NITZ\n" +
+                                "• RF fyzika TA vs. výkon RSRP & poloha BTS: kontrola ΔTA proti známé BTS a ověření útlumu šíření (odhalení blízkých IMSI Catcherů při TA=0–1 i nelegálních opakovačů při velkém TA)\n" +
+                                "• Detekce širokopásmového RF rušení (RSSI − RSRP): analýza energetického rozdílu LTE kanálu nad 38 dB společně se SINR a výpadky paketů\n" +
+                                "• Pokročilý GNSS Anti-Spoofing: kontrola isMock, jednotného výkonu C/N0 (σ) a inverze elevace, kolapsu Dopplerova rozptylu, ztráty L5 při silném L1, fúze IMU + barometru a prostorové kontroly GNSS vs. BTS (> 45 km)\n" +
+                                "• Demo Simulátor útoků: v Demo režimu umožňuje okamžitě otestovat reakci všech detektorů na scénáře GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Výkon a Časový drift"
                             } else {
-                                "• Czech 3-Operator BTS Database (OpenCelliD + GSMweb): memory-safe streaming import of OpenCelliD (230.csv / 230.csv.gz directly with GPS for MCC 230) and GSMweb CSV (address/band metadata without GPS) with smart bidirectional merge\n" +
-                                "• Real GPS-to-BTS Distance & Azimuth: Haversine ground distance, cardinal bearing, Timing Advance vs. real GPS delta (Δ TA), and Free-Space Path Loss (FSPL dB)\n" +
-                                "• MOCN Sharing, Co-Located Bands & PCI/TAC Security Cross-Check: supports T-Mobile/O2 shared sites, lists co-located mast bands, and alerts on PCI/TAC DB mismatches\n" +
-                                "• Geocoding & Coordinate Persistence: optional site-name geocoding for GPS-less GSMweb rows + manual GPS editor preserved across subsequent imports\n" +
-                                "• OSM Map BTS Layer & Serving RF Links: operator-colored BTS markers and dashed RF link polylines from UE position to serving SIM 1 / SIM 2 towers\n" +
-                                "• Extended Logging & v1.5 Exports: Room v5, History inspector, and CSV / GPX 1.1 / GeoJSON exports record matched BTS site, distance, and azimuth"
+                                "• New Spoofing Tab (Anti-Spoofing, Jamming & Security Shield): real-time Threat Risk Index (0–100%), domain sub-scores (GNSS / RF / Time), and forensic incident timeline\n" +
+                                "• Multi-Source UTC Clock Audit (GNSS · Cellular NITZ · Internet NTP): built-in SNTP UDP:123 client with RTT compensation vs. GnssClock hardware UTC and NITZ network time to expose GNSS replay/meaconing and NITZ spoofing\n" +
+                                "• RF Link Physics (TA vs. RSRP & BTS Location): validates ΔTA against known BTS towers and empirical path-loss models (catching near-field Stingrays at TA=0–1 and illegal repeaters at high TA)\n" +
+                                "• Wideband Cellular Jamming (RSSI − RSRP Gap): detects in-band interference above 38 dB paired with SINR degradation and packet loss\n" +
+                                "• Deep GNSS Anti-Spoofing: checks isMock flag, C/N0 dispersion & elevation inversion, orbital Doppler spread collapse, L1-only spoofing (missing L5), IMU/barometer sensor fusion, and GNSS-vs-BTS spatial sanity (> 45 km)\n" +
+                                "• Demo Attack Simulator: interactive scenarios in Demo Mode to verify GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Power, and Time Drift detectors"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark
@@ -215,11 +413,11 @@ fun AboutAndHelpDialog(
                 )
 
                 HelpSection(
-                    title = if (isCs) "2. Mobily (5G NSA/SA, Databáze BTS ČR & Spoofing)" else "2. Cellular RF (5G NSA/SA, CZ BTS Registry & Security)",
+                    title = if (isCs) "2. Mobily (5G NSA/SA, CA & Databáze BTS ČR)" else "2. Cellular RF (5G NSA/SA, CA & CZ BTS Registry)",
                     body = if (isCs) {
-                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Páruje obslužnou buňku proti lokální databázi českých vysílačů (T-Mobile, O2, Vodafone), ukazuje lokalitu BTS, reálnou GPS vzdálenost, azimut, Δ TA, FSPL, sdílená pásma na stožáru a hlídá PCI/TAC nesoulad i 2G downgrade."
+                        "Detailní analýza SIM 1 / SIM 2 / Obě SIM. Páruje obslužnou buňku proti lokální databázi českých vysílačů (T-Mobile, O2, Vodafone), ukazuje lokalitu BTS, reálnou GPS vzdálenost, azimut, Δ TA, FSPL, sdílená pásma na stožáru a nesoulad PCI/TAC. Komplexní detekce spoofingu a rušení je v záložce Podvody."
                     } else {
-                        "Dual-SIM analyzer matching serving cells against the local 3-operator Czech BTS registry (T-Mobile, O2, Vodafone), displaying site address, real GPS distance, azimuth, TA delta, FSPL, co-located mast bands, MOCN status, and PCI/TAC mismatch alerts."
+                        "Dual-SIM analyzer matching serving cells against the local 3-operator Czech BTS registry (T-Mobile, O2, Vodafone), displaying site address, real GPS distance, azimuth, TA delta, FSPL, co-located mast bands, MOCN status, and PCI/TAC checks. Full spoofing & jamming analysis is in the Spoofing tab."
                     }
                 )
 
@@ -251,7 +449,16 @@ fun AboutAndHelpDialog(
                 )
 
                 HelpSection(
-                    title = if (isCs) "6. Historie (Analytika, Skok na bod & Export)" else "6. History (Analytics, Point Jump & Export)",
+                    title = if (isCs) "6. Podvody (Detekce spoofingu, rušení & času)" else "6. Spoofing (Anti-Spoofing, Jamming & Clocks)",
+                    body = if (isCs) {
+                        "Bezpečnostní štít pro GNSS a mobilní sítě: porovnává čas GNSS/NITZ/NTP, hlídá fyziku TA vs. RSRP a polohu BTS, odhaluje širokopásmové rušení (RSSI−RSRP, AGC), inverzi elevace C/N0, kolaps Dopplera, fúzi s IMU/barometrem i 2G IMSI Catchery."
+                    } else {
+                        "GNSS & cellular security shield: audits GNSS/NITZ/NTP clocks, validates TA vs. RSRP path-loss and BTS location, detects wideband RF/AGC jamming, C/N0 elevation inversion, Doppler collapse, IMU/barometer mismatches, and 2G IMSI Catchers."
+                    }
+                )
+
+                HelpSection(
+                    title = if (isCs) "7. Historie (Analytika, Skok na bod & Export)" else "7. History (Analytics, Point Jump & Export)",
                     body = if (isCs) {
                         "Lokální databáze relací se souhrnnou statistikou (min/prům/max RSRP, podíl 5G/4G, průměrný PDOP), bodovým prohlížečem (zobrazuje použité/viditelné satelity, CA pásma a skok na Mapu) a streamovaným exportem do CSV, 3D KML, GPX 1.1 a GeoJSON do Downloads."
                     } else {

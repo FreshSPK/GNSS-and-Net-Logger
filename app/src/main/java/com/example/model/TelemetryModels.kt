@@ -46,7 +46,21 @@ data class GnssState(
     val adrValidCount: Int = 0,
     val speedAccuracyKmh: Float? = null,
     val geoidSeparationM: Double? = null,
-    val ttffSeconds: Float? = null
+    val ttffSeconds: Float? = null,
+    // v1.6 Anti-Spoofing & Clock Forensics fields
+    val isMockLocation: Boolean = false,
+    val fixTimestampMs: Long? = null,
+    val gnssHardwareUtcMs: Long? = null,
+    val clockDiscontinuityCount: Int = 0,
+    val clockDriftNanosPerSec: Double? = null,
+    val clockBiasUncertaintyNanos: Double? = null,
+    val avgAgcDb: Double? = null,
+    val agcBaselineDb: Double? = null,
+    val multipathCount: Int = 0,
+    val dopplerSpreadMps: Float? = null,
+    val hasEverSeenDualFreq: Boolean = false,
+    val jumpEventsCount: Int = 0,
+    val lastJumpSpeedMs: Float? = null
 )
 
 data class CellNeighbor(
