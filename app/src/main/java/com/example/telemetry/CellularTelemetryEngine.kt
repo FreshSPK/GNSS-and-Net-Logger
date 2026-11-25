@@ -1018,9 +1018,9 @@ class CellularTelemetryEngine(
         val serviceStateObj = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && hasPhoneStatePerm) {
             try { tm.serviceState } catch (_: Exception) { null }
         } else null
-        val serviceStateBandwidthsKhz = serviceStateObj?.let {
-            try { it.cellBandwidths.filter { bw -> bw > 0 } } catch (_: Exception) { emptyList() }
-        } ?: emptyList()
+        val serviceStateBandwidthsKhz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && serviceStateObj != null) {
+            try { serviceStateObj.cellBandwidths.filter { bw -> bw > 0 } } catch (_: Exception) { emptyList() }
+        } else emptyList()
 
         val serviceStateDump = serviceStateObj?.toString().orEmpty()
         val isUsingCaBySs = serviceStateDump.contains("mIsUsingCarrierAggregation=true", ignoreCase = true) ||
@@ -1081,7 +1081,8 @@ class CellularTelemetryEngine(
 
         val hasNrSignalData = (ssRsrp != null || csiRsrp != null || ssSinr != null || csiSinr != null)
         val isDataNr = try {
-            hasPhoneStatePerm && tm.dataNetworkType == TelephonyManager.NETWORK_TYPE_NR
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                hasPhoneStatePerm && tm.dataNetworkType == TelephonyManager.NETWORK_TYPE_NR
         } catch (_: Exception) { false }
 
         val (resolvedTech, nrStateLabel) = classifyCellularGeneration(
@@ -1285,7 +1286,7 @@ class CellularTelemetryEngine(
         val isNsaOverride = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
             (subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_NSA ||
                 subOverrideType == 4 /* OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE */)
-        val isNrAdvOverride = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+        val isNrAdvOverride = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_NR_ADVANCED
         val isLteCaOverride = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
             subOverrideType == TelephonyDisplayInfo.OVERRIDE_NETWORK_TYPE_LTE_CA

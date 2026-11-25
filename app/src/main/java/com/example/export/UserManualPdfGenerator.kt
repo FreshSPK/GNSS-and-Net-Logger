@@ -306,7 +306,7 @@ object UserManualPdfGenerator {
         drawDiagramBox(c, col3X, startY + 24f, colW, 26f, COLOR_EMERALD_BG, COLOR_EMERALD,
             if (isCs) "7× Compose UI záložek\nŽivé HUD, SkyPlot, Podvody" else "7× Compose UI Tabs\nLive HUD, SkyPlot, Spoofing")
         drawDiagramBox(c, col3X, startY + 55f, colW, 26f, COLOR_CYAN_BG, COLOR_CYAN,
-            if (isCs) "Foreground Service\nRoom SQLite v5 záznamy" else "Foreground Service\nRoom SQLite v5 Recording")
+            if (isCs) "Foreground Service\nRoom SQLite v6 záznamy" else "Foreground Service\nRoom SQLite v6 Recording")
         drawDiagramBox(c, col3X, startY + 86f, colW, 26f, COLOR_AMBER_BG, COLOR_AMBER,
             if (isCs) "Streamované Exporty\nCSV, 3D KML, GPX, GeoJSON" else "Streaming Exports\nCSV, 3D KML, GPX, GeoJSON")
 
@@ -894,10 +894,10 @@ object UserManualPdfGenerator {
 
         val mapItems = if (isCs) listOf(
             "Vrstva Mapa (OpenStreetMap)" to "• RSRP (S1/S2): Zelená (> -80 dBm), Limetková (-80 až -92), Oranžová (-92 až -105), Červená (< -105 dBm).\n• Satelity: < 5 červená, 5–20 oranžová, 21–30 azurová, 31–50 smaragdová, > 50 modrá.\n• PDOP: < 0,7 smaragdová, 0,7–1,5 azurová, 1,5–2,5 žlutá, 2,5–3,5 oranžová, > 3,5 červená.",
-            "Exporty z Historie (Download/GNSS_Net_Logger/)" to "• CSV: Kompletní tabulka pro Excel/Python (včetně SIM1/SIM2 BTS vzdáleností, azimutů, CA a satelitů).\n• 3D KML: Barevná trasa + špendlíky Waypointů pro Google Earth.\n• GPX 1.1 & GeoJSON: Otevřené standardy pro QGIS, ArcGIS a GPS nástroje."
+            "Exporty z Historie (Download/GNSS_Net_Logger/)" to "• CSV: Kompletní tabulka pro Excel/Python (včetně SIM1/SIM2 BTS vzdáleností, azimutů, CA, satelitů i skóre spoofingu, ΔTA a NTP).\n• 3D KML: Barevná trasa + špendlíky Waypointů pro Google Earth.\n• GPX 1.1 & GeoJSON: Otevřené standardy (vč. bezpečnostních rozšíření) pro QGIS, ArcGIS a GPS nástroje."
         ) else listOf(
             "Map Layers (OpenStreetMap)" to "• RSRP (S1/S2): Green (> -80 dBm), Lime (-80..-92), Orange (-92..-105), Red (< -105 dBm).\n• Satellites: < 5 Red, 5–20 Orange, 21–30 Cyan, 31–50 Emerald, > 50 Blue.\n• PDOP: < 0.7 Emerald, 0.7–1.5 Cyan, 1.5–2.5 Amber, 2.5–3.5 Orange, > 3.5 Red.",
-            "History Exports (Download/GNSS_Net_Logger/)" to "• CSV: Full spreadsheet schema (including SIM 1 / SIM 2 BTS distances, bearings, CA & satellites).\n• 3D KML: Color-coded path + Waypoint pins for Google Earth.\n• GPX 1.1 & GeoJSON: Open GIS standards ready for QGIS & ArcGIS."
+            "History Exports (Download/GNSS_Net_Logger/)" to "• CSV: Full spreadsheet schema (including SIM 1 / SIM 2 BTS distances, bearings, CA, satellites, risk score, ΔTA & NTP).\n• 3D KML: Color-coded path + Waypoint pins for Google Earth.\n• GPX 1.1 & GeoJSON: Open GIS standards (with security extensions) ready for QGIS & ArcGIS."
         )
         for ((k, v) in mapItems) {
             y = drawKeyValueRowBox(c, y, k, v, COLOR_LIGHT_BG, COLOR_EMERALD)

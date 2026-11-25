@@ -19,6 +19,7 @@ import com.example.model.AnomalySeverity
 import com.example.model.ChartPoint
 import com.example.model.LogTriggerMode
 import com.example.model.MapTrailPoint
+import com.example.model.ThreatSeverity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -161,7 +162,7 @@ class TelemetryLoggingService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SignalLogger::LoggingWakeLock").apply {
             setReferenceCounted(false)
-            acquire()
+            acquire(12 * 60 * 60 * 1000L)
         }
 
         val notification = buildNotification("Field logging active", "Recording GNSS & RF Telemetry...")
@@ -302,6 +303,7 @@ class TelemetryLoggingService : Service() {
         val gnss = app.gnssEngine.gnssState.value
         val cellular = app.cellularEngine.cellularState.value
         val env = app.environmentEngine.envState.value
+        val sec = app.securityEngine.securityState.value
         val motion = env.motion
         val now = System.currentTimeMillis()
 
@@ -358,9 +360,10 @@ class TelemetryLoggingService : Service() {
         }
         _handoverCount.value = _handoverCountSim1.value + _handoverCountSim2.value
 
-        // Acoustic alert for critical jamming / 2G downgrade
+        // Acoustic alert for critical jamming / 2G downgrade / spoofing
         if (currentSettings.audioAnomalyAlerts) {
             val hasCriticalAnomaly = gnss.jammingAlert ||
+                sec.overallStatus == ThreatSeverity.CRITICAL ||
                 sim1.anomalies.any { it.severity == AnomalySeverity.CRITICAL } ||
                 sim2.anomalies.any { it.severity == AnomalySeverity.CRITICAL }
             if (hasCriticalAnomaly && now - lastAnomalyAlertMs > 20_000L) {
@@ -380,6 +383,11 @@ class TelemetryLoggingService : Service() {
         } else ""
         val sim1CaText = if (fields.logCellularRf) formatCaSummary(sim1.carrierAggregationSummary, sim1.aggregatedCarriers) else ""
         val sim2CaText = if (fields.logCellularRf) formatCaSummary(sim2.carrierAggregationSummary, sim2.aggregatedCarriers) else ""
+        val secAlertsSummary = if (fields.logSpoofing) {
+            sec.checks
+                .filter { it.severity == ThreatSeverity.WARNING || it.severity == ThreatSeverity.CRITICAL }
+                .joinToString("; ") { "${it.id}:${it.severity.name}(${it.measuredValue})" }
+        } else ""
 
         val record = TelemetryRecord(
             sessionId = sessionId,
@@ -462,7 +470,17 @@ class TelemetryLoggingService : Service() {
             sim1BtsAzimuthDeg = if (fields.logCellularRf) sim1.btsMatch?.azimuthDeg else null,
             sim2BtsLocation = if (fields.logCellularRf) sim2.btsMatch?.locationName.orEmpty() else "",
             sim2BtsDistanceM = if (fields.logCellularRf) sim2.btsMatch?.distanceMeters else null,
-            sim2BtsAzimuthDeg = if (fields.logCellularRf) sim2.btsMatch?.azimuthDeg else null
+            sim2BtsAzimuthDeg = if (fields.logCellularRf) sim2.btsMatch?.azimuthDeg else null,
+            securityRiskScore = if (fields.logSpoofing) sec.overallRiskScore else null,
+            securityStatus = if (fields.logSpoofing) sec.overallStatus.name else "",
+            securityGnssRisk = if (fields.logSpoofing) sec.gnssRiskScore else null,
+            securityRfRisk = if (fields.logSpoofing) sec.rfRiskScore else null,
+            securityTimeRisk = if (fields.logSpoofing) sec.timeRiskScore else null,
+            gnssMinusNtpMs = if (fields.logSpoofing) sec.timeDiagnostics.gnssMinusNtpMs else null,
+            sim1TaVsBtsDeltaM = if (fields.logSpoofing) sec.sim1RfMetrics.taVsBtsDeltaM else null,
+            sim1RsrpResidualDb = if (fields.logSpoofing) sec.sim1RfMetrics.rsrpVsTaResidualDb else null,
+            sim1RssiRsrpGapDb = if (fields.logSpoofing) sec.sim1RfMetrics.rssiMinusRsrpGapDb else null,
+            securityAlertsSummary = secAlertsSummary
         )
 
         val dao = app.database.telemetryDao()

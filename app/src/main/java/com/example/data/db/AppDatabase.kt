@@ -9,7 +9,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [LogSession::class, TelemetryRecord::class, BtsTowerEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -86,6 +86,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN securityRiskScore INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN securityStatus TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN securityGnssRisk INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN securityRfRisk INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN securityTimeRisk INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN gnssMinusNtpMs INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim1TaVsBtsDeltaM REAL")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim1RsrpResidualDb INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN sim1RssiRsrpGapDb INTEGER")
+                db.execSQL("ALTER TABLE telemetry_records ADD COLUMN securityAlertsSummary TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -93,7 +108,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "signal_gnss_logger.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

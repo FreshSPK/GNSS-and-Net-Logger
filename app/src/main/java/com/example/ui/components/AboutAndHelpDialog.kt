@@ -377,13 +377,15 @@ fun AboutAndHelpDialog(
                                 "• RF fyzika TA vs. výkon RSRP & poloha BTS: kontrola ΔTA proti známé BTS a ověření útlumu šíření (odhalení blízkých IMSI Catcherů při TA=0–1 i nelegálních opakovačů při velkém TA)\n" +
                                 "• Detekce širokopásmového RF rušení (RSSI − RSRP): analýza energetického rozdílu LTE kanálu nad 38 dB společně se SINR a výpadky paketů\n" +
                                 "• Pokročilý GNSS Anti-Spoofing: kontrola isMock, jednotného výkonu C/N0 (σ) a inverze elevace, kolapsu Dopplerova rozptylu, ztráty L5 při silném L1, fúze IMU + barometru a prostorové kontroly GNSS vs. BTS (> 45 km)\n" +
-                                "• Demo Simulátor útoků: v Demo režimu umožňuje okamžitě otestovat reakci všech detektorů na scénáře GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Výkon a Časový drift"
+                                "• Demo Simulátor útoků: v Demo režimu umožňuje okamžitě otestovat reakci všech detektorů na scénáře GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Výkon a Časový drift\n" +
+                                "• Logování a export bezpečnosti: v dialogu Položky lze ukládat skóre rizika, GNSS−NTP čas a ΔTA−BTS do databáze Room v6 a exportovat do CSV/GPX/GeoJSON"
                             } else {
                                 "• New Spoofing Tab (Anti-Spoofing, Jamming & Security Shield): real-time Threat Risk Index (0–100%), domain sub-scores (GNSS / RF / Time), and forensic incident timeline\n" +
                                 "• Multi-Source UTC Clock Audit (GNSS · Cellular NITZ · Internet NTP): built-in SNTP UDP:123 client with RTT compensation vs. GnssClock hardware UTC and NITZ network time to expose GNSS replay/meaconing and NITZ spoofing\n" +
                                 "• RF Link Physics (TA vs. RSRP & BTS Location): validates ΔTA against known BTS towers and empirical path-loss models (catching near-field Stingrays at TA=0–1 and illegal repeaters at high TA)\n" +
                                 "• Wideband Cellular Jamming (RSSI − RSRP Gap): detects in-band interference above 38 dB paired with SINR degradation and packet loss\n" +
                                 "• Deep GNSS Anti-Spoofing: checks isMock flag, C/N0 dispersion & elevation inversion, orbital Doppler spread collapse, L1-only spoofing (missing L5), IMU/barometer sensor fusion, and GNSS-vs-BTS spatial sanity (> 45 km)\n" +
+                                "• Security Telemetry Logging & Export: toggle spoofing logging in Fields to save risk score, GNSS−NTP skew, ΔTA−BTS, and alert summaries into Room DB v6 and CSV/GPX/GeoJSON\n" +
                                 "• Demo Attack Simulator: interactive scenarios in Demo Mode to verify GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Power, and Time Drift detectors"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),

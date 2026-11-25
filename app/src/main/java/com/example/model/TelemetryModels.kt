@@ -251,7 +251,8 @@ data class LoggedFieldsSelection(
     val logPing: Boolean = true,
     val logNeighbors: Boolean = true,
     val logBattery: Boolean = true,
-    val logNmea: Boolean = true
+    val logNmea: Boolean = true,
+    val logSpoofing: Boolean = true
 )
 
 data class LoggingSettings(

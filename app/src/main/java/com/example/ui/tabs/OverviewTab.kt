@@ -721,7 +721,7 @@ fun OverviewTab(
             onDismissRequest = { showFieldsDialog = false },
             title = { Text(text = if (isCs) "Výběr položek k logování" else "Select Logging Fields", fontWeight = FontWeight.Bold) },
             text = {
-                Column {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
                         text = if (isCs) "Zvolte parametry a telemetrická data, která se mají ukládat při každém kroku:" else "Select which telemetry data sets will be stored with each recorded point:",
                         style = MaterialTheme.typography.bodySmall,
@@ -763,6 +763,12 @@ fun OverviewTab(
                         label = if (isCs) "Síťová latence (Socket Ping 8.8.8.8)" else "Network latency (Socket Ping 8.8.8.8)",
                         checked = fieldsSelection.logPing,
                         onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logPing = it)) }
+                    )
+                    FieldCheckbox(
+                        label = if (isCs) "Detekce spoofingu & rušení (Riziko, ΔTA, Čas)" else "Spoofing & jamming telemetry (Risk, ΔTA, Time)",
+                        checked = fieldsSelection.logSpoofing,
+                        onChecked = { onUpdateFieldsSelection(fieldsSelection.copy(logSpoofing = it)) },
+                        testTag = "field_checkbox_spoofing"
                     )
                 }
             },
@@ -1005,10 +1011,17 @@ private fun SimCardRow(sim: SimCellInfo, lang: String = "CS", onOpenBtsDatabase:
 }
 
 @Composable
-private fun FieldCheckbox(label: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+private fun FieldCheckbox(
+    label: String,
+    checked: Boolean,
+    onChecked: (Boolean) -> Unit,
+    testTag: String? = null
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .let { if (testTag != null) it.testTag(testTag) else it }
+            .clickable { onChecked(!checked) }
             .padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

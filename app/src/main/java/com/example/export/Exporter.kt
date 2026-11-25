@@ -35,7 +35,8 @@ object Exporter {
                     "Sim2RSRP_dBm,Sim2RSRQ_dB,Sim2RSSI_dBm,Sim2SINR_dB,Sim2TA,Sim2EstDist_m," +
                     "BestNeighborRSRP,NeighborDelta_dB,Pressure_hPa,SeaLevelPressure_hPa,BaroAlt_m,BatteryTemp_C,BatteryLevel_pct,Ping_ms,NmeaSentence," +
                     "UniqueSatsInView,UniqueSatsUsed,UsedSatellites,VisibleSatellites,Sim1CA,Sim2CA," +
-                    "Sim1BtsLocation,Sim1BtsDistance_m,Sim1BtsAzimuth_deg,Sim2BtsLocation,Sim2BtsDistance_m,Sim2BtsAzimuth_deg\n"
+                    "Sim1BtsLocation,Sim1BtsDistance_m,Sim1BtsAzimuth_deg,Sim2BtsLocation,Sim2BtsDistance_m,Sim2BtsAzimuth_deg," +
+                    "SecurityRiskScore,SecurityStatus,GnssRiskScore,RfRiskScore,TimeRiskScore,GnssMinusNtpMs,Sim1TaVsBtsDelta_m,Sim1RsrpResidual_dB,Sim1RssiRsrpGap_dB,SecurityAlertsSummary\n"
             )
 
             for (r in records) {
@@ -115,7 +116,17 @@ object Exporter {
                 append("${r.sim1BtsAzimuthDeg ?: ""},")
                 append("\"${escapeCsv(r.sim2BtsLocation)}\",")
                 append("${r.sim2BtsDistanceM ?: ""},")
-                append("${r.sim2BtsAzimuthDeg ?: ""}\n")
+                append("${r.sim2BtsAzimuthDeg ?: ""},")
+                append("${r.securityRiskScore ?: ""},")
+                append("\"${escapeCsv(r.securityStatus)}\",")
+                append("${r.securityGnssRisk ?: ""},")
+                append("${r.securityRfRisk ?: ""},")
+                append("${r.securityTimeRisk ?: ""},")
+                append("${r.gnssMinusNtpMs ?: ""},")
+                append("${r.sim1TaVsBtsDeltaM ?: ""},")
+                append("${r.sim1RsrpResidualDb ?: ""},")
+                append("${r.sim1RssiRsrpGapDb ?: ""},")
+                append("\"${escapeCsv(r.securityAlertsSummary)}\"\n")
             }
             flush()
         }
@@ -243,6 +254,12 @@ object Exporter {
                 if (r.sim2BtsLocation.isNotBlank()) append("          <sim2_bts_location>${escapeXml(r.sim2BtsLocation)}</sim2_bts_location>\n")
                 r.sim2BtsDistanceM?.let { append("          <sim2_bts_distance_m>$it</sim2_bts_distance_m>\n") }
                 r.sim2BtsAzimuthDeg?.let { append("          <sim2_bts_azimuth_deg>$it</sim2_bts_azimuth_deg>\n") }
+                r.securityRiskScore?.let { append("          <security_risk_score>$it</security_risk_score>\n") }
+                if (r.securityStatus.isNotBlank()) append("          <security_status>${escapeXml(r.securityStatus)}</security_status>\n")
+                r.gnssMinusNtpMs?.let { append("          <gnss_minus_ntp_ms>$it</gnss_minus_ntp_ms>\n") }
+                r.sim1TaVsBtsDeltaM?.let { append("          <sim1_ta_vs_bts_delta_m>$it</sim1_ta_vs_bts_delta_m>\n") }
+                r.sim1RsrpResidualDb?.let { append("          <sim1_rsrp_residual_db>$it</sim1_rsrp_residual_db>\n") }
+                if (r.securityAlertsSummary.isNotBlank()) append("          <security_alerts_summary>${escapeXml(r.securityAlertsSummary)}</security_alerts_summary>\n")
                 append("        </extensions>\n")
                 append("      </trkpt>\n")
             }
@@ -307,7 +324,17 @@ object Exporter {
                 append("        \"sim2BtsLocation\": \"${escapeJson(r.sim2BtsLocation)}\",\n")
                 append("        \"sim2BtsDistanceM\": ${r.sim2BtsDistanceM ?: "null"},\n")
                 append("        \"sim2BtsAzimuthDeg\": ${r.sim2BtsAzimuthDeg ?: "null"},\n")
-                append("        \"pingRttMs\": ${r.pingRttMs ?: "null"}\n")
+                append("        \"pingRttMs\": ${r.pingRttMs ?: "null"},\n")
+                append("        \"securityRiskScore\": ${r.securityRiskScore ?: "null"},\n")
+                append("        \"securityStatus\": \"${escapeJson(r.securityStatus)}\",\n")
+                append("        \"gnssRiskScore\": ${r.securityGnssRisk ?: "null"},\n")
+                append("        \"rfRiskScore\": ${r.securityRfRisk ?: "null"},\n")
+                append("        \"timeRiskScore\": ${r.securityTimeRisk ?: "null"},\n")
+                append("        \"gnssMinusNtpMs\": ${r.gnssMinusNtpMs ?: "null"},\n")
+                append("        \"sim1TaVsBtsDeltaM\": ${r.sim1TaVsBtsDeltaM ?: "null"},\n")
+                append("        \"sim1RsrpResidualDb\": ${r.sim1RsrpResidualDb ?: "null"},\n")
+                append("        \"sim1RssiRsrpGapDb\": ${r.sim1RssiRsrpGapDb ?: "null"},\n")
+                append("        \"securityAlertsSummary\": \"${escapeJson(r.securityAlertsSummary)}\"\n")
                 append("      }\n")
                 append("    }${if (index < records.size - 1) "," else ""}\n")
             }

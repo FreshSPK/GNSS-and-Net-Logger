@@ -519,6 +519,8 @@ fun SessionDetailInspector(
         val nrCount2 = records.count { it.sim2NetworkGen.contains("5G") }
         val lteCount2 = records.count { it.sim2NetworkGen.contains("4G") || it.sim2NetworkGen.contains("LTE") }
         val totalRec = records.size.coerceAtLeast(1)
+        val riskScores = records.mapNotNull { it.securityRiskScore }
+        val secAlertsCount = records.count { it.securityStatus == "WARNING" || it.securityStatus == "CRITICAL" }
 
         mapOf(
             "r1Avg" to r1Vals.takeIf { it.isNotEmpty() }?.average()?.toInt(),
@@ -532,7 +534,9 @@ fun SessionDetailInspector(
             "pct5g1" to (nrCount1 * 100 / totalRec),
             "pct4g1" to (lteCount1 * 100 / totalRec),
             "pct5g2" to (nrCount2 * 100 / totalRec),
-            "pct4g2" to (lteCount2 * 100 / totalRec)
+            "pct4g2" to (lteCount2 * 100 / totalRec),
+            "secMaxRisk" to riskScores.maxOrNull(),
+            "secAlertsCount" to secAlertsCount
         )
     }
 
@@ -637,23 +641,25 @@ fun SessionDetailInspector(
                 val pct5g2 = stats["pct5g2"] as? Int ?: 0
                 val pct4g2 = stats["pct4g2"] as? Int ?: 0
                 val wpCount = stats["waypoints"] as? Int ?: 0
-                if (r1Min != null || r2Min != null || wpCount > 0) {
+                val secMaxRisk = stats["secMaxRisk"] as? Int
+                val secAlertsCount = stats["secAlertsCount"] as? Int ?: 0
+                if (r1Min != null || r2Min != null || wpCount > 0 || secMaxRisk != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     val s2Part = if (r2Min != null || pct5g2 > 0 || pct4g2 > 0) {
-                        if (isCs) {
-                            " • S2: ${r2Min ?: "—"}..${r2Max ?: "—"} dBm (5G/4G: $pct5g2%/$pct4g2%)"
-                        } else {
-                            " • S2: ${r2Min ?: "—"}..${r2Max ?: "—"} dBm (5G/4G: $pct5g2%/$pct4g2%)"
-                        }
+                        " • S2: ${r2Min ?: "—"}..${r2Max ?: "—"} dBm (5G/4G: $pct5g2%/$pct4g2%)"
                     } else ""
+                    val secPart = secMaxRisk?.let { maxR ->
+                        if (isCs) " • Max riziko: $maxR% (výstrah: $secAlertsCount)"
+                        else " • Max risk: $maxR% (alerts: $secAlertsCount)"
+                    } ?: ""
                     Text(
                         text = if (isCs) {
-                            "S1 rozsah: ${r1Min ?: "—"} až ${r1Max ?: "—"} dBm$s2Part • Značky: $wpCount"
+                            "S1 rozsah: ${r1Min ?: "—"} až ${r1Max ?: "—"} dBm$s2Part • Značky: $wpCount$secPart"
                         } else {
-                            "S1 range: ${r1Min ?: "—"} to ${r1Max ?: "—"} dBm$s2Part • Waypoints: $wpCount"
+                            "S1 range: ${r1Min ?: "—"} to ${r1Max ?: "—"} dBm$s2Part • Waypoints: $wpCount$secPart"
                         },
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        color = TextSecondaryDark
+                        color = if (secAlertsCount > 0) AmberWarning else TextSecondaryDark
                     )
                 }
             }
@@ -850,6 +856,30 @@ fun SessionDetailInspector(
                                     color = TextSecondaryDark
                                 )
                             }
+                        }
+
+                        if (r.securityRiskScore != null) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            val secColor = when (r.securityStatus) {
+                                "CRITICAL" -> RoseCritical
+                                "WARNING" -> AmberWarning
+                                "INFO" -> CyanTertiary
+                                else -> EmeraldSignal
+                            }
+                            val deltaTaTxt = r.sim1TaVsBtsDeltaM?.let { " | ΔTA ${String.format(Locale.US, "%.0f", it)}m" } ?: ""
+                            val ntpTxt = r.gnssMinusNtpMs?.let { " | NTP ${it}ms" } ?: ""
+                            val alertSuffix = r.securityAlertsSummary.takeIf { it.isNotBlank() }?.let { " • $it" } ?: ""
+                            Text(
+                                text = if (isCs) {
+                                    "Bezpečnost: ${r.securityRiskScore}% [${r.securityStatus.ifBlank { "OK" }}]$deltaTaTxt$ntpTxt$alertSuffix"
+                                } else {
+                                    "Security: ${r.securityRiskScore}% [${r.securityStatus.ifBlank { "OK" }}]$deltaTaTxt$ntpTxt$alertSuffix"
+                                },
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                fontFamily = FontFamily.Monospace,
+                                color = secColor,
+                                maxLines = 2
+                            )
                         }
                     }
                 }

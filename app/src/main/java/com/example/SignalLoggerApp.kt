@@ -81,11 +81,12 @@ class SignalLoggerApp : Application() {
         val fields = LoggedFieldsSelection(
             logGnss = sp.getBoolean("field_gnss", true),
             logCellularRf = sp.getBoolean("field_cellular_rf", true),
-            logNeighbors = sp.getBoolean("field_neighbors", true),
             logSensors = sp.getBoolean("field_sensors", true),
-            logBattery = sp.getBoolean("field_battery", true),
             logPing = sp.getBoolean("field_ping", true),
-            logNmea = sp.getBoolean("field_nmea", false)
+            logNeighbors = sp.getBoolean("field_neighbors", true),
+            logBattery = sp.getBoolean("field_battery", true),
+            logNmea = sp.getBoolean("field_nmea", false),
+            logSpoofing = sp.getBoolean("field_spoofing", true)
         )
 
         val loaded = LoggingSettings(
@@ -325,6 +326,7 @@ class SignalLoggerApp : Application() {
             .putBoolean("field_battery", newSettings.fieldsSelection.logBattery)
             .putBoolean("field_ping", newSettings.fieldsSelection.logPing)
             .putBoolean("field_nmea", newSettings.fieldsSelection.logNmea)
+            .putBoolean("field_spoofing", newSettings.fieldsSelection.logSpoofing)
             .apply()
 
         environmentEngine.setQnh(newSettings.qnhHpa)

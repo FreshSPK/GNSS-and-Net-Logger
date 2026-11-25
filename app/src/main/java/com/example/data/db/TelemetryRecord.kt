@@ -122,5 +122,17 @@ data class TelemetryRecord(
     val sim1BtsAzimuthDeg: Float? = null,
     val sim2BtsLocation: String = "",
     val sim2BtsDistanceM: Double? = null,
-    val sim2BtsAzimuthDeg: Float? = null
+    val sim2BtsAzimuthDeg: Float? = null,
+
+    // Anti-spoofing, jamming & time-sync telemetry (v1.6)
+    val securityRiskScore: Int? = null,
+    val securityStatus: String = "",
+    val securityGnssRisk: Int? = null,
+    val securityRfRisk: Int? = null,
+    val securityTimeRisk: Int? = null,
+    val gnssMinusNtpMs: Long? = null,
+    val sim1TaVsBtsDeltaM: Double? = null,
+    val sim1RsrpResidualDb: Int? = null,
+    val sim1RssiRsrpGapDb: Int? = null,
+    val securityAlertsSummary: String = ""
 )
