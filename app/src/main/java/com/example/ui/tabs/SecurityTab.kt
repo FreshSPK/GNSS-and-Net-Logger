@@ -199,6 +199,7 @@ fun SecurityTab(
                     ) {
                         Button(
                             onClick = onRunDeepScan,
+                            enabled = !security.isDeepScanning,
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 48.dp)
@@ -207,10 +208,27 @@ fun SecurityTab(
                             colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Radar, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(16.dp))
+                            if (security.isDeepScanning) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(15.dp),
+                                    strokeWidth = 2.dp,
+                                    color = DarkSlate900
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Radar,
+                                    contentDescription = null,
+                                    tint = DarkSlate900,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isCs) "Hloubkový sken" else "Deep Scan",
+                                text = if (security.isDeepScanning) {
+                                    if (isCs) "Skenuji..." else "Scanning..."
+                                } else {
+                                    if (isCs) "Hloubkový sken" else "Deep Scan"
+                                },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = DarkSlate900
@@ -227,14 +245,83 @@ fun SecurityTab(
                             border = BorderStroke(1.dp, CyanSecondary),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = CyanTertiary, modifier = Modifier.size(16.dp))
+                            if (security.timeDiagnostics.isNtpSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(15.dp),
+                                    strokeWidth = 2.dp,
+                                    color = CyanTertiary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Sync,
+                                    contentDescription = null,
+                                    tint = CyanTertiary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (isCs) "Ověřit NTP čas" else "Sync NTP Time",
+                                text = if (security.timeDiagnostics.isNtpSyncing) {
+                                    if (isCs) "Ověřuji NTP..." else "Syncing NTP..."
+                                } else {
+                                    if (isCs) "Ověřit NTP čas" else "Sync NTP Time"
+                                },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CyanTertiary
                             )
+                        }
+                    }
+
+                    if (security.isDeepScanning || security.lastDeepScanTimeMs != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val scanFmt = remember { java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US) }
+                        val alertsNow = security.checks.count { it.severity == ThreatSeverity.WARNING || it.severity == ThreatSeverity.CRITICAL }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("security_deep_scan_status"),
+                            shape = RoundedCornerShape(8.dp),
+                            color = DarkSlate900.copy(alpha = 0.8f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (security.isDeepScanning) CyanPrimary.copy(alpha = 0.6f)
+                                else statusColor.copy(alpha = 0.35f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (security.isDeepScanning) Icons.Default.Radar else Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = if (security.isDeepScanning) CyanTertiary else statusColor,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                val statusMsg = if (security.isDeepScanning) {
+                                    if (isCs) {
+                                        "Probíhá aktivní hloubkový sken: vyžaduji čerstvé buňky modemu, SNTP UDP:123 a kontrolu ${security.checks.size} detektorů..."
+                                    } else {
+                                        "Active deep scan: polling fresh modem cells, SNTP UDP:123 & auditing ${security.checks.size} detectors..."
+                                    }
+                                } else {
+                                    val timeStr = security.lastDeepScanTimeMs?.let { scanFmt.format(java.util.Date(it)) } ?: "—"
+                                    val rttPart = security.timeDiagnostics.ntpRttMs?.let { " • NTP RTT ${it}ms" } ?: ""
+                                    if (isCs) {
+                                        "Hloubkový sken dokončen ($timeStr): ${security.checks.size} kontrol, $alertsNow varování$rttPart"
+                                    } else {
+                                        "Deep scan finished ($timeStr): ${security.checks.size} checks, $alertsNow alerts$rttPart"
+                                    }
+                                }
+                                Text(
+                                    text = statusMsg,
+                                    fontSize = 10.sp,
+                                    color = if (security.isDeepScanning) CyanTertiary else TextSecondaryDark,
+                                    lineHeight = 13.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -709,43 +796,37 @@ private fun SecurityMethodologyDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MethodSection(
-                    title = if (isCs) "1. GNSS Anti-Spoofing & Jamming" else "1. GNSS Anti-Spoofing & Jamming",
+                    title = if (isCs) "1. GNSS Anti-Spoofing & Fúze senzorů" else "1. GNSS Anti-Spoofing & Sensor Fusion",
                     body = if (isCs) {
-                        "• Mock Location (isMock): detekuje SW podvrhávání polohy.\n" +
-                            "• AGC vs. C/N0: pokles AGC + pokles C/N0 = rušení; pokles AGC + vysoké/jednotné C/N0 (σ < 2.3 dB-Hz) nebo inverze elevace = pozemní RF spoofer.\n" +
-                            "• Dopplerův rozptyl (σ_v): reálné družice mají různý radiální posuv; statický SDR spoofer má minimální rozptyl.\n" +
-                            "• Dual-Band L1 vs. L5/E5a: zmizení L5 při silném L1 odhalí jednokanálový L1 spoofer.\n" +
-                            "• Fúze IMU & Barometru: pohyb v GNSS při klidném akcelerometru/gyroskopu nebo výškový skok bez změny tlaku.\n" +
-                            "• Prostorová kontrola GNSS vs. BTS: GNSS souřadnice > 45 km od obslužného vysílače ČR."
+                        "• Mock Location & ΔNMEA: kontrola isMock i shody surových vět \$GNGGA/\$GNRMC vs. Location API (> 35 m).\n" +
+                            "• AGC, C/N0, Konstelace & L5: rušení AGC, uniformní C/N0 (σ < 2,3 dB-Hz), inverze elevace, skok C/N0 (≥ +9 dB v klidu), zmizení L5 či výpadek Galileo/GLONASS/BeiDou.\n" +
+                            "• Doppler, ADR & Zamrznutí: kolaps Dopplera (σ_v < 45 m/s), opačné znaménko Dopplera vůči elevaci, ztráta fáze nosné ADR a zamrzlé nebe (≥ 60 s).\n" +
+                            "• Fúze IMU, Magnetometru, Kroků & BTS: klid IMU vs. rychlost, zatáčení Gyroskop Δyaw vs. GNSS Δbearing, intenzita pole |B| (µT), kadence kroků (6 s), barometr Δh a GNSS vs. BTS (> 45 km)."
                     } else {
-                        "• Mock Location (isMock): catches software fake-GPS apps.\n" +
-                            "• AGC vs. C/N0: AGC drop + C/N0 drop = jamming; AGC drop + uniform high C/N0 (σ < 2.3) or low-elevation inversion = RF spoofer.\n" +
-                            "• Orbital Doppler spread: static SDR spoofers collapse radial velocity dispersion.\n" +
-                            "• Dual-Band L1 vs. L5/E5a: loss of L5 under strong L1 reveals single-band L1 spoofers.\n" +
-                            "• IMU & Barometer fusion: GNSS speed while IMU is stationary or altitude jump without pressure delta.\n" +
-                            "• GNSS vs. BTS spatial sanity: GNSS coordinates > 45 km from serving BTS."
+                        "• Mock Location & ΔNMEA: audits isMock plus raw \$GNGGA/\$GNRMC vs. Location API divergence (> 35 m).\n" +
+                            "• AGC, C/N0, Constellations & L5: AGC jamming, flat C/N0 (σ < 2.3 dB-Hz), elevation inversion, stationary C/N0 takeover jump (≥ +9 dB), L5 drop, and GPS-only constellation drops.\n" +
+                            "• Doppler, ADR & Freeze: Doppler spread collapse (σ_v < 45 m/s), opposite Doppler vs. elevation slope, lost ADR carrier phase, and frozen sky constellations (≥ 60s).\n" +
+                            "• IMU, Mag, Cadence & BTS Fusion: stationary IMU vs. speed, Gyro Δyaw vs. GNSS bearing turn delta, magnetometer |B| (µT), walking cadence (6s), barometer Δh, and GNSS vs. BTS (> 45 km)."
                     }
                 )
                 MethodSection(
                     title = if (isCs) "2. Srovnání času (GNSS · Mobilní síť · NTP)" else "2. Multi-Clock Audit (GNSS · Network · NTP)",
                     body = if (isCs) {
-                        "Porovnává v reálném čase přesný UTC čas ze satelitů (GnssClock i Fix), síťový/systémový čas NITZ a internetový NTP dotaz (UDP:123 s kompenzací RTT). Odhaluje záznamové (meaconing) GNSS útoky, manipulaci NITZ času operátora i skoky a drift krystalu GnssClock."
+                        "Porovnává v reálném čase přesný UTC čas ze satelitů (GnssClock i Fix), síťový/systémový čas NITZ a internetový NTP dotaz (UDP:123 s kompenzací RTT, limit 800 ms). Odhaluje replay útoky (meaconing), manipulaci NITZ i skoky krystalu GnssClock."
                     } else {
-                        "Continuously compares GNSS UTC (GnssClock & Fix), carrier NITZ/System time, and live SNTP UTC (UDP:123 with RTT compensation). Detects GNSS replay/meaconing, NITZ clock tampering, and GnssClock discontinuities."
+                        "Continuously compares GNSS UTC (GnssClock & Fix), carrier NITZ/System time, and live SNTP UTC (UDP:123 with RTT compensation, 800 ms green window) to catch GNSS replay, NITZ spoofing, and oscillator jumps."
                     }
                 )
                 MethodSection(
-                    title = if (isCs) "3. RF fyzika: TA, výkon RSRP & širokopásmové rušení" else "3. Cellular Physics: TA, RSRP & Wideband Jamming",
+                    title = if (isCs) "3. RF fyzika, Dual-SIM & Síťový stack" else "3. Cellular Physics, Dual-SIM & Network Stack",
                     body = if (isCs) {
-                        "• TA vs. poloha BTS (ΔTA): porovnává Timing Advance modemu proti skutečné Haversine vzdálenosti k BTS v databázi.\n" +
-                            "• Poměr RSRP vs. TA: kontroluje fyzikální model útlumu šíření (odhalí blízký IMSI Catcher s TA=0–1 i nelegální opakovač s vysokým TA a silným RSRP).\n" +
-                            "• Širokopásmový rozdíl (RSSI − RSRP): hodnota > 38 dB při nízkém SINR značí cizí energii / rušení v LTE kanálu.\n" +
-                            "• 2G Downgrade, izolovaná buňka bez sousedů, kmitání TAC a ztráta paketů při silném RSRP."
+                        "• TA vs. BTS, RSRP & FSPL strop: kontrola ΔTA proti poloze BTS, path-loss model, strop volného prostoru FSPL (+12 dB) i náhlý pád TA při nehybném IMU.\n" +
+                            "• IMSI Catcher, Test ID & Jamming: 2G downgrade, testovací PLMN/TAC/eNB, úzký LTE kanál (1,4/3 MHz), nízké CQI při silném RSRP, mezera RSSI−RSRP > 38 dB a privátní DNS na mobilních datech.\n" +
+                            "• Dual-SIM korelace: porovnání SIM 1 vs. SIM 2 (jednostranný 2G TA=0 útok, odlišná lokalita BTS > 40 km či souběžné rušení)."
                     } else {
-                        "• TA vs. BTS Distance (ΔTA): compares modem Timing Advance range against real Haversine BTS distance.\n" +
-                            "• RSRP vs. TA Path Loss: validates propagation physics (catches near-field Stingrays at TA=0..1 and illegal repeaters at high TA).\n" +
-                            "• Wideband Gap (RSSI − RSRP > 38 dB): exposes external in-band interference/jamming.\n" +
-                            "• 2G Downgrade, isolated SIB cell, rapid TAC oscillation, and packet-loss blackholing."
+                        "• TA vs. BTS, RSRP & FSPL Ceiling: checks ΔTA against BTS position, path-loss corridor, FSPL ceiling (+12 dB), and abrupt TA drops while IMU-stationary.\n" +
+                            "• Stingray, Test IDs & Jamming: 2G downgrade, test PLMN/TAC/eNB, narrow SDR BW (1.4/3 MHz), low CQI at strong RSRP, RSSI−RSRP > 38 dB, and private cellular DNS.\n" +
+                            "• Dual-SIM Correlation: SIM 1 vs. SIM 2 audit for targeted single-SIM 2G/TA=0 attacks, > 40 km BTS divergence, or dual-band jamming."
                     }
                 )
             }

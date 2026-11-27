@@ -177,4 +177,157 @@ class SecurityAnalyzerTest {
         val parsed = SntpTimeClient.readTimestampMs(buf, 0)
         assertEquals(1700000000500L, parsed)
     }
+
+    @Test
+    fun detectsConstellationDropAndNmeaMismatch() {
+        val gpsOnlySats = (1..8).map { id ->
+            SatelliteInfo(id, 1, "GPS", 38f, 35f + id * 3f, (id * 40f) % 360f, true, 1575420000f, "L1", true)
+        }
+        val gnssSpoof = cleanGnss().copy(
+            satellites = gpsOnlySats,
+            satellitesInView = 8,
+            satellitesUsedInFix = 8,
+            hasEverSeenMultiConstellation = true,
+            nmeaVsLocationDistM = 142.5
+        )
+        val res = SecurityAnalyzer.evaluate(
+            gnssInput = gnssSpoof,
+            cellularInput = cleanCellular(),
+            timeDiagInput = TimeSyncDiagnostics(ntpTimeMs = 1700000000000L, systemTimeMs = 1700000000000L),
+            ctx = SecurityContextSnapshot()
+        )
+        assertEquals(ThreatSeverity.CRITICAL, res.checks.first { it.id == "gnss_constellation_drop" }.severity)
+        assertTrue(res.gnssMetrics.constellationDrop)
+        assertEquals(ThreatSeverity.CRITICAL, res.checks.first { it.id == "gnss_nmea_vs_location" }.severity)
+    }
+
+    @Test
+    fun detectsAdrDropOppositeDopplerCn0StepAndFrozenSky() {
+        val now = 1700000000000L
+        val timeDiag = TimeSyncDiagnostics(ntpTimeMs = now, systemTimeMs = now)
+
+        val adrAndDopplerRes = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss().copy(
+                adrValidCount = 0,
+                hasEverSeenValidAdr = true,
+                satellitesUsedInFix = 6
+            ),
+            cellularInput = cleanCellular(),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot(
+                dopplerElevationMismatchCount = 4,
+                cn0TakeoverJumpDb = 11.4f
+            )
+        )
+        val adrWarn = adrAndDopplerRes.checks.first { it.id == "gnss_adr_doppler_freeze" }
+        assertEquals(ThreatSeverity.WARNING, adrWarn.severity)
+        assertEquals(4, adrAndDopplerRes.gnssMetrics.dopplerElevMismatchCount)
+
+        val frozenRes = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss(),
+            cellularInput = cleanCellular(),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot(frozenConstellationDetected = true)
+        )
+        assertEquals(ThreatSeverity.CRITICAL, frozenRes.checks.first { it.id == "gnss_adr_doppler_freeze" }.severity)
+        assertTrue(frozenRes.gnssMetrics.frozenConstellation)
+    }
+
+    @Test
+    fun detectsGyroHeadingMismatchMagnetometerAnomalyAndWalkingSpeedConflict() {
+        val now = 1700000000000L
+        val timeDiag = TimeSyncDiagnostics(ntpTimeMs = now, systemTimeMs = now)
+
+        val res = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss().copy(speedKmh = 48.0f, horizontalAccuracyM = 3.0f),
+            cellularInput = cleanCellular(),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot(
+                gnssBearingDelta4sDeg = 60.0f,
+                gyroYawDelta4sDeg = 2.0f,
+                gyroTurnMismatchDetected = true,
+                magneticFieldUt = 12.0f,
+                stepsLast6s = 12,
+                isWalkingDetected = true
+            )
+        )
+        assertEquals(ThreatSeverity.CRITICAL, res.checks.first { it.id == "gnss_gyro_heading" }.severity)
+        assertTrue(res.gnssMetrics.gyroTurnMismatch)
+        assertEquals(ThreatSeverity.WARNING, res.checks.first { it.id == "imu_step_speed" }.severity)
+        assertTrue(res.gnssMetrics.walkingVsGnssMismatch)
+
+        // Walking while GNSS stays frozen near zero km/h
+        val frozenWalkRes = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss().copy(speedKmh = 0.1f, horizontalAccuracyM = 3.0f),
+            cellularInput = cleanCellular(),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot(stepsLast6s = 10, isWalkingDetected = true)
+        )
+        assertEquals(ThreatSeverity.WARNING, frozenWalkRes.checks.first { it.id == "imu_step_speed" }.severity)
+    }
+
+    @Test
+    fun detectsFsplExcessTestIdsCqiMismatchStationaryTaDropDualSimDivergenceAndPrivateDns() {
+        val now = 1700000000000L
+        val timeDiag = TimeSyncDiagnostics(ntpTimeMs = now, systemTimeMs = now)
+
+        // 1. FSPL ceiling excess + test TAC + stationary IMU TA drop + private DNS
+        val clean = cleanCellular()
+        val s1Test = clean.sim1.copy(
+            plmn = "00101",
+            tac = "1",
+            rsrp = -50,
+            timingAdvance = 0,
+            estimatedDistanceM = 0.0,
+            neighbors = emptyList(),
+            btsMatch = clean.sim1.btsMatch!!.copy(fsplDb = 110.0) // maxExpected = 40 - 110 = -70 dBm -> excess +20 dB
+        )
+        val res1 = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss(),
+            cellularInput = clean.copy(sim1 = s1Test),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot(
+                stationaryTaDropDetectedSim1 = true,
+                stationaryTaDropDetailSim1 = "TA 10 -> 0 (PCI 21->21)",
+                dnsServers = listOf("192.168.8.1"),
+                hasPrivateCellularDns = true
+            )
+        )
+        assertEquals(ThreatSeverity.CRITICAL, res1.checks.first { it.id == "sim1_fspl_and_cqi" }.severity)
+        assertEquals(ThreatSeverity.CRITICAL, res1.checks.first { it.id == "sim1_imu_ta_drop" }.severity)
+        assertEquals(ThreatSeverity.CRITICAL, res1.checks.first { it.id == "net_integrity" }.severity)
+
+        // 2. Narrow LTE bandwidth / poor CQI at strong RSRP
+        val s1NarrowCqi = clean.sim1.copy(channelBandwidthKhz = 1400, cqi = 2, rsrp = -75, rsrq = -17)
+        val resNarrow = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss(),
+            cellularInput = clean.copy(sim1 = s1NarrowCqi),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot()
+        )
+        assertEquals(ThreatSeverity.WARNING, resNarrow.checks.first { it.id == "sim1_fspl_and_cqi" }.severity)
+        assertTrue(resNarrow.sim1RfMetrics.cqiPoorWithStrongRf)
+
+        // 3. Dual-SIM divergence: SIM1 forced to 2G + TA=0 while SIM2 healthy 4G LTE + >40km BTS divergence
+        val s1Rogue = clean.sim1.copy(
+            networkGen = "2G GSM",
+            timingAdvance = 0,
+            btsMatch = clean.sim1.btsMatch!!.copy(latitude = 49.2266, longitude = 16.5746)
+        )
+        val s2Healthy = clean.sim1.copy(
+            slotIndex = 1,
+            operatorAlpha = "O2 - CZ",
+            plmn = "23002",
+            networkGen = "4G LTE",
+            timingAdvance = 5,
+            btsMatch = clean.sim1.btsMatch!!.copy(latitude = 50.0755, longitude = 14.4378) // Prague vs Brno (~185 km)
+        )
+        val resDual = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss(),
+            cellularInput = CellularState(sim1 = s1Rogue, sim2 = s2Healthy),
+            timeDiagInput = timeDiag,
+            ctx = SecurityContextSnapshot()
+        )
+        assertEquals(ThreatSeverity.CRITICAL, resDual.checks.first { it.id == "dual_sim_cross_check" }.severity)
+    }
 }

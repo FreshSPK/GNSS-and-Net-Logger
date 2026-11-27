@@ -160,25 +160,25 @@ fun getSecurityCheckGuide(checkId: String, isCs: Boolean): SecurityCheckGuide {
 
         checkId == "time_triple_sync" -> SecurityCheckGuide(
             whatItMeans = if (isCs) {
-                "Nezávisle porovnává tři hodinové zdroje: 1) atomový čas GNSS satelitů (G), 2) čas mobilní sítě / systému NITZ (S) a 3) internetový SNTP server (N). Rozdíl odhalí GNSS replay/meaconing útok nebo podvržený síťový čas NITZ."
+                "Nezávisle porovnává tři hodinové zdroje: 1) atomový čas GNSS satelitů, 2) síťový/systémový čas NITZ a 3) internetový SNTP server (UDP:123). Mezi pravidelnými 60s dotazy běží NTP referenční čas přes monotónní čítač elapsedRealtime() (hodiny OS nemění), zatímco NITZ se ze sítě stahuje jen při událostech (Attach / změna TA či 4G↔5G) s krokem 1 s."
             } else {
-                "Cross-audits three independent clocks: 1) GNSS UTC (G), 2) Cellular NITZ/System clock (S), and 3) Internet SNTP UTC (N). Divergence exposes GNSS replay/meaconing or rogue NITZ tampering."
+                "Cross-audits three independent clocks: 1) GNSS UTC, 2) Cellular NITZ/System clock, and 3) Internet SNTP UTC (UDP:123). Between automatic 60s SNTP polls, the NTP clock runs on monotonic elapsedRealtime() (without changing OS time), while NITZ updates event-driven (Attach / TA / RAT change) at 1s steps."
             },
             howItIsCalculated = if (isCs) {
-                "G-N = GNSS UTC − NTP (UDP:123 s kompenzací poloviny RTT)\n" +
-                    "S-N = Systémový/NITZ čas − NTP\n" +
-                    "G-S = GNSS UTC − Systémový/NITZ čas\n" +
-                    "Pozn.: NITZ v mobilní síti bývá posílán s přesností ±1 s (proto má S-N vyšší toleranci)."
+                "GNSS−NTP = GNSS UTC − NTP (UDP:123 s kompenzací poloviny RTT)\n" +
+                    "NITZ−NTP = Systémový/NITZ čas − NTP\n" +
+                    "GNSS−NITZ = GNSS UTC − Systémový/NITZ čas\n" +
+                    "Pozn.: NITZ v mobilní síti má granulaci celých sekund a Android jej synchronizuje jen občas (proto má NITZ−NTP vyšší toleranci)."
             } else {
-                "G-N = GNSS UTC − NTP (UDP:123 with RTT/2 correction)\n" +
-                    "S-N = System/NITZ clock − NTP\n" +
-                    "G-S = GNSS UTC − System/NITZ clock\n" +
-                    "Note: Carrier NITZ updates have ~1 s granularity (higher S-N tolerance)."
+                "GNSS−NTP = GNSS UTC − NTP (UDP:123 with RTT/2 correction)\n" +
+                    "NITZ−NTP = System/NITZ clock − NTP\n" +
+                    "GNSS−NITZ = GNSS UTC − System/NITZ clock\n" +
+                    "Note: Carrier NITZ updates have 1 s granularity (higher NITZ−NTP tolerance)."
             },
             thresholds = if (isCs) {
-                "OK: |G-N| ≤ 800 ms, |G-S| ≤ 800 ms, |S-N| ≤ 2500 ms · WARNING (+35 b.): |G-N| > 800 ms nebo |G-S| > 800 ms · CRITICAL (+75 b.): |G-N| > 2000 ms nebo |G-S| > 2500 ms."
+                "OK: |GNSS−NTP| ≤ 800 ms, |GNSS−NITZ| ≤ 800 ms, |NITZ−NTP| ≤ 2500 ms · WARNING (+35 b.): |GNSS−NTP| > 800 ms nebo |GNSS−NITZ| > 800 ms · CRITICAL (+75 b.): |GNSS−NTP| > 2000 ms nebo |GNSS−NITZ| > 2500 ms."
             } else {
-                "OK: |G-N| ≤ 800 ms, |G-S| ≤ 800 ms, |S-N| ≤ 2500 ms · WARNING (+35 pts): |G-N| > 800 ms or |G-S| > 800 ms · CRITICAL (+75 pts): |G-N| > 2000 ms or |G-S| > 2500 ms."
+                "OK: |GNSS−NTP| ≤ 800 ms, |GNSS−NITZ| ≤ 800 ms, |NITZ−NTP| ≤ 2500 ms · WARNING (+35 pts): |GNSS−NTP| > 800 ms or |GNSS−NITZ| > 800 ms · CRITICAL (+75 pts): |GNSS−NTP| > 2000 ms or |GNSS−NITZ| > 2500 ms."
             }
         )
 
@@ -202,21 +202,111 @@ fun getSecurityCheckGuide(checkId: String, isCs: Boolean): SecurityCheckGuide {
             }
         )
 
-        checkId == "net_integrity" -> SecurityCheckGuide(
+        checkId == "gnss_constellation_drop" -> SecurityCheckGuide(
             whatItMeans = if (isCs) {
-                "Kontroluje, zda aktivní datové připojení má ověřený přístup k internetu (Validated Internet) a zda přes něj neběží VPN tunel (který může navyšovat Ping a NTP RTT)."
+                "Skutečný přijímač pod oblohou sleduje současně více nezávislých systémů (GPS, Galileo, GLONASS, BeiDou). Levnější jednokonstelační SDR spoofer generuje pouze americké GPS L1 – po jeho spuštění ostatní konstelace náhle zmizí."
             } else {
-                "Checks whether the active cellular connection has validated internet routing and whether a VPN tunnel is active (which increases Ping/NTP latency)."
+                "An authentic open-sky receiver tracks multiple GNSS constellations concurrently (GPS, Galileo, GLONASS, BeiDou). Low-cost SDR spoofers emit GPS L1 only, causing non-GPS constellations to drop out."
             },
             howItIsCalculated = if (isCs) {
-                "Čte ConnectivityManager NetworkCapabilities: NET_CAPABILITY_VALIDATED a TRANSPORT_VPN."
+                "Sleduje příznak hasEverSeenMultiConstellation v relaci a porovnává počet GPS satelitů proti součtu Galileo + GLONASS + BeiDou."
             } else {
-                "Inspects Android ConnectivityManager NetworkCapabilities for NET_CAPABILITY_VALIDATED and TRANSPORT_VPN."
+                "Monitors hasEverSeenMultiConstellation across the session and compares GPS count against combined Galileo + GLONASS + BeiDou count."
             },
             thresholds = if (isCs) {
-                "OK: Internet ověřen · INFO: Aktivní VPN · WARNING (+30 b.): Silný mobilní signál (> −95 dBm) na datové SIM bez validovaného internetu."
+                "OK: Gal/GLO/BDS ≥ 1 · CRITICAL (+65 b.): Po předchozím multi-GNSS příjmu spadne Gal/GLO/BDS na 0 při ≥ 7 GPS a Ø C/N0 > 33 dB-Hz."
             } else {
-                "OK: Validated internet · INFO: VPN active · WARNING (+30 pts): Strong data SIM (> −95 dBm) without validated internet."
+                "OK: Gal/GLO/BDS ≥ 1 · CRITICAL (+65 pts): Non-GPS count hits 0 despite ≥ 7 GPS sats and mean C/N0 > 33 dB-Hz after prior multi-GNSS reception."
+            }
+        )
+
+        checkId == "gnss_nmea_vs_location" -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Porovnává souřadnice vypočtené přímo GNSS modemem v textových větách NMEA (\$GNGGA / \$GNRMC) proti souřadnicím z Android Location API. Odhalí hookování a přepisování polohy v operačním systému."
+            } else {
+                "Compares raw modem NMEA sentence coordinates (\$GNGGA / \$GNRMC) against fused Android Location API coordinates to catch OS-level location hooking or spoofing."
+            },
+            howItIsCalculated = if (isCs) {
+                "Parsuje formát ddmm.mmmm z příchozí věty \$GNGGA / \$GNRMC do WGS84 a počítá Haversine odchylku ΔNMEA [m] od Location."
+            } else {
+                "Parses ddmm.mmmm fields from live \$GNGGA / \$GNRMC sentences into WGS84 and computes Haversine offset ΔNMEA [m] vs. Location."
+            },
+            thresholds = if (isCs) {
+                "OK: ΔNMEA ≤ 35 m · CRITICAL (+75 b.): ΔNMEA > 35 m při platném fixu."
+            } else {
+                "OK: ΔNMEA ≤ 35 m · CRITICAL (+75 pts): ΔNMEA > 35 m on an active fix."
+            }
+        )
+
+        checkId == "gnss_adr_doppler_freeze" -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Sdružuje hloubkové fyzikální kontroly GNSS: 1) zamrznutí polohy družic na obloze po ≥ 60 s (statický replay), 2) rozpor znaménka Dopplerova posuvu proti změně elevace družice, 3) výpadek nosné fáze ADR (0 %) při silném signálu, 4) skokový nárůst C/N0 (≥ +9 dB) v klidu a 5) zamrzlou přesnost při vysokém HDOP."
+            } else {
+                "Combines deep physical GNSS checks: 1) sky constellation freeze over ≥ 60s (static replay), 2) Doppler sign contradicting satellite elevation slope, 3) 0% carrier phase ADR lock at strong C/N0, 4) abrupt stationary C/N0 takeover jump (≥ +9 dB), and 5) frozen accuracy under high HDOP."
+            },
+            howItIsCalculated = if (isCs) {
+                "Sleduje 60s změnu azimutu/elevace (|ΔAz|+|ΔEl|), korelaci znaménka pseudorangeRateMps s dEl/dt, poměr platných ADR_STATE_VALID ku použitým družicím a 4,5s krok Ø C/N0."
+            } else {
+                "Tracks 60s azimuth/elevation drift (|ΔAz|+|ΔEl|), sign correlation between pseudorangeRateMps and dEl/dt, ADR_STATE_VALID ratio, and 4.5s mean C/N0 step."
+            },
+            thresholds = if (isCs) {
+                "WARNING (+35–40 b.): OppDop ≥ 3, ΔCN0 ≥ +9 dB v klidu, ADR = 0 % při Ø C/N0 > 38 dB-Hz nebo zamrzlá přesnost · CRITICAL (+70 b.): Zamrzlé nebe ≥ 60 s (< 0,05°)."
+            } else {
+                "WARNING (+35–40 pts): OppDop ≥ 3, stationary ΔCN0 ≥ +9 dB, 0% ADR above 38 dB-Hz, or frozen accuracy · CRITICAL (+70 pts): Sky frozen ≥ 60s (< 0.05°)."
+            }
+        )
+
+        checkId == "gnss_gyro_heading" -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Integruje projekci úhlové rychlosti gyroskopu do svislé osy zemského tíhového pole (∫ω_vert dt) během jízdy (> 14 km/h) a porovnává ji se změnou kurzu (bearing) z GNSS. Doplňuje o kontrolu celkové intenzity magnetického pole |B| [µT]."
+            } else {
+                "Integrates gravity-projected vertical gyroscope angular velocity (∫ω_vert dt) while moving (> 14 km/h) and compares turn delta against GNSS bearing change, alongside ambient magnetic flux |B| [µT]."
+            },
+            howItIsCalculated = if (isCs) {
+                "ω_vert = (ω⃗ · g⃗) / |g⃗|, ΔYaw_Gyro = ∫ω_vert dt za 4,5 s vs. ΔBearing_GNSS; magnetometr |B| = √(Bx² + By² + Bz²)."
+            } else {
+                "ω_vert = (ω⃗ · g⃗) / |g⃗|, ΔYaw_Gyro = ∫ω_vert dt over 4.5s vs. ΔBearing_GNSS; magnetometer |B| = √(Bx² + By² + Bz²)."
+            },
+            thresholds = if (isCs) {
+                "OK: |ΔYaw| ≤ 28°, |B| 18–95 µT · WARNING (+25–35 b.): |ΔYaw| > 28° nebo anomálie |B| · CRITICAL (+65 b.): |ΔYaw| > 40°."
+            } else {
+                "OK: |ΔYaw| ≤ 28°, |B| 18–95 µT · WARNING (+25–35 pts): |ΔYaw| > 28° or |B| anomaly · CRITICAL (+65 pts): |ΔYaw| > 40°."
+            }
+        )
+
+        checkId == "imu_step_speed" -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Bez dalších systémových oprávnění detekuje z dynamických rázů akcelerometru rytmické kroky chůze (posledních 6 s) a porovnává je s rychlostí z GNSS."
+            } else {
+                "Detects rhythmic walking step cadence over the last 6 seconds from accelerometer peaks (zero extra permissions) and cross-checks against GNSS speed."
+            },
+            howItIsCalculated = if (isCs) {
+                "Počítá kroky v okně 6 s (impulz 1,45–8,5 m/s² s odstupem 280–1200 ms) a kontroluje rozpor s GNSS rychlostí (> 35 km/h nebo zamrznutí < 0,5 km/h při ≥ 8 krocích)."
+            } else {
+                "Counts steps in a 6s sliding window (1.45–8.5 m/s² dynamic peaks spaced 280–1200 ms) and flags mismatch with GNSS speed (> 35 km/h or frozen < 0.5 km/h at ≥ 8 steps)."
+            },
+            thresholds = if (isCs) {
+                "OK: Shoda kadence chůze s rychlostí · WARNING (+35 b.): Detekovaná chůze při GNSS > 35 km/h nebo ≥ 8 kroků při rychlosti < 0,5 km/h."
+            } else {
+                "OK: Walking cadence matches velocity · WARNING (+35 pts): Walking with GNSS > 35 km/h or ≥ 8 steps at < 0.5 km/h."
+            }
+        )
+
+        checkId == "net_integrity" -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Kontroluje validitu datového připojení, přidělené DNS servery čistě mobilní sítě (bez Wi-Fi a VPN), stav DATA_SUSPENDED, Captive Portal a přítomnost VPN tunelu."
+            } else {
+                "Inspects internet validation, DNS servers assigned on pure cellular transport (excluding Wi-Fi and VPN), DATA_SUSPENDED state, Captive Portal, and VPN status."
+            },
+            howItIsCalculated = if (isCs) {
+                "Čte ConnectivityManager NetworkCapabilities (VALIDATED, CAPTIVE_PORTAL, TRANSPORT_VPN) a LinkProperties.dnsServers (detekce privátních RFC1918/ULA DNS adres 192.168/10/fc00 na mobilních datech)."
+            } else {
+                "Inspects NetworkCapabilities (VALIDATED, CAPTIVE_PORTAL, TRANSPORT_VPN) and LinkProperties.dnsServers (flagging private RFC1918/ULA DNS on cellular-only links)."
+            },
+            thresholds = if (isCs) {
+                "OK: Internet ověřen, veřejné DNS · INFO: VPN · WARNING (+35 b.): Výpadek internetu, Captive Portal nebo DATA_SUSPENDED · CRITICAL (+65 b.): Privátní lokální DNS na mobilních datech."
+            } else {
+                "OK: Validated public DNS · INFO: VPN · WARNING (+35 pts): Unvalidated net, Captive Portal, or DATA_SUSPENDED · CRITICAL (+65 pts): Private/local DNS on cellular data."
             }
         )
 
@@ -296,6 +386,60 @@ fun getSecurityCheckGuide(checkId: String, isCs: Boolean): SecurityCheckGuide {
                 "OK: 4G/5G, sousedé ≥ 1, shoda DB · WARNING (+45 b.): DB nesoulad, izolovaná buňka, TAC změny ≥ 3 za 2 min nebo ping loss · CRITICAL (+85 b.): vynucený 2G GSM downgrade."
             } else {
                 "OK: 4G/5G, neighbors ≥ 1, DB match · WARNING (+45 pts): DB mismatch, isolated cell, ≥ 3 TAC shifts in 2m, or data blackhole · CRITICAL (+85 pts): forced 2G GSM downgrade."
+            }
+        )
+
+        checkId.endsWith("_fspl_and_cqi") -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Ověřuje fyzikální strop přijatého výkonu podle útlumu volného prostoru (FSPL) k BTS, hlídá podezřelé testovací identifikátory (PLMN 001-01/999, TAC 0/1, eNB 0/1), úzké SDR kanály (1,4 / 3 MHz) a rozpor mezi silným RSRP a kriticky nízkým CQI."
+            } else {
+                "Validates measured RSRP against the Free-Space Path Loss (FSPL) physical ceiling to the BTS, flags test/reserved IDs (PLMN 00101/999, TAC 0/1, eNB 0/1), ultra-narrow SDR bandwidths (1.4/3 MHz), and low CQI despite strong RSRP."
+            },
+            howItIsCalculated = if (isCs) {
+                "FSPL_max = 40 − FSPL_dB [dBm]; ΔFSPL = RSRP − FSPL_max.\nKontrola PLMN (00101/999*), TAC (0,1,65534,65535), eNB (0,1), šířky kanálu (1400/3000 kHz) a CQI ∈ 1..3 při RSRP > −85 dBm."
+            } else {
+                "FSPL_max = 40 − FSPL_dB [dBm]; ΔFSPL = RSRP − FSPL_max.\nChecks PLMN (00101/999*), TAC (0,1,65534,65535), eNB (0,1), LTE BW (1.4/3 MHz), and CQI ∈ 1..3 at RSRP > −85 dBm."
+            },
+            thresholds = if (isCs) {
+                "WARNING (+35 b.): úzké SDR pásmo (1,4/3 MHz) nebo nízké CQI při silném RSRP · CRITICAL (+65–75 b.): ΔFSPL > +12 dB nebo testovací PLMN/TAC/eNB."
+            } else {
+                "WARNING (+35 pts): narrow SDR BW (1.4/3 MHz) or poor CQI at strong RSRP · CRITICAL (+65–75 pts): ΔFSPL > +12 dB or test PLMN/TAC/eNB."
+            }
+        )
+
+        checkId.endsWith("_imu_ta_drop") -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Kombinuje inerciální senzory telefonu s radiovým parametrem Timing Advance. Pokud telefon nehybně leží na stole (IMU klid ≥ 10 s), vzdálenost ke skutečné BTS se nemůže měnit – náhlý pád TA směrem k nule znamená přiblížení mobilní falešné BTS."
+            } else {
+                "Correlates physical IMU stillness with cellular Timing Advance. When the handset is stationary (≥ 10s), tower distance cannot shrink – an abrupt TA drop toward zero indicates a rogue base station approaching or capturing the link."
+            },
+            howItIsCalculated = if (isCs) {
+                "Ukládá klidovou bázi TA při IMU klidu ≥ 10 s a sleduje pokles ΔTA ≥ 4 na TA ≤ 2 při změně buňky (CI/PCI) nebo bez sousedů (alarm drží 90 s)."
+            } else {
+                "Captures a stationary TA baseline after ≥ 10s IMU stillness and triggers on TA drop ≥ 4 down to TA ≤ 2 on cell switch (CI/PCI) or zero neighbors (90s hold)."
+            },
+            thresholds = if (isCs) {
+                "WARNING (+35 b.): skokový pokles TA ≥ 4 na TA ≤ 2 v klidu · CRITICAL (+55 b.): pokles na TA ≤ 1 na izolované buňce."
+            } else {
+                "WARNING (+35 pts): stationary TA drop ≥ 4 to TA ≤ 2 · CRITICAL (+55 pts): drop to TA ≤ 1 on an isolated cell."
+            }
+        )
+
+        checkId == "dual_sim_cross_check" -> SecurityCheckGuide(
+            whatItMeans = if (isCs) {
+                "Křížově srovnává obě aktivní SIM karty (SIM 1 vs. SIM 2) jako vzájemnou referenci. Odhalí cílený útok na jednoho operátora (jedna SIM sražena na 2G s TA=0, zatímco druhá drží 4G/5G), geografický nesoulad BTS obou SIM (> 40 km) či souběžné rušení."
+            } else {
+                "Cross-correlates SIM 1 and SIM 2 as independent hardware probes, exposing targeted single-SIM 2G/TA=0 downgrades, > 40 km BTS geolocation divergence, or simultaneous multi-carrier jamming."
+            },
+            howItIsCalculated = if (isCs) {
+                "Porovnává RAT a TA mezi SIM 1 a SIM 2, Haversine vzdálenost mezi známými BTS obou SIM a současný pokles SINR < −1 dB při RSRP > −95 dBm."
+            } else {
+                "Compares RAT & TA divergence across SIM 1 and SIM 2, Haversine distance between matched BTS sites, and simultaneous SINR < −1 dB under strong RSRP."
+            },
+            thresholds = if (isCs) {
+                "OK: Obě SIM konzistentní na 4G/5G, ΔBTS < 40 km · CRITICAL (+65–70 b.): Jednostranný 2G TA=0 downgrade, ΔBTS > 40 km nebo duální RF rušení."
+            } else {
+                "OK: Both SIMs consistent on 4G/5G, ΔBTS < 40 km · CRITICAL (+65–70 pts): Single-SIM 2G TA=0 downgrade, ΔBTS > 40 km, or dual-SIM jamming."
             }
         )
 

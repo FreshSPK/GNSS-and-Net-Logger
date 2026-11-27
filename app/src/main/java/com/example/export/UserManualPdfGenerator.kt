@@ -63,7 +63,7 @@ object UserManualPdfGenerator {
     private val COLOR_VUT_RED = Color.parseColor("#E4002B")
 
     fun manualFilename(isCs: Boolean): String =
-        if (isCs) "GNSS_Net_Logger_v1.6_Manual_CS.pdf" else "GNSS_Net_Logger_v1.6_Manual_EN.pdf"
+        if (isCs) "GNSS_Net_Logger_v1.7_Manual_CS.pdf" else "GNSS_Net_Logger_v1.7_Manual_EN.pdf"
 
     fun createShareableOrViewableManualFile(context: Context, lang: String): File {
         val isCs = lang != "EN"
@@ -178,7 +178,7 @@ object UserManualPdfGenerator {
 
         val textLeft = MARGIN + 82f
         val titlePaint = textPaint(19f, Color.WHITE, bold = true)
-        c.drawText("GNSS & Net Logger v1.6", textLeft, 44f, titlePaint)
+        c.drawText("GNSS & Net Logger v1.7", textLeft, 44f, titlePaint)
 
         val subtitlePaint = textPaint(11.5f, Color.parseColor("#38BDF8"), bold = true)
         c.drawText(
@@ -235,7 +235,7 @@ object UserManualPdfGenerator {
                 "3. Satelity" to "Multi-konstelační L1+L5/E5a přijímač, interaktivní SkyPlot radar (unikátní družice i signály), C/N0 grafy, PDOP/HDOP/VDOP, geoid N, Dopplerův posuv, AGC rušení a živý tok NMEA.",
                 "4. Mapa" to "OpenStreetMap (tmavý/světlý režim), vrstva známých BTS ČR, režim „Jen BTS“, přímá RF linka k obslužným BTS a barevná trasa dle RSRP, rychlosti, počtu satelitů nebo PDOP.",
                 "5. Grafy" to "Dotykové křivky v reálném čase i pro uložené relace: duální RSRP/SINR, rychlost, použité & viditelné satelity, PDOP, AGC skóre, Ping RTT, akcelerometr, gyroskop, kompas a teplota baterie.",
-                "6. Podvody" to "Bezpečnostní štít (verze 1.6): Threat Risk Index (0–100 %), srovnání 3 časů (GNSS/NITZ/NTP), fyzika TA vs. RSRP a BTS, RSSI−RSRP jamming, inverze elevace, Doppler, IMU/baro fúze a Demo útoky.",
+                "6. Podvody" to "Bezpečnostní štít (v1.7): Threat Risk Index, 3× čas (GNSS/NITZ/NTP), fyzika TA vs. RSRP a FSPL strop, Dual-SIM křížová kontrola, fúze IMU/gyro/magnetometru/kroků, ΔNMEA, ADR & Demo útoky.",
                 "7. Historie" to "Analytika uložených relací, bodový prohlížeč od #1 se skokem na Mapu a streamované exporty (CSV, 3D KML, GPX 1.1, GeoJSON) do Downloads nebo systémového sdílení."
             )
         } else {
@@ -245,7 +245,7 @@ object UserManualPdfGenerator {
                 "3. Satellites" to "Multi-constellation L1+L5/E5a monitor, tap-to-inspect SkyPlot radar (physical SVs vs. signals), C/N0 bars, HDOP/VDOP/PDOP, Geoid N, Doppler shift, AGC jamming score, and NMEA stream.",
                 "4. Map" to "OpenStreetMap (dark/light), Czech BTS tower layer, BTS-only browse mode, dashed serving RF link lines, and color-coded tracks by RSRP, Speed, Satellites, or PDOP (live & replay).",
                 "5. Charts" to "Touch-scrubbing waveforms (live & historical): dual-SIM RSRP/SINR, speed, used & visible satellites, PDOP, AGC jamming, Ping RTT, accelerometer, gyroscope, compass, and battery temp.",
-                "6. Spoofing" to "Security Shield (v1.6): Threat Risk Index (0–100%), 3-clock UTC audit (GNSS/NITZ/NTP), TA vs. RSRP path-loss & BTS geometry, RSSI−RSRP jamming, Doppler/IMU/baro fusion, and Demo attacks.",
+                "6. Spoofing" to "Security Shield (v1.7): Threat Risk Index, 3-clock UTC audit, TA vs. RSRP & FSPL ceiling, Dual-SIM cross-check, IMU/gyro/mag/step fusion, ΔNMEA, ADR phase, and Demo attacks.",
                 "7. History" to "Session analytics, point-by-point inspector starting from #1 with jump-to-Map, and memory-safe streaming exports (CSV, 3D KML, GPX 1.1, GeoJSON) directly to Downloads."
             )
         }
@@ -646,28 +646,28 @@ object UserManualPdfGenerator {
 
         y = drawParagraph(c, y,
             if (isCs) {
-                "Pozemní GNSS spoofer (vysílač podvrženého GPS signálu) i rušička (jammer) porušují několik fyzikálních zákonů šíření signálu z oběžné dráhy zároveň. Záložka Podvody každou sekundu vyhodnocuje devět nezávislých kontrol a sčítá je do GNSS Threat Indexu (0–100 %):"
+                "Pozemní GNSS spoofer i rušička (jammer) porušují více fyzikálních zákonů šíření signálu najednou. Záložka Podvody (v1.7) každou sekundu kombinuje surová data GNSS přijímače a fúzi senzorů telefonu do GNSS Threat Indexu (0–100 %):"
             } else {
-                "A terrestrial GNSS spoofer or RF jammer simultaneously violates multiple laws of orbital physics. The Spoofing tab evaluates nine independent detectors at 1 Hz and fuses them into the GNSS Threat Index (0–100%):"
+                "A terrestrial GNSS spoofer or RF jammer violates multiple orbital and kinematic laws simultaneously. The Spoofing tab (v1.7) fuses raw GNSS observables with phone sensors at 1 Hz into the GNSS Threat Index (0–100%):"
             },
-            fontSize = 9.1f
+            fontSize = 9.0f
         )
         y += 5f
 
         val checks = if (isCs) listOf(
-            "1. Softwarové podvržení (Location.isMock)" to "Okamžitý kritický poplach, pokud jiná aplikace injektuje falešnou polohu přes Android Mock Location API.",
-            "2. AGC vs. pokles C/N0 (Jamming)" to "Sleduje hardwarový zisk AGC předzesilovače v dB. Prudký pokles AGC (> 6 dB pod klidovou bázi) spojený s pádem C/N0 odhalí širokopásmovou rušičku; nárůst AGC při ztrátě fixu varuje před přehlcujícím vysílačem.",
-            "3. Uniformita C/N0 (σ) & Inverze elevace" to "Reálné družice v nadhlavníku (elevace > 45°) mají vyšší C/N0 než družice nízko nad obzorem. Pozemní spoofer vysílá všechny PRN z jedné antény: směrodatná odchylka σ < 2,3 dB-Hz při vysokém C/N0 (> 43,5 dB-Hz) nebo silnější signál u obzoru než v zenitu odhalí podvrh.",
-            "4. Kolaps Dopplerova rozptylu (σ_v)" to "Družice na oběžné dráze se pohybují různými směry (±800 m/s), takže surové pseudorange rate hodnoty mají vysoký rozptyl (σ_v ≈ 200–500 m/s). Jednoduchý spoofer ze statického bodu má σ_v < 45 m/s.",
-            "5. Ztráta dvoupásma L5 / E5a" to "Levné SDR spooféry generují pouze civilní L1/E1. Pokud telefon v dané lokalitě dříve přijímal L5/E5a a pásmo L5 náhle zmizí, zatímco L1 skokově zesílí, jde o varovný příznak.",
-            "6. Fúze IMU + Barometr & Skoky" to "Stacionární akcelerometr + gyroskop vs. GNSS rychlost > 15 km/h; barometrická Δh vs. GNSS Δh (> 40 m za 5 s); teleportační skoky (> 65 m/s) a GNSS vzdálenost od připojené BTS > 45 km."
+            "1. Softwarové Mock & ΔNMEA" to "Detekuje příznak isMock=true i odchylku souřadnic surové věty NMEA (\$GNGGA/\$GNRMC) od Android Location API (> 35 m – OS hooking).",
+            "2. AGC vs. C/N0 (Jamming & Spoof)" to "Pokles zisku AGC (> 6 dB pod bázi) + pokles C/N0 = rušička; jednotný výkon C/N0 (σ < 2,3 dB-Hz), inverze elevace nebo skok C/N0 (≥ +9 dB v klidu) = RF spoofer.",
+            "3. Doppler, ADR & Zamrzlé nebe" to "Kolaps Dopplerova rozptylu (σ_v < 45 m/s), opačné znaménko Dopplera vůči elevaci, výpadek fáze nosné ADR (0 %) a zamrznutí polohy družic po ≥ 60 s.",
+            "4. Konstelace & Pásmo L5/E5a" to "Výpadek Galileo/GLONASS/BeiDou (zůstává jen ≥ 7 GPS) nebo zmizení dvoupásma L5/E5a při silném L1 odhalí jednokanálový spoofer.",
+            "5. Fúze IMU, Gyro, Magnetometr & Kroky" to "Klid IMU vs. rychlost GNSS, projekce rotace gyroskopu (∫ω_vert dt) vs. změna kurzu GNSS, odchylka magnetometru |B| (µT), kadence kroků (6 s) a barometr Δh.",
+            "6. Prostorová kontrola GNSS vs. BTS" to "Vzdálenost souřadnic GNSS od známé obslužné BTS v ČR > 45 km i teleportační skoky polohy (> 65 m/s)."
         ) else listOf(
-            "1. Software Mock (Location.isMock)" to "Immediate CRITICAL alert when any third-party app injects synthetic coordinates via Android's Mock Location provider API.",
-            "2. AGC vs. C/N0 Jamming Discriminator" to "Tracks hardware front-end AGC gain in dB. A sharp AGC drop (> 6 dB below baseline) with falling C/N0 exposes wideband jamming rather than simple roof shielding.",
-            "3. C/N0 Uniformity (σ) & Elevation Inversion" to "Real zenith satellites (> 45°) arrive stronger than horizon satellites (< 20°). Single-antenna ground spoofers radiate flat high C/N0 (σ < 2.3 dB-Hz, mean > 43.5) or stronger horizon PRNs.",
-            "4. Orbital Doppler Spread Collapse (σ_v)" to "Orbital satellites exhibit diverse line-of-sight velocities (±800 m/s, σ_v ≈ 200–500 m/s). A stationary SDR replay collapses pseudorange-rate spread to σ_v < 45 m/s.",
-            "5. L1-Only Spoofing (Vanishing L5 / E5a)" to "Low-cost spoofers transmit legacy L1 only. If the receiver previously locked L5/E5a and L5 suddenly drops out while L1 surges, an alert is raised.",
-            "6. IMU / Barometer Fusion & Spatial Sanity" to "Stationary IMU vs. GNSS speed > 15 km/h; 5 s barometric vs. GNSS Δh > 40 m; teleport jumps (> 65 m/s); and GNSS-to-serving-BTS distance > 45 km."
+            "1. Software Mock & ΔNMEA Check" to "Catches isMock=true and Haversine divergence between raw modem NMEA (\$GNGGA/\$GNRMC) and Android Location API (> 35 m OS hooking).",
+            "2. AGC vs. C/N0 (Jamming & Spoof)" to "AGC compression (> 6 dB) with falling C/N0 = jammer; flat C/N0 (σ < 2.3), elevation inversion, or stationary C/N0 takeover jump (≥ +9 dB) = RF spoofer.",
+            "3. Doppler, ADR & Sky Freeze" to "Collapsed Doppler spread (σ_v < 45 m/s), Doppler sign contradicting elevation slope, 0% ADR carrier phase at strong C/N0, and 60s frozen sky constellation.",
+            "4. Multi-Constellation & L5 Drop" to "Vanishing Galileo/GLONASS/BeiDou (GPS-only ≥ 7) or sudden loss of L5/E5a under strong L1 exposes single-band spoofers.",
+            "5. IMU, Gyro, Magnetometer & Step Fusion" to "Stationary IMU vs. speed, gravity-projected gyro yaw (∫ω_vert dt) vs. GNSS bearing turn, magnetometer |B| (µT), 6s step cadence vs. speed, and barometer Δh.",
+            "6. Spatial GNSS vs. BTS Sanity" to "Flags GNSS coordinates > 45 km from matched Czech serving BTS and abrupt teleport jumps (> 65 m/s)."
         )
         for ((k, v) in checks) {
             y = drawKeyValueRowBox(c, y, k, v, COLOR_LIGHT_BG, COLOR_CRIMSON)
@@ -759,18 +759,16 @@ object UserManualPdfGenerator {
 
         y = drawCalloutCard(
             c, y,
-            if (isCs) "Empirický model útlumu trasy pro odhalení falešných BTS a nelegálních opakovačů"
-            else "Empirical Path-Loss Corridor to Expose Rogue BTS & Illegal Repeaters",
+            if (isCs) "Fyzika šíření RSRP vs. TA, strop FSPL, Dual-SIM & Síťový stack (v1.7)"
+            else "RSRP vs. TA Path-Loss, FSPL Ceiling, Dual-SIM & Network Stack (v1.7)",
             if (isCs) {
-                "Pro vzdálenost d_TA vypočtenou z Timing Advance a nosnou frekvenci f_GHz odhaduje model očekávaný výkon: RSRP_exp ≈ −72 − 28·log10(d_km) − 20·log10(f_GHz) [dBm].\n" +
-                "• Extrémně silný signál (RSRP > −68 dBm) při TA = 0–1 (0–150 m) s nulou sousedů nebo pádem na 2G odpovídá přenosnému IMSI Catcheru (Stingray) v bezprostřední blízkosti.\n" +
-                "• Nereálně silné RSRP při velkém TA (> 1,5 km, reziduum > +24 dB) odhaluje aktivní RF opakovač, zpoždění linky nebo manipulaci s TA.\n" +
-                "• Širokopásmové rušení kanálu: V LTE je rozdíl (RSSI − RSRP) úměrný rušení mimo referenční signály. Hodnota > 38 dB společně se SINR < −3 dB značí silný jammer v pásmu."
+                "Pro vzdálenost d_TA z Timing Advance platí model RSRP_exp ≈ −72 − 34·log10(d/150) − 20·log10(f/1800) a strop volného prostoru FSPL_max = 40 − FSPL_dB (+12 dB).\n" +
+                "• IMSI Catcher, Test ID & Skok TA v klidu: 2G downgrade, testovací PLMN (00101/999) či TAC/eNB 0/1, úzký SDR kanál (1,4/3 MHz), nízké CQI při silném RSRP a náhlý pokles TA při klidném IMU.\n" +
+                "• Dual-SIM & DNS integrita: křížová kontrola SIM 1 vs. SIM 2 (jednostranný 2G TA=0 útok, ΔBTS > 40 km), mezera RSSI−RSRP > 38 dB a detekce privátních DNS (192.168/10.x) na mobilních datech."
             } else {
-                "Given Timing Advance range d_TA and carrier frequency f_GHz, the model predicts expected signal strength: RSRP_exp ≈ −72 − 28·log10(d_km) − 20·log10(f_GHz) [dBm].\n" +
-                "• Extreme RSRP (> −68 dBm) at TA = 0–1 (0–150 m) with 0 neighbors or forced 2G GSM matches a portable near-field IMSI Catcher (Stingray).\n" +
-                "• Impossibly strong RSRP at high TA (> 1.5 km, residual > +24 dB) exposes illegal RF repeaters or TA manipulation.\n" +
-                "• Wideband In-Band Jamming: An LTE (RSSI − RSRP) gap > 38 dB paired with SINR < −3 dB reveals wideband interference across the carrier."
+                "Given Timing Advance range d_TA, expected RSRP follows −72 − 34·log10(d/150) − 20·log10(f/1800) with free-space ceiling FSPL_max = 40 − FSPL_dB (+12 dB).\n" +
+                "• Stingray, Test IDs & Stationary TA Drop: 2G downgrade, reserved PLMN (00101/999) or TAC/eNB 0/1, narrow SDR bandwidth (1.4/3 MHz), low CQI at strong RSRP, and abrupt TA drop while IMU-stationary.\n" +
+                "• Dual-SIM & DNS Stack: cross-checks SIM 1 vs. SIM 2 (single-SIM 2G/TA=0 attack, > 40 km BTS divergence), RSSI−RSRP > 38 dB jamming, and private cellular DNS servers."
             },
             COLOR_PURPLE_BG, COLOR_PURPLE
         )
@@ -786,15 +784,15 @@ object UserManualPdfGenerator {
         )
 
         val clockRows = if (isCs) listOf(
-            "1. Internetový NTP (RFC 4330 SNTP)" to "Přímý UDP paket na port 123 (time.google.com, tik.cesnet.cz, time.cloudflare.com) s výpočtem zpátečního zpoždění RTT/2 pro přesnost na jednotky milisekund.",
-            "2. Čas mobilní sítě / OS (NITZ)" to "Čas poskytovaný základnovou stanicí operátora (Network Identity and Time Zone) a systémovými hodinami Androidu.",
+            "1. Internetový NTP (RFC 4330 SNTP)" to "Přímý UDP paket na port 123 (time.google.com, tik.cesnet.cz, time.cloudflare.com) s výpočtem RTT/2. Aplikace dotaz opakuje každých 60 s (nebo ručně tlačítkem Sync NTP) a mezitím referenční čas počítá přes monotónní čítač elapsedRealtime(), aniž by měnila systémové hodiny OS.",
+            "2. Čas mobilní sítě / OS (NITZ)" to "Čas základnové stanice operátora (NITZ) posílaný událostně při registraci Attach, změně Tracking Area či přechodu 4G↔5G s krokem 1 s a systémové hodiny Androidu.",
             "3. Hardwarový čas GNSS (GnssClock)" to "Výpočet přímého satelitního času z nanosekundového čítače (timeNanos − fullBiasNanos − biasNanos) s odečtem přestupných sekund GPS–UTC, doplněný o sledování skokových diskontinuit a frekvenčního driftu oscilátoru (ns/s).",
-            "Jak odhaluje podvody" to "Replay útok (meaconing) přehrává starší záznam GNSS a způsobí odchylku Δ(GNSS − NTP) > 800 ms (kriticky > 2 000 ms). Podvržená BTS vysílající falešný NITZ čas vytvoří odchylku Δ(Síť − NTP) při zachování platného NTP."
+            "Jak odhaluje podvody" to "Replay útok (meaconing) přehrává starší záznam GNSS a způsobí odchylku Δ(GNSS − NTP) > 800 ms (kriticky > 2 000 ms). Podvržená BTS vysílající falešný NITZ čas vytvoří odchylku Δ(NITZ − NTP) při zachování platného NTP."
         ) else listOf(
-            "1. Internet NTP (RFC 4330 SNTP)" to "Direct UDP:123 query (time.google.com, tik.cesnet.cz, time.cloudflare.com) with half-RTT compensation yielding millisecond-grade UTC reference.",
-            "2. Mobile Network / OS Time (NITZ)" to "Carrier base-station NITZ broadcast and synchronized Android wall-clock time.",
+            "1. Internet NTP (RFC 4330 SNTP)" to "Direct UDP:123 query (time.google.com, tik.cesnet.cz, time.cloudflare.com) with half-RTT compensation, refreshed every 60s (or on demand) and propagated locally via monotonic elapsedRealtime() without altering OS time.",
+            "2. Mobile Network / OS Time (NITZ)" to "Carrier base-station NITZ broadcast (pushed event-driven on Attach, TA update, or RAT change at 1s steps) and Android wall-clock time.",
             "3. Hardware GNSS UTC (GnssClock)" to "Computes exact satellite UTC directly from raw nanosecond counters (timeNanos − fullBiasNanos − biasNanos) minus GPS-UTC leap seconds, while monitoring oscillator drift (ns/s) and clock discontinuities.",
-            "What Skews Expose" to "GNSS replay (meaconing) injects delayed satellite signals causing Δ(GNSS − NTP) > 800 ms (critical > 2,000 ms). A rogue BTS sending fake NITZ triggers Δ(Net − NTP) while internet NTP stays accurate."
+            "What Skews Expose" to "GNSS replay (meaconing) injects delayed satellite signals causing Δ(GNSS − NTP) > 800 ms (critical > 2,000 ms). A rogue BTS sending fake NITZ triggers Δ(NITZ − NTP) while internet NTP stays accurate."
         )
         for ((k, v) in clockRows) {
             y = drawKeyValueRowBox(c, y, k, v, COLOR_LIGHT_BG, COLOR_CYAN)
@@ -988,7 +986,7 @@ object UserManualPdfGenerator {
         c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 32f, fillPaint(COLOR_DARK_NAVY))
         c.drawRect(0f, 32f, PAGE_WIDTH.toFloat(), 34.5f, fillPaint(COLOR_CYAN))
         c.drawText(text, MARGIN, 21f, textPaint(8.8f, Color.WHITE, bold = true))
-        c.drawText("v1.6", PAGE_WIDTH - MARGIN - 20f, 21f, textPaint(8.8f, Color.parseColor("#38BDF8"), bold = true))
+        c.drawText("v1.7", PAGE_WIDTH - MARGIN - 20f, 21f, textPaint(8.8f, Color.parseColor("#38BDF8"), bold = true))
     }
 
     private fun drawPageFooter(c: Canvas, pageNum: Int, totalPages: Int, isCs: Boolean) {
@@ -996,7 +994,7 @@ object UserManualPdfGenerator {
         c.drawLine(MARGIN, y - 8f, PAGE_WIDTH - MARGIN, y - 8f, strokePaint(COLOR_CARD_BORDER, 0.8f))
         val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         c.drawText(
-            "GNSS & Net Logger v1.6 • Ing. Jan Kufa, Ph.D. (VUT FEKT UREL) • $dateStr",
+            "GNSS & Net Logger v1.7 • Ing. Jan Kufa, Ph.D. (VUT FEKT UREL) • $dateStr",
             MARGIN, y + 4f, textPaint(7.5f, COLOR_MUTED)
         )
         val pageLabel = if (isCs) "Strana $pageNum / $totalPages" else "Page $pageNum / $totalPages"

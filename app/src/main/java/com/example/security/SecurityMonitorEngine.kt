@@ -1,10 +1,14 @@
 package com.example.security
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.SystemClock
 import android.provider.Settings
+import android.telephony.TelephonyManager
+import androidx.core.content.ContextCompat
 import com.example.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.Inet4Address
+import java.net.Inet6Address
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 
@@ -42,6 +48,10 @@ class SecurityMonitorEngine(
     private var lastNtpAttemptElapsedMs: Long = 0L
     @Volatile
     private var isNtpSyncing: Boolean = false
+    @Volatile
+    private var isDeepScanning: Boolean = false
+    @Volatile
+    private var lastDeepScanTimeMs: Long? = null
 
     // Rolling kinematics & TAC windows
     private var imuStationaryStreakSec: Int = 0
@@ -52,6 +62,23 @@ class SecurityMonitorEngine(
     private var lastSim2Tac: String = ""
     private var sustainedPingLossCount: Int = 0
     private var initialClockDiscontinuity: Int? = null
+
+    // v1.7 rolling windows for gyro-bearing, stationary TA drop, sky freeze, Doppler-elev, C/N0 step & accuracy freeze
+    private data class HeadingSample(val elapsedMs: Long, val bearingDeg: Float, val yawRateRadPerSec: Float)
+    private data class SatTrackSample(val elapsedMs: Long, val azDeg: Float, val elDeg: Float)
+    private data class TaBaseline(val ta: Int, val ci: String, val pci: Int)
+
+    private val headingWindow = ArrayDeque<HeadingSample>()
+    private var gyroMismatchStreak: Int = 0
+    private val satBaselineMap = HashMap<Pair<Int, Int>, SatTrackSample>()
+    private val cn0History = ArrayDeque<Triple<Long, Float, Int>>() // elapsedMs, avgCn0, satCount
+    private val accFreezeHistory = ArrayDeque<Float>()
+    private var sim1TaBaseline: TaBaseline? = null
+    private var sim2TaBaseline: TaBaseline? = null
+    private var sim1TaDropUntilElapsedMs: Long = 0L
+    private var sim2TaDropUntilElapsedMs: Long = 0L
+    private var sim1TaDropDetail: String? = null
+    private var sim2TaDropDetail: String? = null
 
     // Forensic incident log (deduplicated with 30s cooldown per check ID)
     private val incidents = mutableListOf<SecurityIncident>()
@@ -79,7 +106,29 @@ class SecurityMonitorEngine(
         lastSim2Tac = ""
         sustainedPingLossCount = 0
         initialClockDiscontinuity = null
+        headingWindow.clear()
+        gyroMismatchStreak = 0
+        satBaselineMap.clear()
+        cn0History.clear()
+        accFreezeHistory.clear()
+        sim1TaBaseline = null
+        sim2TaBaseline = null
+        sim1TaDropUntilElapsedMs = 0L
+        sim2TaDropUntilElapsedMs = 0L
+        sim1TaDropDetail = null
+        sim2TaDropDetail = null
         simulatedAttack = SimulatedAttackType.NONE
+    }
+
+    fun setDeepScanActive(active: Boolean, completedEpochMs: Long? = null) {
+        isDeepScanning = active
+        if (completedEpochMs != null) {
+            lastDeepScanTimeMs = completedEpochMs
+        }
+        _securityState.value = _securityState.value.copy(
+            isDeepScanning = isDeepScanning,
+            lastDeepScanTimeMs = lastDeepScanTimeMs
+        )
     }
 
     fun syncNtpNow(force: Boolean = true) {
@@ -89,6 +138,9 @@ class SecurityMonitorEngine(
 
         isNtpSyncing = true
         lastNtpAttemptElapsedMs = nowElapsed
+        _securityState.value = _securityState.value.copy(
+            timeDiagnostics = _securityState.value.timeDiagnostics.copy(isNtpSyncing = true)
+        )
         scope.launch(Dispatchers.IO) {
             val result = SntpTimeClient.syncTime()
             isNtpSyncing = false
@@ -102,6 +154,19 @@ class SecurityMonitorEngine(
             }.onFailure { err ->
                 ntpError = err.message ?: "NTP sync failed"
             }
+            val nowE = SystemClock.elapsedRealtime()
+            val cur = _securityState.value
+            _securityState.value = cur.copy(
+                timeDiagnostics = cur.timeDiagnostics.copy(
+                    ntpTimeMs = ntpOffsetFromElapsedMs?.let { nowE + it },
+                    ntpServer = ntpServerName,
+                    ntpRttMs = ntpRttMs,
+                    ntpStratum = ntpStratum,
+                    ntpError = ntpError,
+                    lastNtpSyncEpochMs = lastNtpSyncEpochMs,
+                    isNtpSyncing = false
+                )
+            )
         }
     }
 
@@ -165,8 +230,152 @@ class SecurityMonitorEngine(
             initialClockDiscontinuity = gnss.clockDiscontinuityCount
         }
 
-        // 5. Network / Device integrity flags
-        val (hasVpn, hasInternet) = readNetworkFlags()
+        // 5. v1.7 Heading Fusion (Gyroscope vs GNSS Bearing)
+        var gnssBearingDelta4s: Float? = null
+        var gyroYawDelta4s: Float? = null
+        var gyroMismatchNow = false
+        if (!isDemoMode && gnss.hasFix && gnss.speedKmh > 14f) {
+            headingWindow.addLast(HeadingSample(nowElapsed, gnss.bearingDeg, motion.verticalYawRadPerSec))
+            while (headingWindow.isNotEmpty() && nowElapsed - headingWindow.first().elapsedMs > 4500L) {
+                headingWindow.removeFirst()
+            }
+            if (headingWindow.size >= 3 && nowElapsed - headingWindow.first().elapsedMs >= 2500L) {
+                val oldest = headingWindow.first()
+                val newest = headingWindow.last()
+                var bDiff = newest.bearingDeg - oldest.bearingDeg
+                if (bDiff > 180f) bDiff -= 360f
+                if (bDiff < -180f) bDiff += 360f
+                gnssBearingDelta4s = bDiff
+
+                var yawDegSum = 0.0
+                for (i in 1 until headingWindow.size) {
+                    val prev = headingWindow.elementAt(i - 1)
+                    val cur = headingWindow.elementAt(i)
+                    val dtSec = ((cur.elapsedMs - prev.elapsedMs) / 1000.0).coerceIn(0.0, 2.0)
+                    val avgRad = (prev.yawRateRadPerSec + cur.yawRateRadPerSec) * 0.5
+                    yawDegSum += Math.toDegrees(avgRad * dtSec)
+                }
+                gyroYawDelta4s = yawDegSum.toFloat()
+
+                val turnDiff = abs(abs(bDiff) - abs(gyroYawDelta4s))
+                val maxTurn = maxOf(abs(bDiff), abs(gyroYawDelta4s))
+                if (turnDiff > 28f && maxTurn > 25f) {
+                    gyroMismatchStreak++
+                    if (gyroMismatchStreak >= 2) gyroMismatchNow = true
+                } else {
+                    gyroMismatchStreak = 0
+                }
+            }
+        } else {
+            headingWindow.clear()
+            gyroMismatchStreak = 0
+        }
+
+        // 6. v1.7 Stationary IMU vs Timing Advance Drop
+        val (taDrop1, taDropDetail1) = trackStationaryTaDrop(
+            sim = cellular.sim1,
+            isStationary = isStationaryImu && !isDemoMode,
+            stationarySec = imuStationaryStreakSec,
+            nowElapsed = nowElapsed,
+            baseline = sim1TaBaseline,
+            updateBaseline = { sim1TaBaseline = it },
+            heldUntil = sim1TaDropUntilElapsedMs,
+            updateHeldUntil = { sim1TaDropUntilElapsedMs = it },
+            heldDetail = sim1TaDropDetail,
+            updateHeldDetail = { sim1TaDropDetail = it }
+        )
+        val (taDrop2, taDropDetail2) = trackStationaryTaDrop(
+            sim = cellular.sim2,
+            isStationary = isStationaryImu && !isDemoMode,
+            stationarySec = imuStationaryStreakSec,
+            nowElapsed = nowElapsed,
+            baseline = sim2TaBaseline,
+            updateBaseline = { sim2TaBaseline = it },
+            heldUntil = sim2TaDropUntilElapsedMs,
+            updateHeldUntil = { sim2TaDropUntilElapsedMs = it },
+            heldDetail = sim2TaDropDetail,
+            updateHeldDetail = { sim2TaDropDetail = it }
+        )
+
+        // 7. v1.7 GNSS Sky Freeze, Doppler Sign vs Elevation Rate, C/N0 Takeover Step, Frozen Accuracy
+        var frozenConstellation = false
+        var dopplerElevMismatches = 0
+        if (!isDemoMode && gnss.satellites.isNotEmpty()) {
+            var matchedFreezeSats = 0
+            var maxDeltaAzEl = 0f
+            var longestSpanMs = 0L
+            val activeKeys = HashSet<Pair<Int, Int>>()
+            for (s in gnss.satellites) {
+                val key = s.constellationType to s.svid
+                activeKeys.add(key)
+                val base = satBaselineMap[key]
+                if (base == null) {
+                    satBaselineMap[key] = SatTrackSample(nowElapsed, s.azimuthDegrees, s.elevationDegrees)
+                } else {
+                    val span = nowElapsed - base.elapsedMs
+                    if (span > longestSpanMs) longestSpanMs = span
+                    val dEl = s.elevationDegrees - base.elDeg
+                    var dAz = abs(s.azimuthDegrees - base.azDeg)
+                    if (dAz > 180f) dAz = 360f - dAz
+                    val combined = dAz + abs(dEl)
+                    if (span >= 55_000L) {
+                        matchedFreezeSats++
+                        if (combined > maxDeltaAzEl) maxDeltaAzEl = combined
+                    }
+                    val prRate = s.pseudorangeRateMps
+                    if (span >= 12_000L && prRate != null && abs(prRate) > 25f && abs(dEl) >= 0.35f) {
+                        if ((dEl > 0.35f && prRate > 25f) || (dEl < -0.35f && prRate < -25f)) {
+                            dopplerElevMismatches++
+                        }
+                        if (span > 45_000L && matchedFreezeSats == 0) {
+                            satBaselineMap[key] = SatTrackSample(nowElapsed, s.azimuthDegrees, s.elevationDegrees)
+                        }
+                    }
+                }
+            }
+            satBaselineMap.keys.retainAll(activeKeys)
+            if (matchedFreezeSats >= 6 && longestSpanMs >= 60_000L && maxDeltaAzEl < 0.05f) {
+                frozenConstellation = true
+            }
+        } else if (isDemoMode) {
+            satBaselineMap.clear()
+        }
+
+        val liveAvgCn0 = gnss.satellites.map { it.cn0DbHz }.filter { it > 0f }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+        var takeoverJumpDb: Float? = null
+        if (!isDemoMode && liveAvgCn0 != null) {
+            cn0History.addLast(Triple(nowElapsed, liveAvgCn0, gnss.satellitesInView))
+            while (cn0History.isNotEmpty() && nowElapsed - cn0History.first().first > 4500L) {
+                cn0History.removeFirst()
+            }
+            if (isStationaryImu && imuStationaryStreakSec >= 5 && gnss.satellitesInView >= 6 && cn0History.size >= 2) {
+                val old = cn0History.first()
+                if (nowElapsed - old.first >= 1500L && old.third >= 6) {
+                    val jump = liveAvgCn0 - old.second
+                    if (jump >= 9.0f) takeoverJumpDb = jump
+                }
+            }
+        } else {
+            cn0History.clear()
+        }
+
+        var frozenAccWithHighHdop = false
+        if (!isDemoMode && gnss.hasFix && gnss.horizontalAccuracyM > 0f) {
+            accFreezeHistory.addLast(gnss.horizontalAccuracyM)
+            while (accFreezeHistory.size > 15) accFreezeHistory.removeFirst()
+            if (accFreezeHistory.size == 15 && gnss.hdop >= 3.0f && gnss.horizontalAccuracyM <= 1.5f) {
+                val minAcc = accFreezeHistory.minOrNull() ?: 0f
+                val maxAcc = accFreezeHistory.maxOrNull() ?: 0f
+                if (maxAcc - minAcc < 0.01f) {
+                    frozenAccWithHighHdop = true
+                }
+            }
+        } else {
+            accFreezeHistory.clear()
+        }
+
+        // 8. Network / Device integrity flags & LinkProperties DNS inspection
+        val netFlags = readNetworkFlags()
         val devOpts = try {
             Settings.Global.getInt(context.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
         } catch (_: Exception) { false }
@@ -206,9 +415,27 @@ class SecurityMonitorEngine(
             sustainedPingLossCount = sustainedPingLossCount,
             devOptionsEnabled = devOpts,
             adbEnabled = adbOn,
-            hasVpnActive = hasVpn,
-            hasValidatedInternet = hasInternet,
-            initialClockDiscontinuity = initialClockDiscontinuity
+            hasVpnActive = netFlags.hasVpn,
+            hasValidatedInternet = netFlags.hasValidatedInternet,
+            initialClockDiscontinuity = initialClockDiscontinuity,
+            gnssBearingDelta4sDeg = gnssBearingDelta4s,
+            gyroYawDelta4sDeg = gyroYawDelta4s,
+            gyroTurnMismatchDetected = gyroMismatchNow,
+            magneticFieldUt = motion.magneticFieldUt,
+            stepsLast6s = motion.stepsLast6s,
+            isWalkingDetected = motion.isWalkingDetected && !isDemoMode,
+            stationaryTaDropDetectedSim1 = taDrop1,
+            stationaryTaDropDetectedSim2 = taDrop2,
+            stationaryTaDropDetailSim1 = taDropDetail1,
+            stationaryTaDropDetailSim2 = taDropDetail2,
+            frozenConstellationDetected = frozenConstellation,
+            dopplerElevationMismatchCount = dopplerElevMismatches,
+            cn0TakeoverJumpDb = takeoverJumpDb,
+            frozenAccuracyWithHighHdop = frozenAccWithHighHdop,
+            dnsServers = netFlags.dnsServers,
+            hasPrivateCellularDns = netFlags.hasPrivateCellularDns,
+            hasCaptivePortal = netFlags.hasCaptivePortal,
+            isCellularDataSuspended = netFlags.isCellularDataSuspended
         )
 
         val evaluated = SecurityAnalyzer.evaluate(
@@ -223,7 +450,11 @@ class SecurityMonitorEngine(
         recordIncidents(evaluated.checks, nowEpoch)
 
         val currentIncidents = synchronized(incidents) { incidents.toList() }
-        _securityState.value = evaluated.copy(recentIncidents = currentIncidents)
+        _securityState.value = evaluated.copy(
+            recentIncidents = currentIncidents,
+            isDeepScanning = isDeepScanning,
+            lastDeepScanTimeMs = lastDeepScanTimeMs
+        )
     }
 
     private fun trackTacChange(
@@ -247,17 +478,101 @@ class SecurityMonitorEngine(
         }
     }
 
-    private fun readNetworkFlags(): Pair<Boolean, Boolean> {
+    private fun trackStationaryTaDrop(
+        sim: SimCellInfo,
+        isStationary: Boolean,
+        stationarySec: Int,
+        nowElapsed: Long,
+        baseline: TaBaseline?,
+        updateBaseline: (TaBaseline?) -> Unit,
+        heldUntil: Long,
+        updateHeldUntil: (Long) -> Unit,
+        heldDetail: String?,
+        updateHeldDetail: (String?) -> Unit
+    ): Pair<Boolean, String?> {
+        val currentTa = sim.timingAdvance
+        if (!sim.isServing || currentTa == null || !isStationary) {
+            if (!isStationary) updateBaseline(null)
+            return (nowElapsed < heldUntil) to (if (nowElapsed < heldUntil) heldDetail else null)
+        }
+        if (baseline == null) {
+            if (stationarySec >= 10) {
+                updateBaseline(TaBaseline(currentTa, sim.ci, sim.pci))
+            }
+        } else {
+            val cellSwitched = sim.ci != baseline.ci || sim.pci != baseline.pci
+            if (baseline.ta - currentTa >= 4 && currentTa <= 2 && (cellSwitched || sim.neighbors.isEmpty())) {
+                val detail = "TA ${baseline.ta} → $currentTa (PCI ${baseline.pci}→${sim.pci})"
+                updateHeldDetail(detail)
+                updateHeldUntil(nowElapsed + 90_000L)
+                updateBaseline(TaBaseline(currentTa, sim.ci, sim.pci))
+                return true to detail
+            } else if (!cellSwitched && currentTa > baseline.ta) {
+                updateBaseline(TaBaseline(currentTa, sim.ci, sim.pci))
+            }
+        }
+        return (nowElapsed < heldUntil) to (if (nowElapsed < heldUntil) heldDetail else null)
+    }
+
+    private data class NetworkFlags(
+        val hasVpn: Boolean = false,
+        val hasValidatedInternet: Boolean = true,
+        val dnsServers: List<String> = emptyList(),
+        val hasPrivateCellularDns: Boolean = false,
+        val hasCaptivePortal: Boolean = false,
+        val isCellularDataSuspended: Boolean = false
+    )
+
+    private fun readNetworkFlags(): NetworkFlags {
         return try {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                ?: return false to true
-            val net = cm.activeNetwork ?: return false to false
-            val caps = cm.getNetworkCapabilities(net) ?: return false to false
+                ?: return NetworkFlags()
+            val net = cm.activeNetwork ?: return NetworkFlags(hasValidatedInternet = false)
+            val caps = cm.getNetworkCapabilities(net) ?: return NetworkFlags(hasValidatedInternet = false)
             val vpn = caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+            val wifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+            val cellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
             val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-            vpn to validated
+            val captive = cellular && !wifi && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
+
+            val dnsList = try {
+                cm.getLinkProperties(net)?.dnsServers?.mapNotNull { it.hostAddress }.orEmpty()
+            } catch (_: Exception) {
+                emptyList()
+            }
+
+            val privateCellDns = if (cellular && !wifi && !vpn) {
+                cm.getLinkProperties(net)?.dnsServers?.any { addr ->
+                    when (addr) {
+                        is Inet4Address -> addr.isSiteLocalAddress || addr.isLoopbackAddress
+                        is Inet6Address -> addr.isSiteLocalAddress || (addr.address.isNotEmpty() && (addr.address[0].toInt() and 0xFE) == 0xFC)
+                        else -> false
+                    }
+                } == true
+            } else false
+
+            val dataSuspended = if (cellular && !wifi &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+            ) {
+                try {
+                    val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+                    @Suppress("DEPRECATION")
+                    tm?.dataState == TelephonyManager.DATA_SUSPENDED
+                } catch (_: Exception) {
+                    false
+                }
+            } else false
+
+            NetworkFlags(
+                hasVpn = vpn,
+                hasValidatedInternet = validated,
+                dnsServers = dnsList,
+                hasPrivateCellularDns = privateCellDns,
+                hasCaptivePortal = captive,
+                isCellularDataSuspended = dataSuspended
+            )
         } catch (_: Exception) {
-            false to true
+            NetworkFlags()
         }
     }
 

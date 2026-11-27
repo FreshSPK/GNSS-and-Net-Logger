@@ -6,13 +6,13 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-Compose%20M3-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org/)
 [![Room](https://img.shields.io/badge/Database-Room%20v6%20SQLite-FFA000.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OSMDroid-7EBC6F.svg?style=flat&logo=openstreetmap)](https://github.com/osmdroid/osmdroid)
-[![Release](https://img.shields.io/badge/Release-v1.6-10B981.svg?style=flat)](RELEASE_v1.6.md)
+[![Release](https://img.shields.io/badge/Release-v1.7-10B981.svg?style=flat)](RELEASE_v1.7.md)
 [![VUT FEKT](https://img.shields.io/badge/VUT-FEKT%20Brno-E4002B.svg?style=flat)](https://www.fekt.vut.cz/)
 
 Standalone native Android application for field RF drive-testing, multi-constellation GNSS satellite diagnostics, Dual-SIM (4G LTE / 5G NSA / 5G SA) network telemetry logging, offline Czech 3-operator BTS registry matching, and real-time GNSS/RF anti-spoofing & jamming detection. Runs **100% locally** with zero external API keys, cloud accounts, or tracking SDKs.
 
 * **Author:** Ing. Jan Kufa, Ph.D. — Department of Radio Electronics (UREL), FEKT, Brno University of Technology (VUT Brno)
-* **Links:** [VUT Profile](https://www.vut.cz/lide/jan-kufa-125512) · [Latest Release (v1.6)](RELEASE_v1.6.md) · [All Releases](https://github.com/FreshSPK/GNSS-and-Net-Logger/releases)
+* **Links:** [VUT Profile](https://www.vut.cz/lide/jan-kufa-125512) · [Latest Release (v1.7)](RELEASE_v1.7.md) · [All Releases](https://github.com/FreshSPK/GNSS-and-Net-Logger/releases)
 * **Contact:** `kufa@vut.cz` / `kufa@vutbr.cz`
 
 ---
@@ -27,7 +27,7 @@ Standalone native Android application for field RF drive-testing, multi-constell
 │  • LocationManager  │  • Dual-SIM Cell Engine   │  • Room SQLite (v6, MIG 5→6) │
 │  • GnssStatus / Raw │  • GNSS & SkyPlot Engine  │  • Foreground Service + Mark │
 │  • TelephonyManager │  • BtsRepository (MCC230) │  • CSV / 3D KML / GPX / JSON │
-│  • IMU & Barometer  │  • SecurityAnalyzer (v1.6)│  • OSMDroid Map + BTS Layer  │
+│  • IMU & Barometer  │  • SecurityAnalyzer (v1.7)│  • OSMDroid Map + BTS Layer  │
 │  • SNTP UDP:123     │  • 3-Clock NTP/NITZ/GNSS  │  • 6-Page Vector PDF Manual  │
 └─────────────────────┴───────────────────────────┴──────────────────────────────┘
 ```
@@ -39,7 +39,7 @@ Standalone native Android application for field RF drive-testing, multi-constell
 | 3 | **GNSS** | **GNSS** | Multi-constellation L1+L5/E5a/B2a SkyPlot radar, C/N₀ bars, satellite table, `GnssMeasurementsEvent` AGC & NMEA stream |
 | 4 | **Map** | **Mapa** | OpenStreetMap + BTS Tower layer, BTS-only browser, RF serving links, live breadcrumbs & clickable historical replay |
 | 5 | **Charts** | **Grafy** | Interactive touch-scrubbing waveforms (RSRP, SINR, Speed, Sats, PDOP, AGC, Ping, IMU, Battery) |
-| 6 | **Spoofing** *(v1.6)* | **Podvody** *(v1.6)* | Threat Risk Index (`0–100%`), 3-clock NTP/NITZ/GNSS audit, TA-vs-RSRP & BTS physics, GNSS/IMU anti-spoofing, Demo Attack Simulator |
+| 6 | **Spoofing** *(v1.7)* | **Podvody** *(v1.7)* | Threat Risk Index (`0–100%`), 3-clock NTP/NITZ/GNSS audit, TA-vs-RSRP & FSPL ceiling, Gyro/Mag/Step & NMEA/ADR forensics, Dual-SIM check, Simulator |
 | 7 | **History** | **Historie** | Search/rename sessions, Dual-SIM + Security analytics, numbered point inspector (`#1`…) with jump-to-Map & CSV/KML/GPX/GeoJSON exports |
 
 ---
@@ -80,11 +80,11 @@ Standalone native Android application for field RF drive-testing, multi-constell
 ### 5. Charts
 Interactive touch-scrubbing Canvas waveforms (live & historical): **Dual-SIM RSRP & SINR**, **Speed**, **Satellites** (**Used** vs. **Visible**), **PDOP**, **AGC Interference**, **Ping RTT**, **Accelerometer**, **Gyroscope**, **Compass**, and **Battery Temperature**.
 
-### 6. Spoofing & Jamming Shield *(v1.6)*
+### 6. Spoofing & Jamming Shield *(v1.7)*
 * **Threat Risk Index (`0–100%`) & Sub-Scores:** Fused risk score across **GNSS**, **Cell RF**, and **Clock**, with bottom-bar warning badge, **Deep Scan**, tap-to-inspect **Check Detail Popups** (unclipped values, meaning & calculation formula), timestamped **Incident Log**, and **acoustic warning tone** on critical events during active recording.
 * **Multi-Source UTC Time Audit (`GNSS · NITZ · NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) with RTT compensation compared against hardware `GnssClock` UTC (`timeNanos − fullBiasNanos`) and cellular NITZ time, plus hardware clock discontinuity & oscillator drift tracking.
-* **RF Propagation Physics (`TA vs. RSRP` & `BTS Distance`):** Validates Timing Advance against known BTS Haversine distance (`ΔTA`), checks measured RSRP against empirical path-loss (`-72 dBm @ 150 m / 1800 MHz`, `34 dB/dec`), flags wideband LTE jamming (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G GSM downgrades, isolated SIB cells, TAC oscillations, and strong-RF data blackholes.
-* **Deep GNSS Anti-Spoofing & Sensor Fusion:** Evaluates `Location.isMock`, AGC vs. C/N₀ compression, uniform C/N₀ (`Ø > 43.5 dB-Hz`, `σ < 2.3 dB-Hz`) & zenith-vs-horizon elevation inversion, orbital Doppler spread collapse (`σ_v < 45 m/s`), L1-only spoofing (vanishing L5/E5a), IMU stationary kinematics, barometer `Δh > 40 m`, teleport jumps (`> 65 m/s`), and GNSS-vs-BTS distance (`> 45 km`).
+* **RF Propagation Physics, Dual-SIM & Cellular DNS Audit:** Validates Timing Advance against known BTS Haversine distance (`ΔTA`), checks RSRP against path-loss and FSPL ceilings (`ΔFSPL > +12 dB`), flags wideband jamming (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G downgrades, reserved test IDs (`PLMN 00101`/`TAC 0/1`/`eNB 0/1`), narrow `1.4/3 MHz` LTE channels, poor `CQI` at strong RSRP, stationary IMU TA drops, Dual-SIM cross-correlation (`2G+TA=0` divergence, BTS `> 40 km`), and private cellular DNS / Captive Portal / `DATA_SUSPENDED` anomalies.
+* **Deep GNSS Anti-Spoofing & Multi-Sensor Fusion:** Evaluates `Location.isMock`, AGC compression, uniform C/N₀ & elevation inversion, orbital Doppler spread (`σ_v < 45 m/s`), L1-only & single-constellation GPS drops, raw `$GNGGA/$GNRMC` vs. Android Location (`> 35 m`), carrier-phase **ADR** collapse, opposite Doppler-vs-elevation trends, `≥ 60 s` sky freeze, `C/N₀` takeover steps, **Gyroscope `ΔYaw` vs. GNSS bearing**, magnetometer `|B|` (`18–95 µT`), zero-permission walking cadence (`imu_step_speed`), barometer `Δh > 40 m`, teleport jumps, and GNSS-vs-BTS distance (`> 45 km`).
 * **Demo Attack Simulator:** One-tap Demo Mode verification scenarios (*GNSS Spoof*, *GNSS Jamming*, *2G IMSI Catcher*, *TA + Power*, *Time Drift*).
 
 ### 7. History & Exports (Room DB v6)
@@ -133,11 +133,11 @@ Interactive touch-scrubbing Canvas waveforms (live & historical): **Dual-SIM RSR
 ### 5. Grafy
 Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro historické relace): **Duální RSRP & SINR**, **Rychlost**, **Satelity** (**Ve fixu** i **Viditelné**), **PDOP**, **AGC rušení**, **Ping RTT**, **Akcelerometr**, **Gyroskop**, **Kompas** a **Teplota baterie**.
 
-### 6. Podvody (Detekce spoofingu, rušení & přesného času) *(v1.6)*
+### 6. Podvody (Detekce spoofingu, rušení & přesného času) *(v1.7)*
 * **Threat Risk Index (`0–100 %`) & dílčí skóre:** Souhrnný ukazatel rizika pro **GNSS**, **RF sítě** a **Čas**, varovný štítek ve spodní liště, **Hloubkový sken**, rozklikávací **detailní pop-up u každé kontroly** (úplné hodnoty, význam a vzorec výpočtu), **Deník incidentů** a **akustický tón** při kritickém incidentu během záznamu.
 * **Srovnání přesného času (`GNSS · NITZ · NTP`):** Vestavěný RFC 4330 SNTP UDP:123 klient (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) s kompenzací RTT oproti `GnssClock` UTC (`timeNanos − fullBiasNanos`) a síťovému času NITZ + sledování diskontinuit a driftu oscilátoru.
-* **RF Fyzika (`TA vs. RSRP` & `Poloha BTS`):** Ověřuje vzdálenost dle Timing Advance proti poloze BTS (ΔTA), kontroluje empirický útlum trasy (`-72 dBm @ 150 m / 1800 MHz`, `34 dB/dek`), detekuje širokopásmové rušení (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G GSM downgrade, izolovanou buňku, oscilaci TAC a výpadky dat při silném signálu.
-* **GNSS Anti-Spoofing & Fúze senzorů:** Kontroluje `Location.isMock`, pokles zisku AGC vs. C/N₀, jednotný výkon C/N₀ (`Ø > 43,5 dB-Hz`, `σ < 2,3 dB-Hz`) i inverzi elevace, kolaps Dopplerova rozptylu (`σ_v < 45 m/s`), zmizení pásma L5/E5a při silném L1, nesoulad s nehybným IMU a barometrem (`Δh > 40 m`), skoky polohy (`> 65 m/s`) i vzdálenost GNSS vs. BTS (`> 45 km`).
+* **RF Fyzika, Dual-SIM korelace & audit DNS:** Ověřuje vzdálenost dle Timing Advance proti poloze BTS (ΔTA), kontroluje empirický útlum i teoretický strop `FSPL` (`ΔFSPL > +12 dB`), detekuje širokopásmové rušení (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G downgrade, testovací ID (`PLMN 00101`/`TAC 0/1`/`eNB 0/1`), úzkou šířku kanálu (`1,4/3 MHz`), nízké `CQI` při silném RSRP, skokové poklesy TA při klidovém IMU, křížovou kontrolu **Dual-SIM** (`2G+TA=0`, rozestup BTS `> 40 km`) i privátní DNS / Captive Portal na mobilních datech.
+* **GNSS Anti-Spoofing & fúze senzorů:** Kontroluje `Location.isMock`, kompresi AGC, jednotný `C/N₀` i inverzi elevace, kolaps Dopplerova rozptylu, vymizení L5/E5a i ostatních konstelací při silném GPS, nesoulad surových vět `$GNGGA/$GNRMC` s `Location API` (`> 35 m`), výpadek nosné fáze **ADR**, opačný Doppler vůči elevaci, zamrzlou oblohu (`≥ 60 s`), skok `C/N₀`, **fúzi gyroskopu (`ΔYaw` vs. kurz GNSS)**, magnetometr `|B|` (`18–95 µT`), detekci chůze (`imu_step_speed`), barometr (`Δh > 40 m`), skoky polohy a vzdálenost GNSS vs. BTS (`> 45 km`).
 * **Demo Simulátor útoků:** V Demo režimu testuje scénáře *GNSS Spoof*, *GNSS Jamming*, *2G IMSI Catcher*, *TA + Výkon* a *Časový útok*.
 
 ### 7. Historie & Exporty (Room DB v6)
@@ -156,7 +156,7 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 * **Language / Jazyk:** Czech, English, or System default / Čeština, Angličtina nebo dle systému.
 * **Demo Mode / Demo režim:** Synthetic drive-test around FEKT VUT Brno with `DEMO` badge & attack simulator; cleanly resets on exit.
 * **Sampling & Calibration / Vzorkování & Kalibrace:** **Walking (`5s / 10m`)**, **Driving (`10s / 50m`)**, **Static (`10s`)** + continuous sliders (`1–60 s`, `5–200 m`), TA multiplier (`1× 78.12 m` / `2× 156.24 m`), QNH pressure (`1013.25 hPa`), and optional BTS geocoding toggle.
-* **6-Page Vector PDF Manual / 6stránkový ilustrovaný PDF manuál:** Tap the top-right **Info (`ⓘ`)** icon to download into `Download/GNSS_Net_Logger/GNSS_Net_Logger_v1.6_Manual_*.pdf` or open/share a bilingual vector-illustrated handbook covering every GNSS, RF, BTS, TA, and anti-spoofing model.
+* **6-Page Vector PDF Manual / 6stránkový ilustrovaný PDF manuál:** Tap the top-right **Info (`ⓘ`)** icon to download into `Download/GNSS_Net_Logger/GNSS_Net_Logger_v1.7_Manual_*.pdf` or open/share a bilingual vector-illustrated handbook covering every GNSS, RF, BTS, TA, and anti-spoofing model.
 
 ### Permissions & Privacy / Oprávnění a soukromí
 | Permission / Oprávnění | Purpose (EN) | Účel (CZ) |
@@ -173,6 +173,7 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 ### Releases / Vydání
 | Version | Release Notes | APK Package |
 | :---: | :--- | :--- |
+| **v1.7** | [RELEASE_v1.7.md](RELEASE_v1.7.md) | [`APK/GNSS_Net_Logger_v1.7.apk.zip`](APK/GNSS_Net_Logger_v1.7.apk.zip) |
 | **v1.6** | [RELEASE_v1.6.md](RELEASE_v1.6.md) | [`APK/GNSS_Net_Logger_v1.6.apk.zip`](APK/GNSS_Net_Logger_v1.6.apk.zip) |
 | **v1.5** | [RELEASE_v1.5.md](RELEASE_v1.5.md) | [`APK/GNSS_Net_Logger_v1.5.apk.zip`](APK/GNSS_Net_Logger_v1.5.apk.zip) |
 | **v1.4** | [RELEASE_v1.4.md](RELEASE_v1.4.md) | [`APK/GNSS_Net_Logger_v1.4.apk.zip`](APK/GNSS_Net_Logger_v1.4.apk.zip) |

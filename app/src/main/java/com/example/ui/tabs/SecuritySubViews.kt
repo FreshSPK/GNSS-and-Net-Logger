@@ -110,11 +110,19 @@ fun TimeForensicsSubView(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            val ntpAgeSec = timeDiag.lastNtpSyncEpochMs?.let { syncMs ->
+                ((timeDiag.systemTimeMs - syncMs) / 1000L).coerceAtLeast(0L)
+            }
             ClockSourceRow(
                 label = if (isCs) "1. Internet NTP (${timeDiag.ntpServer})" else "1. Internet NTP (${timeDiag.ntpServer})",
                 timeText = formatMs(timeDiag.ntpTimeMs),
                 subText = when {
-                    timeDiag.ntpRttMs != null -> "Stratum ${timeDiag.ntpStratum ?: "?"} • RTT ${timeDiag.ntpRttMs} ms"
+                    timeDiag.ntpRttMs != null -> buildString {
+                        append("Stratum ${timeDiag.ntpStratum ?: "?"} • RTT ${timeDiag.ntpRttMs} ms")
+                        if (ntpAgeSec != null) {
+                            append(if (isCs) " • dotaz před ${ntpAgeSec}s (auto 60s)" else " • polled ${ntpAgeSec}s ago (auto 60s)")
+                        }
+                    }
                     timeDiag.ntpError != null -> timeDiag.ntpError
                     else -> if (isCs) "Čekání na odpověď UDP:123..." else "Awaiting UDP:123 response..."
                 },
@@ -126,7 +134,11 @@ fun TimeForensicsSubView(
             ClockSourceRow(
                 label = if (isCs) "2. Mobilní síť / Systém (NITZ)" else "2. Mobile Network / System (NITZ)",
                 timeText = formatMs(timeDiag.systemTimeMs),
-                subText = if (isCs) "Synchronizace ze základnové stanice operátora / OS" else "Carrier NITZ & Android system wall clock",
+                subText = if (isCs) {
+                    "OS / NITZ ze sítě (operátor posílá při Attach / změně TA)"
+                } else {
+                    "OS / carrier NITZ clock (pushed on Attach / TA change)"
+                },
                 accentColor = AmberWarning
             )
 
@@ -170,14 +182,14 @@ fun TimeForensicsSubView(
                 )
                 DeltaTile(
                     modifier = Modifier.weight(1f),
-                    title = if (isCs) "Síť − NTP" else "Net − NTP",
+                    title = "NITZ − NTP",
                     deltaMs = timeDiag.systemMinusNtpMs,
                     warnThresholdMs = 1500L,
                     critThresholdMs = 3000L
                 )
                 DeltaTile(
                     modifier = Modifier.weight(1f),
-                    title = if (isCs) "GNSS − Síť" else "GNSS − Net",
+                    title = "GNSS − NITZ",
                     deltaMs = timeDiag.gnssMinusSystemMs,
                     warnThresholdMs = 800L,
                     critThresholdMs = 2500L
@@ -186,12 +198,23 @@ fun TimeForensicsSubView(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = if (isCs) {
-                    "Limity (zelená): GNSS−NTP ≤ 800 ms • Síť−NTP ≤ 1500 ms (krok NITZ) • GNSS−Síť ≤ 800 ms"
+                    "Limity (zelená): GNSS−NTP ≤ 800 ms • NITZ−NTP ≤ 1500 ms (krok NITZ) • GNSS−NITZ ≤ 800 ms"
                 } else {
-                    "Green limits: GNSS−NTP ≤ 800 ms • Net−NTP ≤ 1500 ms (NITZ step) • GNSS−Net ≤ 800 ms"
+                    "Green limits: GNSS−NTP ≤ 800 ms • NITZ−NTP ≤ 1500 ms (NITZ step) • GNSS−NITZ ≤ 800 ms"
                 },
                 fontSize = 9.sp,
                 color = TextSecondaryDark
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (isCs) {
+                    "NTP se dotazuje přes UDP:123 (auto každých 60 s) a mezi dotazy běží nad elapsedRealtime() bez změny hodin OS. NITZ síť vysílá jen při událostech (Attach/TA/změna 4G↔5G) s krokem 1 s."
+                } else {
+                    "NTP queries UDP:123 every 60s and propagates via monotonic elapsedRealtime() without altering OS time. Carrier NITZ updates on Attach/TA/RAT events at 1s steps."
+                },
+                fontSize = 9.sp,
+                lineHeight = 12.sp,
+                color = TextSecondaryDark.copy(alpha = 0.85f)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -350,7 +373,9 @@ private fun SimPhysicsCard(
     isCs: Boolean
 ) {
     val hasIssue = sim.taAnomaly || sim.powerVsTaAnomalyType != null || sim.widebandJammingDetected ||
-        sim.is2gDowngrade || sim.isIsolatedNoNeighbors || sim.dbMismatch || sim.pingLossWithStrongRf
+        sim.is2gDowngrade || sim.isIsolatedNoNeighbors || sim.dbMismatch || sim.pingLossWithStrongRf ||
+        sim.suspiciousCellOrBwIssue != null || sim.cqiPoorWithStrongRf || sim.stationaryTaDrop ||
+        ((sim.fsplExcessDb ?: -99) > 12)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -439,6 +464,23 @@ private fun SimPhysicsCard(
                 value = "${sim.sinrDb?.let { String.format(Locale.US, "%.1f dB", it) } ?: "—"} / ${sim.tacChangesCount}×",
                 valueColor = if ((sim.sinrDb ?: 10f) < -3f || sim.tacChangesCount >= 3) AmberWarning else TextPrimaryDark
             )
+            PhysicsMetricRow(
+                label = if (isCs) "Strop FSPL (Δ proti max)" else "FSPL Ceiling (Δ vs. max)",
+                value = sim.fsplMaxExpectedDbm?.let {
+                    "$it dBm (${sim.fsplExcessDb?.let { d -> "${if (d >= 0) "+" else ""}$d dB" } ?: "—"})"
+                } ?: "—",
+                valueColor = if ((sim.fsplExcessDb ?: -99) > 12) RoseCritical else EmeraldSignal
+            )
+            PhysicsMetricRow(
+                label = if (isCs) "Test ID / SDR BW / CQI" else "Test ID / SDR BW / CQI",
+                value = sim.suspiciousCellOrBwIssue ?: (if (sim.cqiPoorWithStrongRf) "Low CQI @ Strong RSRP" else "OK"),
+                valueColor = if (sim.suspiciousCellOrBwIssue != null || sim.cqiPoorWithStrongRf) RoseCritical else EmeraldSignal
+            )
+            PhysicsMetricRow(
+                label = if (isCs) "Skok TA při klidu IMU" else "Stationary IMU TA Drop",
+                value = if (sim.stationaryTaDrop) (if (isCs) "DETEKOVÁN" else "DETECTED") else "OK",
+                valueColor = if (sim.stationaryTaDrop) RoseCritical else EmeraldSignal
+            )
         }
     }
 }
@@ -493,6 +535,26 @@ private fun GnssPhysicsCard(m: GnssSecurityMetrics, isCs: Boolean) {
                 label = if (isCs) "IMU klidový test / Δh Baro" else "IMU stationary / Δh Baro",
                 value = "${m.imuStationarySeconds}s / ${m.gnssVsBaroAltJumpM?.let { String.format(Locale.US, "%.1f m", it) } ?: "—"}",
                 valueColor = if (m.gnssVsImuMismatch) RoseCritical else EmeraldSignal
+            )
+            PhysicsMetricRow(
+                label = if (isCs) "Ostatní konstelace / ΔNMEA" else "Non-GPS sats / ΔNMEA",
+                value = "${m.nonGpsSatCount} sat. / ${m.nmeaVsLocationDistM?.let { String.format(Locale.US, "%.1f m", it) } ?: "—"}",
+                valueColor = if (m.constellationDrop || (m.nmeaVsLocationDistM ?: 0.0) > 35.0) RoseCritical else EmeraldSignal
+            )
+            PhysicsMetricRow(
+                label = if (isCs) "Nosná ADR / Opačný Doppler" else "Carrier ADR / Opp. Doppler",
+                value = "${m.adrValidRatioPct?.let { "${it.toInt()}%" } ?: "—"} / ${m.dopplerElevMismatchCount}×${if (m.frozenConstellation) " FROZEN" else ""}",
+                valueColor = if (m.frozenConstellation || m.dopplerElevMismatchCount >= 3 || (m.cn0TakeoverJumpDb ?: 0f) >= 9f) RoseCritical else CyanTertiary
+            )
+            PhysicsMetricRow(
+                label = if (isCs) "Gyroskop ΔYaw vs. GNSS" else "Gyro ΔYaw vs. GNSS Bearing",
+                value = "${m.gyroYawDeltaDeg?.let { "${it.toInt()}°" } ?: "—"} / ${m.gnssBearingDeltaDeg?.let { "${it.toInt()}°" } ?: "—"}",
+                valueColor = if (m.gyroTurnMismatch) RoseCritical else EmeraldSignal
+            )
+            PhysicsMetricRow(
+                label = if (isCs) "Magnetometr |B| / Kroky (6s)" else "Magnetometer |B| / Steps (6s)",
+                value = "${m.magneticFieldUt?.let { String.format(Locale.US, "%.1f µT", it) } ?: "—"} / ${m.stepsLast6s}",
+                valueColor = if (m.walkingVsGnssMismatch || ((m.magneticFieldUt ?: 48f) !in 18f..95f)) AmberWarning else TextPrimaryDark
             )
         }
     }

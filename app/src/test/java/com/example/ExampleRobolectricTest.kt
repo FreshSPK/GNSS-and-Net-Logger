@@ -464,13 +464,13 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testAboutDialogShowsRelease16AndGithubRepoLink() {
+    fun testAboutDialogShowsRelease17AndGithubRepoLink() {
         composeTestRule.setContent {
             SignalLoggerTheme(darkTheme = true) {
                 AboutAndHelpDialog(lang = "CS", onDismiss = {})
             }
         }
-        composeTestRule.onNodeWithText("Release v1.6").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Release v1.7").assertIsDisplayed()
         composeTestRule.onNodeWithTag("author_github_link").assertIsDisplayed()
         composeTestRule.onNodeWithText("GitHub: https://github.com/FreshSPK/GNSS-and-Net-Logger").assertIsDisplayed()
     }
@@ -881,11 +881,11 @@ class ExampleRobolectricTest {
     @Test
     fun testAboutDialogShowsPdfManualButtonsAndLocalizedFilenames() {
         assertEquals(
-            "GNSS_Net_Logger_v1.6_Manual_CS.pdf",
+            "GNSS_Net_Logger_v1.7_Manual_CS.pdf",
             com.example.export.UserManualPdfGenerator.manualFilename(isCs = true)
         )
         assertEquals(
-            "GNSS_Net_Logger_v1.6_Manual_EN.pdf",
+            "GNSS_Net_Logger_v1.7_Manual_EN.pdf",
             com.example.export.UserManualPdfGenerator.manualFilename(isCs = false)
         )
 

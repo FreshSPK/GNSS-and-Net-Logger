@@ -90,6 +90,8 @@ class DemoSimulationEngine {
         val uniqueInView = satList.map { "${it.constellationType}_${it.svid}" }.distinct().size
         val uniqueUsed = satList.filter { it.usedInFix }.map { "${it.constellationType}_${it.svid}" }.distinct().size
 
+        val nmeaLatStr = formatNmeaLat(curLat)
+        val nmeaLonStr = formatNmeaLon(curLon)
         val gnss = GnssState(
             hasFix = true,
             latitude = curLat,
@@ -116,9 +118,16 @@ class DemoSimulationEngine {
             l1Count = l1Count,
             l5Count = l5Count,
             l5InViewCount = l5Count,
-            latestNmeaSentence = "\$GNGGA,100800.00,4913.823,N,01634.731,E,1,18,0.94,286.9,M,44.1,M,,*47",
+            latestNmeaSentence = "\$GNGGA,100800.00,$nmeaLatStr,N,$nmeaLonStr,E,1,18,0.94,286.9,M,44.1,M,,*47",
             rawDopplerHz = -1240.5f + (80f * sin(tick * 0.15f)).toFloat(),
-            adrValidCount = (satUsed * 0.75).toInt()
+            adrValidCount = (satUsed * 0.75).toInt(),
+            dopplerSpreadMps = 340f,
+            hasEverSeenDualFreq = true,
+            hasEverSeenMultiConstellation = true,
+            hasEverSeenValidAdr = true,
+            nmeaLat = curLat,
+            nmeaLon = curLon,
+            nmeaVsLocationDistM = 0.8
         )
 
         // RF Dual-SIM
@@ -240,8 +249,12 @@ class DemoSimulationEngine {
                 accelY = 0.4f * cos(tick * 0.2f).toFloat(),
                 accelZ = 9.8f,
                 accelMagnitude = 9.82f,
-                gyroZ = 0.05f * sin(tick * 0.1f).toFloat(),
-                compassAzimuthDeg = bearing
+                gyroZ = 0.0436f,
+                compassAzimuthDeg = bearing,
+                verticalYawRadPerSec = 0.0436f,
+                magneticFieldUt = 48.6f,
+                stepsLast6s = 0,
+                isWalkingDetected = false
             ),
             battery = BatteryState(
                 temperatureC = 30.5f + (1.2f * sin(tick * 0.05f)).toFloat(),
@@ -252,5 +265,19 @@ class DemoSimulationEngine {
         )
 
         return Triple(gnss, cell, env)
+    }
+
+    private fun formatNmeaLat(lat: Double): String {
+        val absLat = kotlin.math.abs(lat)
+        val deg = absLat.toInt()
+        val min = (absLat - deg) * 60.0
+        return String.format(java.util.Locale.US, "%02d%07.4f", deg, min)
+    }
+
+    private fun formatNmeaLon(lon: Double): String {
+        val absLon = kotlin.math.abs(lon)
+        val deg = absLon.toInt()
+        val min = (absLon - deg) * 60.0
+        return String.format(java.util.Locale.US, "%03d%07.4f", deg, min)
     }
 }

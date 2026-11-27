@@ -22,7 +22,7 @@ object Exporter {
         val isoFormat = createIsoFormat()
         val writer = BufferedWriter(OutputStreamWriter(outputStream, StandardCharsets.UTF_8), 32 * 1024)
         writer.apply {
-            append("# Signal & GNSS Field Logger - Session Export (v1.6)\n")
+            append("# Signal & GNSS Field Logger - Session Export (v1.7)\n")
             append("# Author: Ing. Jan Kufa, Ph.D. (VUT FEKT UREL)\n")
             append("# Session: ${session.title} (ID: ${session.id})\n")
             append("# Start: ${isoFormat.format(Date(session.startTimeMs))}\n")
@@ -144,7 +144,7 @@ object Exporter {
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>${escapeXml(session.title)}</name>
-    <description>Recorded by GNSS &amp; Net Logger v1.6 (Ing. Jan Kufa, Ph.D. - VUT Brno FEKT UREL)</description>
+    <description>Recorded by GNSS &amp; Net Logger v1.7 (Ing. Jan Kufa, Ph.D. - VUT Brno FEKT UREL)</description>
     <Style id="rsrpStrong"><LineStyle><color>ff81b910</color><width>5</width></LineStyle></Style>
     <Style id="rsrpGood"><LineStyle><color>ff16cc84</color><width>5</width></LineStyle></Style>
     <Style id="rsrpFair"><LineStyle><color>ff0b9ef5</color><width>5</width></LineStyle></Style>
@@ -209,7 +209,7 @@ object Exporter {
         writer.apply {
             append(
                 """<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GNSS &amp; Net Logger v1.6 - VUT FEKT UREL" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="GNSS &amp; Net Logger v1.7 - VUT FEKT UREL" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>${escapeXml(session.title)}</name>
     <time>${isoFormat.format(Date(session.startTimeMs))}</time>

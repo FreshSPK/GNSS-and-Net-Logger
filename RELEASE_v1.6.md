@@ -15,7 +15,7 @@
 * **Nová záložka „Podvody“ (Anti-Spoofing, Jamming & Bezpečnostní štít):**
   * Souhrnný **Threat Risk Index (`0–100 %`)** s dílčími skóre pro **GNSS**, **RF sítě** a **Čas**, živou indikací varování ve spodní navigační liště, tlačítkem **Hloubkový sken** a chronologickým **Deníkem incidentů**.
 * **Audit přesného času ze 3 zdrojů (`GNSS · NITZ · Internet NTP`):**
-  * Vestavěný **SNTP v4 (UDP:123)** klient (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) s kompenzací RTT porovnává hardwarový UTC čas `GnssClock`, čas GNSS fixu a síťový čas NITZ (`Δ(GNSS−NTP)`, `Δ(Síť−NTP)`, `Δ(GNSS−Síť)`).
+  * Vestavěný **SNTP v4 (UDP:123)** klient (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) s kompenzací RTT porovnává hardwarový UTC čas `GnssClock`, čas GNSS fixu a síťový čas NITZ (`Δ(GNSS−NTP)`, `Δ(NITZ−NTP)`, `Δ(GNSS−NITZ)`).
   * Sleduje skokové diskontinuity a frekvenční drift interního GNSS oscilátoru (`GnssClock.hardwareClockDiscontinuityCount`, `driftNanosPerSecond`).
 * **RF Fyzika (Timing Advance vs. RSRP & poloha BTS):**
   * Kontroluje odchylku vzdálenosti z **Timing Advance** oproti reálné Haversine vzdálenosti známé **BTS** (`ΔTA`, varování `> 1 500 m`, kritické `> 3 500 m`).
@@ -37,7 +37,7 @@
 ### 🌐 English
 
 * **New "Spoofing" Tab (Anti-Spoofing, Jamming & Security Shield):** Real-time **Threat Risk Index (`0–100%`)** across **GNSS**, **Cell RF**, and **Clock**, bottom-bar warning badge, **On-Demand Deep Scan**, and timestamped **Incident Log**.
-* **3-Clock UTC Audit (`GNSS · Cellular NITZ · Internet NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) with RTT compensation compared against hardware `GnssClock` UTC, fix time, and NITZ time (`Δ(GNSS−NTP)`, `Δ(Net−NTP)`, `Δ(GNSS−Net)`), plus TCXO oscillator drift and discontinuity tracking.
+* **3-Clock UTC Audit (`GNSS · Cellular NITZ · Internet NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) with RTT compensation compared against hardware `GnssClock` UTC, fix time, and NITZ time (`Δ(GNSS−NTP)`, `Δ(NITZ−NTP)`, `Δ(GNSS−NITZ)`), plus TCXO oscillator drift and discontinuity tracking.
 * **RF Propagation Physics (`TA vs. RSRP` & `BTS Distance`):** Cross-checks Timing Advance against real Haversine BTS distance (`ΔTA`), validates measured RSRP against empirical path-loss for TA distance and carrier frequency, and flags wideband interference (`RSSI − RSRP > 38 dB` + SINR), 2G GSM downgrades, isolated SIB cells, TAC oscillations, data blackholes, and BTS DB `PCI/TAC` mismatches.
 * **Deep GNSS Anti-Spoofing & Sensor Fusion:** Checks `Location.isMock`, AGC compression vs. C/N₀, uniform C/N₀ (`σ < 2.3 dB-Hz`) and elevation inversion, orbital Doppler spread collapse (`σ_v < 45 m/s`), L1-only spoofing (vanishing L5/E5a), IMU/barometer kinematic consistency (`Δh > 40 m`), teleport jumps (`> 65 m/s`), and GNSS-vs-BTS distance sanity (`> 45 km`).
 * **Spoofing Telemetry Logging, Room DB v6 & Exports:** Added toggleable **Spoofing & Jamming Telemetry** (`logSpoofing`) in the *Fields* dialog with non-destructive **`MIGRATION_5_6`**, session risk/alert summaries and per-point indicators in *History*, and 10 new exported security columns across **CSV, GPX 1.1, and GeoJSON**.

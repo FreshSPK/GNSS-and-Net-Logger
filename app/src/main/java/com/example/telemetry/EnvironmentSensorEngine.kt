@@ -4,18 +4,22 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.Manifest
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.BatteryManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.example.model.BatteryState
 import com.example.model.EnvironmentState
 import com.example.model.MotionSensorState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.math.atan2
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -25,6 +29,7 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
     private val accelSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val gyroSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
     private val magSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+    private val stepDetectorSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
     private val _envState = MutableStateFlow(EnvironmentState())
     val envState: StateFlow<EnvironmentState> = _envState.asStateFlow()
@@ -81,6 +86,16 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         gyroSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler) }
         magSensor?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler) }
 
+        val canUseHwSteps = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+        if (canUseHwSteps) {
+            try {
+                stepDetectorSensor?.let {
+                    sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI, handler)
+                }
+            } catch (_: SecurityException) {}
+        }
+
         try {
             if (!isBatteryRegistered) {
                 context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -134,7 +149,18 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         )
     }
 
-    fun updateDemoMotion(ax: Float, ay: Float, az: Float, gx: Float, gy: Float, gz: Float, azimuth: Float) {
+    fun updateDemoMotion(
+        ax: Float,
+        ay: Float,
+        az: Float,
+        gx: Float,
+        gy: Float,
+        gz: Float,
+        azimuth: Float,
+        verticalYawRadPerSec: Float = gz,
+        magneticFieldUt: Float? = 48.5f,
+        stepsLast6s: Int = 0
+    ) {
         val mag = sqrt(ax * ax + ay * ay + az * az)
         _envState.value = _envState.value.copy(
             motion = MotionSensorState(
@@ -145,7 +171,11 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 gyroX = gx,
                 gyroY = gy,
                 gyroZ = gz,
-                compassAzimuthDeg = azimuth
+                compassAzimuthDeg = azimuth,
+                verticalYawRadPerSec = verticalYawRadPerSec,
+                magneticFieldUt = magneticFieldUt,
+                stepsLast6s = stepsLast6s,
+                isWalkingDetected = stepsLast6s >= 4
             )
         )
     }
@@ -158,6 +188,11 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
     private var latestGy = 0f
     private var latestGz = 0f
     private var latestAzimuth = 0f
+    private var latestVerticalYaw = 0f
+    private var latestMagFieldUt: Float? = null
+    private val stepPeakTimestampsMs = ArrayDeque<Long>()
+    private var stepArmed = false
+    private var lastStepRecordedMs = 0L
 
     override fun onSensorChanged(event: SensorEvent?) {
         val e = event ?: return
@@ -180,6 +215,7 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 latestAy = e.values[1]
                 latestAz = e.values[2]
                 latestMag = sqrt(latestAx * latestAx + latestAy * latestAy + latestAz * latestAz)
+                updateAccelStepCadence(latestMag)
                 computeOrientationInternal()
                 maybeEmitMotionState()
             }
@@ -188,15 +224,64 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 latestGx = e.values[0]
                 latestGy = e.values[1]
                 latestGz = e.values[2]
+                latestVerticalYaw = if (hasGravity) {
+                    val gNorm = sqrt(
+                        gravityValues[0] * gravityValues[0] +
+                            gravityValues[1] * gravityValues[1] +
+                            gravityValues[2] * gravityValues[2]
+                    )
+                    if (gNorm > 2f) {
+                        (latestGx * gravityValues[0] + latestGy * gravityValues[1] + latestGz * gravityValues[2]) / gNorm
+                    } else latestGz
+                } else latestGz
                 maybeEmitMotionState()
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
                 if (e.values.size < 3) return
                 System.arraycopy(e.values, 0, geomagneticValues, 0, 3)
                 hasGeomagnetic = true
+                latestMagFieldUt = sqrt(
+                    geomagneticValues[0] * geomagneticValues[0] +
+                        geomagneticValues[1] * geomagneticValues[1] +
+                        geomagneticValues[2] * geomagneticValues[2]
+                )
                 computeOrientationInternal()
                 maybeEmitMotionState()
             }
+            Sensor.TYPE_STEP_DETECTOR -> {
+                recordStepImpulse(android.os.SystemClock.elapsedRealtime())
+                maybeEmitMotionState()
+            }
+        }
+    }
+
+    private fun updateAccelStepCadence(accelMag: Float) {
+        val dev = abs(accelMag - 9.81f)
+        if (!stepArmed && dev < 0.7f) {
+            stepArmed = true
+        } else if (stepArmed && dev in 1.45f..8.5f) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            val dt = now - lastStepRecordedMs
+            if (dt in 280L..1200L || lastStepRecordedMs == 0L) {
+                recordStepImpulse(now)
+            } else if (dt > 1200L) {
+                // Re-arm on first step of new gait sequence
+                lastStepRecordedMs = now
+            }
+            stepArmed = false
+        }
+    }
+
+    private fun recordStepImpulse(nowElapsedMs: Long) {
+        if (nowElapsedMs - lastStepRecordedMs < 260L && lastStepRecordedMs != 0L) return
+        lastStepRecordedMs = nowElapsedMs
+        stepPeakTimestampsMs.addLast(nowElapsedMs)
+        pruneOldSteps(nowElapsedMs)
+    }
+
+    private fun pruneOldSteps(nowElapsedMs: Long) {
+        while (stepPeakTimestampsMs.isNotEmpty() && nowElapsedMs - stepPeakTimestampsMs.first() > 6000L) {
+            stepPeakTimestampsMs.removeFirst()
         }
     }
 
@@ -215,6 +300,8 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastEmitMs < 100L) return // Max 10 Hz state emissions to reduce Compose recomposition overhead
         lastEmitMs = now
+        pruneOldSteps(now)
+        val stepsCount = stepPeakTimestampsMs.size
 
         val cur = _envState.value
         _envState.value = cur.copy(
@@ -226,7 +313,11 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 gyroX = latestGx,
                 gyroY = latestGy,
                 gyroZ = latestGz,
-                compassAzimuthDeg = latestAzimuth
+                compassAzimuthDeg = latestAzimuth,
+                verticalYawRadPerSec = latestVerticalYaw,
+                magneticFieldUt = latestMagFieldUt,
+                stepsLast6s = stepsCount,
+                isWalkingDetected = stepsCount >= 4
             )
         )
     }

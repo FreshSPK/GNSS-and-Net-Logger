@@ -315,6 +315,12 @@ class CellularTelemetryEngine(
         }
     }
 
+    fun requestImmediateRefresh() {
+        if (!isRunning) return
+        triggerFreshCellUpdate()
+        scheduleRead(providedCells = null, force = true)
+    }
+
     private fun triggerFreshCellUpdate() {
         val tm = telephonyManager ?: return
         if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

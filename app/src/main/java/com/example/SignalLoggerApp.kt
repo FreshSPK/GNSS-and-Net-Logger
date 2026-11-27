@@ -294,15 +294,27 @@ class SignalLoggerApp : Application() {
     }
 
     fun runDeepSecurityScan() {
-        if (!_settings.value.isDemoMode) {
-            securityEngine.syncNtpNow(force = true)
+        if (securityEngine.securityState.value.isDeepScanning) return
+        applicationScope.launch {
+            securityEngine.setDeepScanActive(true)
+            try {
+                if (!_settings.value.isDemoMode) {
+                    cellularEngine.requestImmediateRefresh()
+                    securityEngine.syncNtpNow(force = true)
+                    delay(950)
+                } else {
+                    delay(450)
+                }
+                securityEngine.evaluateNow(
+                    gnss = gnssEngine.gnssState.value,
+                    cellular = cellularEngine.cellularState.value,
+                    env = environmentEngine.envState.value,
+                    isDemoMode = _settings.value.isDemoMode
+                )
+            } finally {
+                securityEngine.setDeepScanActive(false, completedEpochMs = System.currentTimeMillis())
+            }
         }
-        securityEngine.evaluateNow(
-            gnss = gnssEngine.gnssState.value,
-            cellular = cellularEngine.cellularState.value,
-            env = environmentEngine.envState.value,
-            isDemoMode = _settings.value.isDemoMode
-        )
     }
 
     fun updateSettings(newSettings: LoggingSettings) {

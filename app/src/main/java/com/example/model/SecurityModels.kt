@@ -78,7 +78,21 @@ data class GnssSecurityMetrics(
     val gnssVsBaroAltJumpM: Float? = null,
     val gnssVsBtsDistanceM: Double? = null,
     val gnssVsBtsMismatch: Boolean = false,
-    val jumpEventsCount: Int = 0
+    val jumpEventsCount: Int = 0,
+    // v1.7 extended metrics
+    val nonGpsSatCount: Int = 0,
+    val constellationDrop: Boolean = false,
+    val nmeaVsLocationDistM: Double? = null,
+    val adrValidRatioPct: Float? = null,
+    val frozenConstellation: Boolean = false,
+    val dopplerElevMismatchCount: Int = 0,
+    val cn0TakeoverJumpDb: Float? = null,
+    val gnssBearingDeltaDeg: Float? = null,
+    val gyroYawDeltaDeg: Float? = null,
+    val gyroTurnMismatch: Boolean = false,
+    val magneticFieldUt: Float? = null,
+    val stepsLast6s: Int = 0,
+    val walkingVsGnssMismatch: Boolean = false
 )
 
 data class SimRfSecurityMetrics(
@@ -103,7 +117,13 @@ data class SimRfSecurityMetrics(
     val is2gDowngrade: Boolean = false,
     val isIsolatedNoNeighbors: Boolean = false,
     val dbMismatch: Boolean = false,
-    val pingLossWithStrongRf: Boolean = false
+    val pingLossWithStrongRf: Boolean = false,
+    // v1.7 extended RF metrics
+    val fsplMaxExpectedDbm: Int? = null,
+    val fsplExcessDb: Int? = null,
+    val suspiciousCellOrBwIssue: String? = null,
+    val cqiPoorWithStrongRf: Boolean = false,
+    val stationaryTaDrop: Boolean = false
 )
 
 data class SecurityIncident(
@@ -132,5 +152,7 @@ data class SecurityAnalysisState(
     val hasValidatedInternet: Boolean = true,
     val recentIncidents: List<SecurityIncident> = emptyList(),
     val activeSimulatedAttack: SimulatedAttackType = SimulatedAttackType.NONE,
-    val lastEvaluatedMs: Long = System.currentTimeMillis()
+    val lastEvaluatedMs: Long = System.currentTimeMillis(),
+    val isDeepScanning: Boolean = false,
+    val lastDeepScanTimeMs: Long? = null
 )

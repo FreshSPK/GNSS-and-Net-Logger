@@ -41,6 +41,13 @@ class GnssTelemetryEngine(
     private var measuredTtffSec: Float? = null
     private var latestGeoidSepM: Double? = null
     private var hasEverSeenDualFreq = false
+    private var hasEverSeenMultiConstellation = false
+    private var hasEverSeenValidAdr = false
+    private var latestNmeaLat: Double? = null
+    private var latestNmeaLon: Double? = null
+    private var latestNmeaFixElapsedMs: Long = 0L
+    @Volatile
+    private var latestSatPrRates: Map<Pair<Int, Int>, Float> = emptyMap()
     private var jumpEventsCount = 0
     private var lastJumpSpeedMs: Float? = null
     private var gnssThread: android.os.HandlerThread? = null
@@ -145,6 +152,12 @@ class GnssTelemetryEngine(
         measuredTtffSec = null
         latestGeoidSepM = null
         hasEverSeenDualFreq = false
+        hasEverSeenMultiConstellation = false
+        hasEverSeenValidAdr = false
+        latestNmeaLat = null
+        latestNmeaLon = null
+        latestNmeaFixElapsedMs = 0L
+        latestSatPrRates = emptyMap()
         jumpEventsCount = 0
         lastJumpSpeedMs = null
         _gnssState.value = GnssState()
@@ -259,6 +272,15 @@ class GnssTelemetryEngine(
         val geoid = latestGeoidSepM
         val wgsAlt = if (geoid != null) loc.altitude + geoid else loc.altitude
 
+        val nmeaDistM = if (latestNmeaLat != null && latestNmeaLon != null &&
+            (nowElapsed - latestNmeaFixElapsedMs) <= 3000L
+        ) {
+            com.example.bts.BtsGeoUtils.haversineDistanceMeters(
+                loc.latitude, loc.longitude,
+                latestNmeaLat!!, latestNmeaLon!!
+            )
+        } else null
+
         val current = _gnssState.value
         _gnssState.value = current.copy(
             hasFix = true,
@@ -277,7 +299,10 @@ class GnssTelemetryEngine(
             isMockLocation = isMock,
             fixTimestampMs = loc.time.takeIf { it > 0L },
             jumpEventsCount = jumpEventsCount,
-            lastJumpSpeedMs = lastJumpSpeedMs
+            lastJumpSpeedMs = lastJumpSpeedMs,
+            nmeaLat = latestNmeaLat,
+            nmeaLon = latestNmeaLon,
+            nmeaVsLocationDistM = nmeaDistM
         )
     }
 
@@ -322,6 +347,15 @@ class GnssTelemetryEngine(
             val body = cleanSentence.substringBefore('*')
             val tokens = body.split(',')
             if (tokens.size > 11) {
+                val fixQuality = tokens[6].toIntOrNull() ?: 0
+                if (fixQuality > 0) {
+                    val latLon = parseNmeaLatLon(tokens[2], tokens[3], tokens[4], tokens[5])
+                    if (latLon != null) {
+                        latestNmeaLat = latLon.first
+                        latestNmeaLon = latLon.second
+                        latestNmeaFixElapsedMs = android.os.SystemClock.elapsedRealtime()
+                    }
+                }
                 val hdopVal = tokens[8].toFloatOrNull()
                 val geoidSep = tokens[11].toDoubleOrNull()
                 if (geoidSep != null) {
@@ -334,6 +368,17 @@ class GnssTelemetryEngine(
                         pdop = if (c.pdop <= 0f) hdopVal * 1.4f else c.pdop,
                         geoidSeparationM = geoidSep ?: c.geoidSeparationM
                     )
+                }
+            }
+        } else if (cleanSentence.startsWith("\$GNRMC") || cleanSentence.startsWith("\$GPRMC")) {
+            val body = cleanSentence.substringBefore('*')
+            val tokens = body.split(',')
+            if (tokens.size >= 7 && tokens[2] == "A") {
+                val latLon = parseNmeaLatLon(tokens[3], tokens[4], tokens[5], tokens[6])
+                if (latLon != null) {
+                    latestNmeaLat = latLon.first
+                    latestNmeaLon = latLon.second
+                    latestNmeaFixElapsedMs = android.os.SystemClock.elapsedRealtime()
                 }
             }
         }
@@ -389,7 +434,8 @@ class GnssTelemetryEngine(
                     hasCarrierFrequency = hasCarrier,
                     carrierFrequencyHz = carrierHz,
                     bandLabel = bandLabel,
-                    usedInFix = used
+                    usedInFix = used,
+                    pseudorangeRateMps = latestSatPrRates[constType to svid]
                 )
             )
 
@@ -467,6 +513,14 @@ class GnssTelemetryEngine(
         if (dualFreqViewCount > 0) {
             hasEverSeenDualFreq = true
         }
+        val nonGpsInView = satList.count {
+            it.constellationType == GnssStatus.CONSTELLATION_GALILEO ||
+                it.constellationType == GnssStatus.CONSTELLATION_GLONASS ||
+                it.constellationType == GnssStatus.CONSTELLATION_BEIDOU
+        }
+        if (nonGpsInView >= 3) {
+            hasEverSeenMultiConstellation = true
+        }
 
         val current = _gnssState.value
         _gnssState.value = current.copy(
@@ -489,7 +543,8 @@ class GnssTelemetryEngine(
             l5InViewCount = dualFreqViewCount,
             dualFrequencyRatioPct = dualRatio,
             constellationCountMap = constellationMap,
-            hasEverSeenDualFreq = hasEverSeenDualFreq
+            hasEverSeenDualFreq = hasEverSeenDualFreq,
+            hasEverSeenMultiConstellation = hasEverSeenMultiConstellation
         )
     }
 
@@ -534,6 +589,7 @@ class GnssTelemetryEngine(
         var sumDopplerHz = 0.0
         var dopplerCount = 0
         val prRates = mutableListOf<Double>()
+        val prRateMap = HashMap<Pair<Int, Int>, Float>()
 
         for (m in event.measurements) {
             val state = m.accumulatedDeltaRangeState
@@ -547,6 +603,7 @@ class GnssTelemetryEngine(
             val prRate = m.pseudorangeRateMetersPerSecond
             if (prRate in -6000.0..6000.0 && prRate != 0.0) {
                 prRates.add(prRate)
+                prRateMap[m.constellationType to m.svid] = prRate.toFloat()
                 val carrierHz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && m.hasCarrierFrequencyHz()) {
                     m.carrierFrequencyHz.toDouble()
                 } else 1575420000.0
@@ -554,6 +611,10 @@ class GnssTelemetryEngine(
                 sumDopplerHz += dopplerHz
                 dopplerCount++
             }
+        }
+        latestSatPrRates = prRateMap
+        if (adrValidCount >= 3) {
+            hasEverSeenValidAdr = true
         }
 
         val dopplerSpreadMps = if (prRates.size >= 2) {
@@ -585,8 +646,36 @@ class GnssTelemetryEngine(
             clockDiscontinuityCount = discontinuityCount,
             clockDriftNanosPerSec = driftNps,
             clockBiasUncertaintyNanos = biasUncNanos,
-            gnssHardwareUtcMs = gnssHardwareUtcMs ?: current.gnssHardwareUtcMs
+            gnssHardwareUtcMs = gnssHardwareUtcMs ?: current.gnssHardwareUtcMs,
+            hasEverSeenValidAdr = hasEverSeenValidAdr
         )
+    }
+
+    companion object {
+        fun parseNmeaLatLon(
+            latRaw: String,
+            latHemi: String,
+            lonRaw: String,
+            lonHemi: String
+        ): Pair<Double, Double>? {
+            val lat = parseNmeaCoord(latRaw, isLat = true, hemi = latHemi) ?: return null
+            val lon = parseNmeaCoord(lonRaw, isLat = false, hemi = lonHemi) ?: return null
+            return lat to lon
+        }
+
+        private fun parseNmeaCoord(raw: String, isLat: Boolean, hemi: String): Double? {
+            if (raw.isBlank() || hemi.isBlank()) return null
+            val dotIdx = raw.indexOf('.')
+            val degDigits = if (isLat) 2 else 3
+            if (dotIdx < degDigits + 1 && raw.length < degDigits + 2) return null
+            val deg = raw.substring(0, degDigits).toDoubleOrNull() ?: return null
+            val min = raw.substring(degDigits).toDoubleOrNull() ?: return null
+            var dec = deg + (min / 60.0)
+            if (hemi.equals("S", ignoreCase = true) || hemi.equals("W", ignoreCase = true)) {
+                dec = -dec
+            }
+            return if (dec.isFinite()) dec else null
+        }
     }
 
     private fun getConstellationName(type: Int): String {

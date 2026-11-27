@@ -60,7 +60,13 @@ data class GnssState(
     val dopplerSpreadMps: Float? = null,
     val hasEverSeenDualFreq: Boolean = false,
     val jumpEventsCount: Int = 0,
-    val lastJumpSpeedMs: Float? = null
+    val lastJumpSpeedMs: Float? = null,
+    // v1.7 Advanced GNSS & Sensor-Fusion Anti-Spoofing fields
+    val hasEverSeenMultiConstellation: Boolean = false,
+    val hasEverSeenValidAdr: Boolean = false,
+    val nmeaLat: Double? = null,
+    val nmeaLon: Double? = null,
+    val nmeaVsLocationDistM: Double? = null
 )
 
 data class CellNeighbor(
@@ -187,6 +193,10 @@ data class MotionSensorState(
     val gyroY: Float = 0f,
     val gyroZ: Float = 0f,
     val compassAzimuthDeg: Float = 0f,
+    val verticalYawRadPerSec: Float = 0f,
+    val magneticFieldUt: Float? = null,
+    val stepsLast6s: Int = 0,
+    val isWalkingDetected: Boolean = false,
     val hasSensors: Boolean = true
 )
 

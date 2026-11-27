@@ -3,6 +3,7 @@ package com.example
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -179,7 +180,7 @@ class ComprehensiveAppTest {
         sim1TaVsBtsDeltaM = if (risk != null) 2450.0 else null,
         sim1RsrpResidualDb = if (risk != null) 34 else null,
         sim1RssiRsrpGapDb = if (risk != null) 43 else null,
-        securityAlertsSummary = if (risk != null) "sim1_power_vs_ta:CRITICAL(-61 dBm); time_triple_sync:CRITICAL(G-N: -4820ms)" else ""
+        securityAlertsSummary = if (risk != null) "sim1_power_vs_ta:CRITICAL(-61 dBm); time_triple_sync:CRITICAL(GNSS-NTP: -4820ms)" else ""
     )
 
     @Test
@@ -512,7 +513,7 @@ class ComprehensiveAppTest {
 
         val csv = Exporter.exportToCsv(session, listOf(recLogged, recSkipped))
         assertTrue(csv.contains("SecurityRiskScore,SecurityStatus,GnssRiskScore,RfRiskScore,TimeRiskScore,GnssMinusNtpMs,Sim1TaVsBtsDelta_m,Sim1RsrpResidual_dB,Sim1RssiRsrpGap_dB,SecurityAlertsSummary"))
-        assertTrue(csv.contains("75,\"CRITICAL\",20,85,0,-4820,2450.0,34,43,\"sim1_power_vs_ta:CRITICAL(-61 dBm); time_triple_sync:CRITICAL(G-N: -4820ms)\""))
+        assertTrue(csv.contains("75,\"CRITICAL\",20,85,0,-4820,2450.0,34,43,\"sim1_power_vs_ta:CRITICAL(-61 dBm); time_triple_sync:CRITICAL(GNSS-NTP: -4820ms)\""))
         assertTrue(csv.contains(",\"\",,,,,")) // null fields for skipped record
 
         val gpx = Exporter.exportToGpx(session, listOf(recLogged))
@@ -719,5 +720,105 @@ class ComprehensiveAppTest {
 
         composeTestRule.onNodeWithTag("security_check_detail_close").performClick()
         composeTestRule.onNodeWithTag("security_check_detail_dialog").assertDoesNotExist()
+
+        // Switch to Clocks sub-tab and verify unified NITZ / NTP / GNSS delta labels
+        composeTestRule.onNodeWithText("Čas UTC").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("GNSS − NTP").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("NITZ − NTP").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("GNSS − NITZ").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Síť − NTP").assertDoesNotExist()
+    }
+
+    @Test
+    fun testSecurityTabDeepScanActiveAndCompletedStates() {
+        val now = 1700000000000L
+        val evaluated = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss().copy(fixTimestampMs = now, gnssHardwareUtcMs = now),
+            cellularInput = CellularState(sim1 = cleanSim1()),
+            timeDiagInput = TimeSyncDiagnostics(
+                ntpTimeMs = now,
+                ntpServer = "time.google.com",
+                ntpRttMs = 24L,
+                ntpStratum = 1,
+                lastNtpSyncEpochMs = now - 5_000L,
+                systemTimeMs = now
+            ),
+            ctx = SecurityContextSnapshot()
+        )
+        val scanningState = mutableStateOf(evaluated.copy(isDeepScanning = true))
+
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SecurityTab(
+                    security = scanningState.value,
+                    isDemoMode = false,
+                    lang = "CS",
+                    onSyncNtpNow = {},
+                    onRunDeepScan = {},
+                    onClearIncidents = {},
+                    onSelectSimulatedAttack = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Skenuji...").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("security_deep_scan_status").assertIsDisplayed()
+
+        composeTestRule.runOnUiThread {
+            scanningState.value = evaluated.copy(
+                isDeepScanning = false,
+                lastDeepScanTimeMs = now
+            )
+        }
+        composeTestRule.onNodeWithText("Hloubkový sken").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("security_deep_scan_status").assertIsDisplayed()
+    }
+
+    @Test
+    fun testV17CheckDetailDialogsPhysicsRowsAndNoLightSensor() {
+        val now = 1700000000000L
+        val evaluated = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss().copy(adrValidCount = 4, hasEverSeenValidAdr = true),
+            cellularInput = CellularState(sim1 = cleanSim1().copy(channelBandwidthKhz = 20_000, cqi = 11)),
+            timeDiagInput = TimeSyncDiagnostics(ntpTimeMs = now, systemTimeMs = now),
+            ctx = SecurityContextSnapshot(
+                gnssBearingDelta4sDeg = 55f,
+                gyroYawDelta4sDeg = 2f,
+                gyroTurnMismatchDetected = true,
+                magneticFieldUt = 48.2f,
+                stepsLast6s = 4
+            )
+        )
+
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SecurityTab(
+                    security = evaluated,
+                    isDemoMode = false,
+                    lang = "CS",
+                    onSyncNtpNow = {},
+                    onRunDeepScan = {},
+                    onClearIncidents = {},
+                    onSelectSimulatedAttack = {}
+                )
+            }
+        }
+
+        // Verify v1.7 check card opens detail popup cleanly
+        composeTestRule.onNodeWithTag("security_check_card_gnss_gyro_heading").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("security_check_detail_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Co tento parametr znamená").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("security_check_detail_close").performClick()
+
+        // Verify excluded light sensor never appears in Spoofing tab
+        composeTestRule.onNodeWithText("Světeln", substring = true).assertDoesNotExist()
+
+        // Verify v1.7 Physics Workbench rows
+        composeTestRule.onNodeWithText("Fyzika TA").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Strop FSPL (Δ proti max)").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Test ID / SDR BW / CQI").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Skok TA při klidu IMU").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Gyroskop ΔYaw vs. GNSS").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Magnetometr |B| / Kroky (6s)").performScrollTo().assertIsDisplayed()
     }
 }

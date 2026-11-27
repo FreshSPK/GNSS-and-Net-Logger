@@ -99,7 +99,7 @@ fun AboutAndHelpDialog(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Release v1.6",
+                                    text = "Release v1.7",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldSignal
@@ -355,7 +355,7 @@ fun AboutAndHelpDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Release v1.6 New Features Box
+                // Release v1.7 New Features Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -364,7 +364,7 @@ fun AboutAndHelpDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = if (isCs) "✨ Novinky verze 1.6 (Release v1.6)" else "✨ What's New in Release v1.6",
+                            text = if (isCs) "✨ Novinky verze 1.7 (Release v1.7)" else "✨ What's New in Release v1.7",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
@@ -372,21 +372,15 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "• Nová záložka Podvody (Anti-Spoofing, Jamming & Bezpečnostní štít): souhrnný Threat Risk Index (0–100 %), živé indikátory GNSS/RF/Času a deník bezpečnostních incidentů\n" +
-                                "• Srovnání přesného času (GNSS · Mobilní síť NITZ · Internet NTP): vestavěný SNTP UDP:123 klient s kompenzací RTT proti hardwarovému času GnssClock a síťovému času pro odhalení replay útoků (meaconing) a podvržení NITZ\n" +
-                                "• RF fyzika TA vs. výkon RSRP & poloha BTS: kontrola ΔTA proti známé BTS a ověření útlumu šíření (odhalení blízkých IMSI Catcherů při TA=0–1 i nelegálních opakovačů při velkém TA)\n" +
-                                "• Detekce širokopásmového RF rušení (RSSI − RSRP): analýza energetického rozdílu LTE kanálu nad 38 dB společně se SINR a výpadky paketů\n" +
-                                "• Pokročilý GNSS Anti-Spoofing: kontrola isMock, jednotného výkonu C/N0 (σ) a inverze elevace, kolapsu Dopplerova rozptylu, ztráty L5 při silném L1, fúze IMU + barometru a prostorové kontroly GNSS vs. BTS (> 45 km)\n" +
-                                "• Demo Simulátor útoků: v Demo režimu umožňuje okamžitě otestovat reakci všech detektorů na scénáře GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Výkon a Časový drift\n" +
-                                "• Logování a export bezpečnosti: v dialogu Položky lze ukládat skóre rizika, GNSS−NTP čas a ΔTA−BTS do databáze Room v6 a exportovat do CSV/GPX/GeoJSON"
+                                "• Pokročilá fúze senzorů (Gyroskop + Magnetometr + Krokoměr + Barometr): srovnává projekci rotace gyroskopu (∫ω_vert dt) se zatáčením kurzu GNSS, hlídá odchylky magnetického pole |B| (µT), kadenci kroků vs. rychlost GNSS i náhlý pád TA při nehybném telefonu\n" +
+                                "• Hluboké detektory GNSS spoofingu: kontrola shody surových vět \$GNGGA/\$GNRMC vs. Location API (ΔNMEA), výpadek vícekonstelačního příjmu (GPS-only), zamrzlé nebe (60 s), opačné znaménko Dopplera vůči elevaci, ztráta nosné fáze ADR a skok C/N0 (≥ +9 dB v klidu)\n" +
+                                "• Fyzika RF, FSPL strop & Dual-SIM křížová kontrola: ověření maximálního výkonu podle FSPL k BTS, detekce testovacích PLMN/TAC/eNB, úzkých LTE kanálů (1,4/3 MHz), nízkého CQI při silném RSRP, privátního mobilního DNS a srovnání SIM 1 vs. SIM 2\n" +
+                                "• Kompletní bezpečnostní štít z v1.6: Threat Risk Index (0–100 %), srovnání 3 časů (GNSS/NITZ/NTP), detekce 2G IMSI Catcherů, rušení AGC / RSSI−RSRP, Demo Simulátor útoků a detailní pop-upy se vzorci"
                             } else {
-                                "• New Spoofing Tab (Anti-Spoofing, Jamming & Security Shield): real-time Threat Risk Index (0–100%), domain sub-scores (GNSS / RF / Time), and forensic incident timeline\n" +
-                                "• Multi-Source UTC Clock Audit (GNSS · Cellular NITZ · Internet NTP): built-in SNTP UDP:123 client with RTT compensation vs. GnssClock hardware UTC and NITZ network time to expose GNSS replay/meaconing and NITZ spoofing\n" +
-                                "• RF Link Physics (TA vs. RSRP & BTS Location): validates ΔTA against known BTS towers and empirical path-loss models (catching near-field Stingrays at TA=0–1 and illegal repeaters at high TA)\n" +
-                                "• Wideband Cellular Jamming (RSSI − RSRP Gap): detects in-band interference above 38 dB paired with SINR degradation and packet loss\n" +
-                                "• Deep GNSS Anti-Spoofing: checks isMock flag, C/N0 dispersion & elevation inversion, orbital Doppler spread collapse, L1-only spoofing (missing L5), IMU/barometer sensor fusion, and GNSS-vs-BTS spatial sanity (> 45 km)\n" +
-                                "• Security Telemetry Logging & Export: toggle spoofing logging in Fields to save risk score, GNSS−NTP skew, ΔTA−BTS, and alert summaries into Room DB v6 and CSV/GPX/GeoJSON\n" +
-                                "• Demo Attack Simulator: interactive scenarios in Demo Mode to verify GNSS Spoof, Jamming, 2G IMSI Catcher, TA+Power, and Time Drift detectors"
+                                "• Advanced Sensor Fusion (Gyro + Magnetometer + Pedometer + Barometer): compares gravity-projected gyroscope yaw (∫ω_vert dt) against GNSS bearing turns, tracks magnetic flux |B| (µT), walking cadence vs. GNSS speed, and abrupt TA drops while IMU-stationary\n" +
+                                "• Deep GNSS Anti-Spoofing: audits raw \$GNGGA/\$GNRMC vs. Location API divergence (ΔNMEA), non-GPS constellation dropouts, 60s frozen constellations, opposite Doppler-vs-elevation slope, lost ADR carrier phase, and stationary C/N0 takeover jumps (≥ +9 dB)\n" +
+                                "• RF FSPL Ceiling, Network Stack & Dual-SIM Correlation: enforces FSPL power ceiling to serving BTS, catches test PLMN/TAC/eNB IDs, narrow SDR bandwidths (1.4/3 MHz), poor CQI with strong RSRP, private cellular DNS, and SIM 1 vs. SIM 2 divergence\n" +
+                                "• Full v1.6 Security Shield Foundation: Threat Risk Index (0–100%), 3-clock UTC audit (GNSS/NITZ/NTP), 2G Stingray & AGC/RSSI−RSRP jamming detection, Demo Attack Simulator, and detailed calculation popups"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark

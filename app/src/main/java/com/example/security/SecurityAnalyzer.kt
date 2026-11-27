@@ -1,5 +1,6 @@
 package com.example.security
 
+import com.example.bts.BtsGeoUtils
 import com.example.model.*
 import java.util.Locale
 import kotlin.math.abs
@@ -19,7 +20,33 @@ data class SecurityContextSnapshot(
     val adbEnabled: Boolean = false,
     val hasVpnActive: Boolean = false,
     val hasValidatedInternet: Boolean = true,
-    val initialClockDiscontinuity: Int? = null
+    val initialClockDiscontinuity: Int? = null,
+    // v1.7 extended sensor-fusion, GNSS & cellular/network context
+    val gnssBearingDelta4sDeg: Float? = null,
+    val gyroYawDelta4sDeg: Float? = null,
+    val gyroTurnMismatchDetected: Boolean = false,
+    val magneticFieldUt: Float? = null,
+    val stepsLast6s: Int = 0,
+    val isWalkingDetected: Boolean = false,
+    val stationaryTaDropDetectedSim1: Boolean = false,
+    val stationaryTaDropDetectedSim2: Boolean = false,
+    val stationaryTaDropDetailSim1: String? = null,
+    val stationaryTaDropDetailSim2: String? = null,
+    val frozenConstellationDetected: Boolean = false,
+    val dopplerElevationMismatchCount: Int = 0,
+    val cn0TakeoverJumpDb: Float? = null,
+    val frozenAccuracyWithHighHdop: Boolean = false,
+    val dnsServers: List<String> = emptyList(),
+    val hasPrivateCellularDns: Boolean = false,
+    val hasCaptivePortal: Boolean = false,
+    val isCellularDataSuspended: Boolean = false
+)
+
+private data class SimulatedScenarioInput(
+    val gnss: GnssState,
+    val cellular: CellularState,
+    val timeDiag: TimeSyncDiagnostics,
+    val ctx: SecurityContextSnapshot
 )
 
 object SecurityAnalyzer {
@@ -44,8 +71,8 @@ object SecurityAnalyzer {
         simulatedAttack: SimulatedAttackType = SimulatedAttackType.NONE
     ): SecurityAnalysisState {
         // Apply optional Demo Attack Simulator transformations on copies
-        val (gnss, cellular, timeDiag) = applySimulatedAttackIfActive(
-            gnssInput, cellularInput, timeDiagInput, simulatedAttack
+        val (gnss, cellular, timeDiag, ctx) = applySimulatedAttackIfActive(
+            gnssInput, cellularInput, timeDiagInput, ctx, simulatedAttack
         )
 
         val checks = mutableListOf<SecurityCheckResult>()
@@ -297,6 +324,190 @@ object SecurityAnalyzer {
             )
         )
 
+        // 1H. Constellation Drop (Non-GPS constellations vanish while strong GPS persists)
+        val gpsSatCount = gnss.satellites.count { it.constellationType == 1 }
+        val nonGpsSatCount = gnss.satellites.count { it.constellationType != 1 }
+        val constellationDrop = gnss.hasEverSeenMultiConstellation &&
+            gpsSatCount >= 7 &&
+            (avgCn0 ?: 0f) > 33f &&
+            nonGpsSatCount == 0
+        checks.add(
+            SecurityCheckResult(
+                id = "gnss_constellation_drop",
+                category = ThreatCategory.GNSS_SPOOFING,
+                severity = if (constellationDrop) ThreatSeverity.CRITICAL else ThreatSeverity.OK,
+                titleCs = "Výpadek vícekonstelačního příjmu (GPS-only)",
+                titleEn = "Multi-Constellation Drop (GPS-Only Spoofer)",
+                summaryCs = when {
+                    constellationDrop -> "Galileo/GLONASS/BeiDou zcela zmizely při silném příjmu GPS ($gpsSatCount sat.) – typický podpis jednokonstelačního GPS L1 spooferu!"
+                    nonGpsSatCount > 0 -> "Souběžný příjem GPS ($gpsSatCount) i ostatních konstelací ($nonGpsSatCount) potvrzuje autentické nebe."
+                    else -> "Sledování konstelací aktivní (čeká na multi-GNSS základnu)."
+                },
+                summaryEn = when {
+                    constellationDrop -> "All Galileo/GLONASS/BeiDou satellites vanished while strong GPS persists ($gpsSatCount sats) – classic single-constellation GPS spoofer!"
+                    nonGpsSatCount > 0 -> "Concurrent GPS ($gpsSatCount) and Galileo/GLONASS/BeiDou ($nonGpsSatCount) tracking verified."
+                    else -> "Monitoring constellation diversity."
+                },
+                measuredValue = "GPS: $gpsSatCount • Gal/GLO/BDS: $nonGpsSatCount",
+                expectedRange = if (gnss.hasEverSeenMultiConstellation) "Gal/GLO/BDS ≥ 1" else "Multi-GNSS",
+                scoreImpact = if (constellationDrop) 65 else 0
+            )
+        )
+
+        // 1I. Raw NMEA vs Android Location Coordinate Consistency
+        val nmeaDistM = gnss.nmeaVsLocationDistM
+        val nmeaMismatch = gnss.hasFix && nmeaDistM != null && nmeaDistM > 35.0
+        checks.add(
+            SecurityCheckResult(
+                id = "gnss_nmea_vs_location",
+                category = ThreatCategory.GNSS_SPOOFING,
+                severity = if (nmeaMismatch) ThreatSeverity.CRITICAL else ThreatSeverity.OK,
+                titleCs = "Konzistence surových vět NMEA vs. Location API",
+                titleEn = "Raw NMEA vs. Android Location Consistency",
+                summaryCs = when {
+                    nmeaMismatch -> "Poloha ze surové věty NMEA se liší o ${String.format(Locale.US, "%.1f", nmeaDistM)} m od Location API! Podezření na softwarové přepsání polohy v OS."
+                    nmeaDistM != null -> "Surová NMEA souřadnice přesně souhlasí s Location API (Δ = ${String.format(Locale.US, "%.1f", nmeaDistM)} m)."
+                    else -> "Čekání na souběžný NMEA tok (\$GNGGA / \$GNRMC) a platný fix."
+                },
+                summaryEn = when {
+                    nmeaMismatch -> "Raw NMEA coordinates diverge from Android Location by ${String.format(Locale.US, "%.1f", nmeaDistM)} m! Possible OS-level location hooking."
+                    nmeaDistM != null -> "Raw NMEA coordinates match Android Location API (Δ = ${String.format(Locale.US, "%.1f", nmeaDistM)} m)."
+                    else -> "Awaiting paired raw NMEA (\$GNGGA/\$GNRMC) and location fix."
+                },
+                measuredValue = nmeaDistM?.let { "ΔNMEA = ${String.format(Locale.US, "%.1f m", it)}" } ?: "N/A",
+                expectedRange = "ΔNMEA ≤ 35 m",
+                scoreImpact = if (nmeaMismatch) 75 else 0
+            )
+        )
+
+        // 1J. ADR Carrier Phase, Frozen Sky, Opposite Doppler, C/N0 Takeover Step & Frozen Accuracy
+        val adrRatioPct = if (gnss.satellitesUsedInFix > 0 && gnss.hasEverSeenValidAdr) {
+            ((gnss.adrValidCount.toFloat() / gnss.satellitesUsedInFix.toFloat()) * 100f).coerceIn(0f, 100f)
+        } else null
+        val adrMissing = gnss.hasEverSeenValidAdr &&
+            gnss.satellitesUsedInFix >= 6 &&
+            (avgCn0 ?: 0f) > 38f &&
+            gnss.adrValidCount == 0
+        val oppDoppler = ctx.dopplerElevationMismatchCount >= 3
+        val takeoverJump = ctx.cn0TakeoverJumpDb != null && ctx.cn0TakeoverJumpDb >= 9.0f
+        val frozenSky = ctx.frozenConstellationDetected
+        val frozenAcc = ctx.frozenAccuracyWithHighHdop
+        val adrDopplerFreezeSeverity = when {
+            frozenSky -> ThreatSeverity.CRITICAL
+            oppDoppler || adrMissing || takeoverJump || frozenAcc -> ThreatSeverity.WARNING
+            else -> ThreatSeverity.OK
+        }
+        checks.add(
+            SecurityCheckResult(
+                id = "gnss_adr_doppler_freeze",
+                category = ThreatCategory.GNSS_SPOOFING,
+                severity = adrDopplerFreezeSeverity,
+                titleCs = "Fáze nosné ADR, opačný Doppler & zamrzlé nebe",
+                titleEn = "Carrier ADR, Opposite Doppler & Sky Freeze",
+                summaryCs = when {
+                    frozenSky -> "KRITICKÉ: Polohy satelitů na obloze jsou po dobu ≥ 60 s zcela zamrzlé (statický/opakovaný GNSS záznam)!"
+                    oppDoppler -> "Fyzikální rozpor: ${ctx.dopplerElevationMismatchCount} družic má opačné znaménko Dopplera vůči změně své elevace!"
+                    takeoverJump -> "Prudký skok průměrného C/N0 o +${String.format(Locale.US, "%.1f", ctx.cn0TakeoverJumpDb)} dB v klidu – možný přechod na silnější podvržený signál!"
+                    adrMissing -> "Čip podporuje nosnou fázi ADR, ale při silném signálu (${String.format(Locale.US, "%.1f", avgCn0)} dB-Hz) je platných ADR = 0 %!"
+                    frozenAcc -> "Zamrzlá hodnota přesnosti (${String.format(Locale.US, "%.2f", gnss.horizontalAccuracyM)} m) i při vysokém HDOP (${String.format(Locale.US, "%.1f", gnss.hdop)})."
+                    else -> "Nosná fáze ADR, pohyb družic po obloze i znaménka Dopplera odpovídají realitě."
+                },
+                summaryEn = when {
+                    frozenSky -> "CRITICAL: Satellite sky positions stayed frozen for ≥ 60s (static/looped GNSS replay)!"
+                    oppDoppler -> "Orbital physics conflict: ${ctx.dopplerElevationMismatchCount} satellites show Doppler sign contradicting elevation trend!"
+                    takeoverJump -> "Sudden stationary C/N0 step (+${String.format(Locale.US, "%.1f", ctx.cn0TakeoverJumpDb)} dB) – possible spoofer takeover!"
+                    adrMissing -> "ADR carrier phase dropped to 0% despite strong GNSS C/N0 (${String.format(Locale.US, "%.1f", avgCn0)} dB-Hz)!"
+                    frozenAcc -> "Horizontal accuracy (${String.format(Locale.US, "%.2f", gnss.horizontalAccuracyM)} m) frozen despite high HDOP (${String.format(Locale.US, "%.1f", gnss.hdop)})."
+                    else -> "Carrier phase ADR, orbital motion, and Doppler slopes are consistent."
+                },
+                measuredValue = buildString {
+                    append("ADR: ${adrRatioPct?.let { "${it.toInt()}%" } ?: "—"}")
+                    append(" • OppDop: ${ctx.dopplerElevationMismatchCount}")
+                    if (ctx.cn0TakeoverJumpDb != null) append(" • ΔCN0:+${String.format(Locale.US, "%.1f", ctx.cn0TakeoverJumpDb)}dB")
+                    if (frozenSky) append(" • FROZEN")
+                },
+                expectedRange = "Pohyb >0.05°, ADR>0%, OppDop<3",
+                scoreImpact = when {
+                    frozenSky -> 70
+                    oppDoppler || takeoverJump -> 40
+                    adrMissing || frozenAcc -> 35
+                    else -> 0
+                }
+            )
+        )
+
+        // 1K. Gyroscope Turn Delta vs GNSS Bearing + Magnetometer Magnitude
+        val turnDiffDeg = if (ctx.gnssBearingDelta4sDeg != null && ctx.gyroYawDelta4sDeg != null) {
+            abs(abs(ctx.gnssBearingDelta4sDeg) - abs(ctx.gyroYawDelta4sDeg))
+        } else null
+        val magUt = ctx.magneticFieldUt
+        val magAnomaly = magUt != null && (magUt < 18f || magUt > 95f)
+        val gyroHeadingSeverity = when {
+            ctx.gyroTurnMismatchDetected && (turnDiffDeg ?: 0f) > 40f -> ThreatSeverity.CRITICAL
+            ctx.gyroTurnMismatchDetected || magAnomaly -> ThreatSeverity.WARNING
+            else -> ThreatSeverity.OK
+        }
+        checks.add(
+            SecurityCheckResult(
+                id = "gnss_gyro_heading",
+                category = ThreatCategory.GNSS_SPOOFING,
+                severity = gyroHeadingSeverity,
+                titleCs = "Fúze směru: Gyroskop vs. kurz GNSS & Magnetometr",
+                titleEn = "Heading Fusion: Gyro Yaw vs. GNSS Bearing & Mag",
+                summaryCs = when {
+                    ctx.gyroTurnMismatchDetected -> "Zatáčení podle GNSS (${String.format(Locale.US, "%.0f", ctx.gnssBearingDelta4sDeg ?: 0f)}°) nesouhlasí s gyroskopem (${String.format(Locale.US, "%.0f", ctx.gyroYawDelta4sDeg ?: 0f)}°)!"
+                    magAnomaly -> "Magnetické pole (${String.format(Locale.US, "%.1f", magUt)} µT) je mimo běžný rozsah zemského pole (~20–90 µT)."
+                    else -> "Změna směru GNSS souhlasí s rotací gyroskopu a geomagnetické pole je normální."
+                },
+                summaryEn = when {
+                    ctx.gyroTurnMismatchDetected -> "GNSS heading turn (${String.format(Locale.US, "%.0f", ctx.gnssBearingDelta4sDeg ?: 0f)}°) contradicts gyroscope yaw (${String.format(Locale.US, "%.0f", ctx.gyroYawDelta4sDeg ?: 0f)}°)!"
+                    magAnomaly -> "Ambient magnetic flux (${String.format(Locale.US, "%.1f", magUt)} µT) outside normal Earth range (~20–90 µT)."
+                    else -> "GNSS bearing deltas match gyroscope yaw and magnetic field is nominal."
+                },
+                measuredValue = buildString {
+                    append("ΔGNSS:${ctx.gnssBearingDelta4sDeg?.let { "${it.toInt()}°" } ?: "—"}")
+                    append(" / ΔGyro:${ctx.gyroYawDelta4sDeg?.let { "${it.toInt()}°" } ?: "—"}")
+                    append(" • |B|:${magUt?.let { "${it.toInt()}µT" } ?: "—"}")
+                },
+                expectedRange = "|ΔYaw| ≤ 28°, |B| 18–95 µT",
+                scoreImpact = when {
+                    gyroHeadingSeverity == ThreatSeverity.CRITICAL -> 65
+                    ctx.gyroTurnMismatchDetected -> 35
+                    magAnomaly -> 25
+                    else -> 0
+                }
+            )
+        )
+
+        // 1L. Walking Step Cadence vs GNSS Speed
+        val walkingHighSpeed = ctx.isWalkingDetected && gnss.hasFix && gnss.speedKmh > 35f
+        val walkingZeroSpeed = ctx.isWalkingDetected && ctx.stepsLast6s >= 8 && gnss.hasFix && gnss.speedKmh < 0.5f && gnss.horizontalAccuracyM < 8f
+        val walkingMismatch = walkingHighSpeed || walkingZeroSpeed
+        checks.add(
+            SecurityCheckResult(
+                id = "imu_step_speed",
+                category = ThreatCategory.GNSS_SPOOFING,
+                severity = if (walkingMismatch) ThreatSeverity.WARNING else ThreatSeverity.OK,
+                titleCs = "Fúze kroků (Krokoměr) vs. rychlost GNSS",
+                titleEn = "Walking Cadence vs. GNSS Speed Fusion",
+                summaryCs = when {
+                    walkingHighSpeed -> "Akcelerometr detekuje chůzi (${ctx.stepsLast6s} kroků/6 s), ale GNSS hlásí rychlost ${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h!"
+                    walkingZeroSpeed -> "Senzory detekují chůzi (${ctx.stepsLast6s} kroků/6 s), ale poloha GNSS je zmrazená na ${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h."
+                    ctx.isWalkingDetected -> "Detekovaná chůze (${ctx.stepsLast6s} kroků/6 s) odpovídá rychlosti GNSS (${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h)."
+                    else -> "Kadence chůze v normě (bez rozporu s rychlostí GNSS)."
+                },
+                summaryEn = when {
+                    walkingHighSpeed -> "Pedometer detects walking (${ctx.stepsLast6s} steps/6s), yet GNSS reports ${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h!"
+                    walkingZeroSpeed -> "Walking detected (${ctx.stepsLast6s} steps/6s), yet GNSS coordinates stay frozen at ${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h."
+                    ctx.isWalkingDetected -> "Detected walking (${ctx.stepsLast6s} steps/6s) matches GNSS speed (${String.format(Locale.US, "%.1f", gnss.speedKmh)} km/h)."
+                    else -> "Step cadence consistent with GNSS velocity."
+                },
+                measuredValue = "Kroky/6s: ${ctx.stepsLast6s} • GNSS: ${String.format(Locale.US, "%.1f km/h", gnss.speedKmh)}",
+                expectedRange = "Chůze ↔ 1–12 km/h",
+                scoreImpact = if (walkingMismatch) 35 else 0
+            )
+        )
+
         // =====================================================================
         // 2. MULTI-CLOCK TIME FORENSICS (GNSS vs MOBILE NITZ vs INTERNET NTP)
         // =====================================================================
@@ -337,13 +548,13 @@ object SecurityAnalyzer {
                 id = "time_triple_sync",
                 category = ThreatCategory.TIME_ANOMALY,
                 severity = timeDriftSeverity,
-                titleCs = "Rozdíl času: GNSS vs. Mobilní síť vs. NTP",
-                titleEn = "Clock Skew: GNSS vs. Mobile Network vs. NTP",
+                titleCs = "Rozdíl času: GNSS vs. NITZ vs. NTP",
+                titleEn = "Clock Skew: GNSS vs. NITZ vs. NTP",
                 summaryCs = when (timeDriftSeverity) {
                     ThreatSeverity.CRITICAL -> "Kritická odchylka hodin! Přehrávání záznamu GNSS (meaconing) nebo manipulace se síťovým časem NITZ."
-                    ThreatSeverity.WARNING -> "Měřitelný časový posun mezi GNSS, mobilní sítí a internetovým NTP serverem."
+                    ThreatSeverity.WARNING -> "Měřitelný časový posun mezi GNSS, mobilní sítí (NITZ) a internetovým NTP serverem."
                     else -> if (timeDiag.ntpTimeMs != null || bestGnssTimeMs != null) {
-                        "Všechny dostupné časové zdroje (GNSS / Mobilní síť / NTP) jsou vzájemně synchronizované."
+                        "Všechny dostupné časové zdroje (GNSS / NITZ / NTP) jsou vzájemně synchronizované."
                     } else {
                         "Čekání na NTP synchronizaci nebo platný GNSS čas."
                     }
@@ -354,9 +565,9 @@ object SecurityAnalyzer {
                     else -> "Available time references (GNSS / Cellular NITZ / NTP) are tightly synchronized."
                 },
                 measuredValue = buildString {
-                    append("G-N: ${gnssMinusNtp?.let { "${it}ms" } ?: "—"}")
-                    append(" | S-N: ${sysMinusNtp?.let { "${it}ms" } ?: "—"}")
-                    append(" | G-S: ${gnssMinusSys?.let { "${it}ms" } ?: "—"}")
+                    append("GNSS-NTP: ${gnssMinusNtp?.let { "${it}ms" } ?: "—"}")
+                    append(" | NITZ-NTP: ${sysMinusNtp?.let { "${it}ms" } ?: "—"}")
+                    append(" | GNSS-NITZ: ${gnssMinusSys?.let { "${it}ms" } ?: "—"}")
                 },
                 expectedRange = "|Δt| ≤ 800 ms",
                 scoreImpact = when (timeDriftSeverity) {
@@ -401,15 +612,90 @@ object SecurityAnalyzer {
         // =====================================================================
         // 3. CELLULAR RF ANTI-SPOOFING, TA-POWER PHYSICS & JAMMING (SIM 1 & SIM 2)
         // =====================================================================
-        val sim1Metrics = analyzeSimRfSecurity(cellular.sim1, ctx.sim1TacChanges2Min, cellular.pingPacketLoss, checks)
-        val sim2Metrics = analyzeSimRfSecurity(cellular.sim2, ctx.sim2TacChanges2Min, false, checks)
+        val sim1Metrics = analyzeSimRfSecurity(
+            sim = cellular.sim1,
+            tacChanges2Min = ctx.sim1TacChanges2Min,
+            pingLossOnData = cellular.pingPacketLoss,
+            stationaryTaDrop = ctx.stationaryTaDropDetectedSim1,
+            stationaryTaDropDetail = ctx.stationaryTaDropDetailSim1,
+            outChecks = checks
+        )
+        val sim2Metrics = analyzeSimRfSecurity(
+            sim = cellular.sim2,
+            tacChanges2Min = ctx.sim2TacChanges2Min,
+            pingLossOnData = false,
+            stationaryTaDrop = ctx.stationaryTaDropDetectedSim2,
+            stationaryTaDropDetail = ctx.stationaryTaDropDetailSim2,
+            outChecks = checks
+        )
+
+        // 3B. Dual-SIM Cross-Correlation Check (when both SIMs are actively serving)
+        if (cellular.sim1.isServing && cellular.sim2.isServing &&
+            cellular.sim1.networkGen != "Searching" && cellular.sim2.networkGen != "Searching"
+        ) {
+            val s1LowTa2g = sim1Metrics.is2gDowngrade && (cellular.sim1.timingAdvance ?: 99) == 0
+            val s2LowTa2g = sim2Metrics.is2gDowngrade && (cellular.sim2.timingAdvance ?: 99) == 0
+            val targetedSingleSim = s1LowTa2g xor s2LowTa2g
+
+            val m1 = cellular.sim1.btsMatch
+            val m2 = cellular.sim2.btsMatch
+            val interBtsDistKm = if (m1?.latitude != null && m1.longitude != null &&
+                m2?.latitude != null && m2.longitude != null
+            ) {
+                BtsGeoUtils.haversineDistanceMeters(m1.latitude, m1.longitude, m2.latitude, m2.longitude) / 1000.0
+            } else null
+            val btsGeoDivergence = interBtsDistKm != null && interBtsDistKm > 40.0
+
+            val dualSimJam = (cellular.sim1.sinr ?: 10f) < -1f &&
+                (cellular.sim2.sinr ?: 10f) < -1f &&
+                (cellular.sim1.rsrp ?: -140) > -95 &&
+                (cellular.sim2.rsrp ?: -140) > -95
+
+            val dualSeverity = when {
+                targetedSingleSim || btsGeoDivergence || dualSimJam -> ThreatSeverity.CRITICAL
+                else -> ThreatSeverity.OK
+            }
+            checks.add(
+                SecurityCheckResult(
+                    id = "dual_sim_cross_check",
+                    category = ThreatCategory.CELLULAR_SPOOFING,
+                    severity = dualSeverity,
+                    titleCs = "Křížová korelace Dual-SIM (SIM 1 vs. SIM 2)",
+                    titleEn = "Dual-SIM Cross-Correlation (SIM 1 vs. SIM 2)",
+                    summaryCs = when {
+                        targetedSingleSim -> "Cílený útok na jednu SIM: zatímco jedna SIM byla sražena do 2G s TA=0, druhá SIM drží 4G/5G – silný podpis IMSI Catcheru!"
+                        btsGeoDivergence -> "Obslužné BTS obou SIM jsou od sebe ${String.format(Locale.US, "%.1f", interBtsDistKm)} km! Pravděpodobný falešný/opakovaný Cell ID."
+                        dualSimJam -> "Obě SIM současně hlásí silný signál se záporným SINR – širokopásmové rušení více operátorů!"
+                        else -> "Obě SIM karty hlásí konzistentní 4G/5G síť v téže lokalitě."
+                    },
+                    summaryEn = when {
+                        targetedSingleSim -> "Targeted single-SIM downgrade: one SIM dropped to 2G at TA=0 while the other stays on 4G/5G – strong Stingray signature!"
+                        btsGeoDivergence -> "Serving BTS sites for SIM 1 and SIM 2 are ${String.format(Locale.US, "%.1f", interBtsDistKm)} km apart!"
+                        dualSimJam -> "Both SIMs exhibit degraded SINR with strong RSRP simultaneously – multi-band cellular jamming!"
+                        else -> "Both SIM slots report consistent 4G/5G cells in the same geographic area."
+                    },
+                    measuredValue = buildString {
+                        append("S1:${cellular.sim1.networkGen} / S2:${cellular.sim2.networkGen}")
+                        if (interBtsDistKm != null) append(" • ΔBTS:${String.format(Locale.US, "%.1f km", interBtsDistKm)}")
+                    },
+                    expectedRange = "Konzistentní 4G/5G, ΔBTS < 40 km",
+                    scoreImpact = when {
+                        targetedSingleSim -> 70
+                        btsGeoDivergence || dualSimJam -> 65
+                        else -> 0
+                    }
+                )
+            )
+        }
 
         // =====================================================================
         // 4. NETWORK & DEVICE INTEGRITY CHECKS
         // =====================================================================
+        val strongDataSim = (cellular.sim1.isDataActive || cellular.sim2.isDataActive) &&
+            ((cellular.sim1.rsrp ?: -140) > -95 || (cellular.sim2.rsrp ?: -140) > -95)
         val netSeverity = when {
-            !ctx.hasValidatedInternet && (cellular.sim1.isDataActive || cellular.sim2.isDataActive) &&
-                ((cellular.sim1.rsrp ?: -140) > -95 || (cellular.sim2.rsrp ?: -140) > -95) -> ThreatSeverity.WARNING
+            ctx.hasPrivateCellularDns -> ThreatSeverity.CRITICAL
+            (!ctx.hasValidatedInternet && strongDataSim) || ctx.hasCaptivePortal || ctx.isCellularDataSuspended -> ThreatSeverity.WARNING
             ctx.hasVpnActive -> ThreatSeverity.INFO
             else -> ThreatSeverity.OK
         }
@@ -418,25 +704,39 @@ object SecurityAnalyzer {
                 id = "net_integrity",
                 category = ThreatCategory.INTEGRITY,
                 severity = netSeverity,
-                titleCs = "Integrita datového tunelu, VPN & Mock nastavení",
-                titleEn = "Network Tunnel, VPN & Mock Settings",
-                summaryCs = when (netSeverity) {
-                    ThreatSeverity.WARNING -> "Silný mobilní signál, ale síť nemá ověřený přístup k internetu (možný pasivní IMSI Catcher nebo blokace dat)."
-                    ThreatSeverity.INFO -> "Aktivní VPN tunel – internetový Ping a NTP procházejí přes šifrovaný tunel (vyšší RTT)."
-                    else -> "Konektivita ověřena, bez podezřelé odchylky síťového stacku."
+                titleCs = "Integrita datového tunelu, DNS, VPN & sítě",
+                titleEn = "Network Tunnel, Cellular DNS, VPN & Stack",
+                summaryCs = when {
+                    ctx.hasPrivateCellularDns -> "KRITICKÉ: Mobilní síť (bez Wi-Fi/VPN) přidělila privátní lokální DNS server (${ctx.dnsServers.joinToString()}) – podezření na falešnou IP/DNS bránu IMSI Catcheru!"
+                    ctx.hasCaptivePortal -> "Mobilní datové rozhraní vyžaduje Captive Portal přesměrování – neobvyklé pro standardní mobilní síť."
+                    ctx.isCellularDataSuspended -> "Mobilní datový stav je DATA_SUSPENDED při aktivním rádiovém spojení."
+                    netSeverity == ThreatSeverity.WARNING -> "Silný mobilní signál, ale síť nemá ověřený přístup k internetu (možný pasivní IMSI Catcher nebo blokace dat)."
+                    netSeverity == ThreatSeverity.INFO -> "Aktivní VPN tunel – internetový Ping a NTP procházejí přes šifrovaný tunel (vyšší RTT)."
+                    else -> "Konektivita i DNS konfigurace ověřeny, bez podezřelé odchylky síťového stacku."
                 },
-                summaryEn = when (netSeverity) {
-                    ThreatSeverity.WARNING -> "Strong cellular signal but unvalidated internet access (possible passive IMSI Catcher or data blackhole)."
-                    ThreatSeverity.INFO -> "Active VPN tunnel – Ping and NTP traffic are routed through VPN (elevated RTT)."
-                    else -> "Network connectivity validated with clean routing."
+                summaryEn = when {
+                    ctx.hasPrivateCellularDns -> "CRITICAL: Cellular connection (no Wi-Fi/VPN) assigns private/local DNS (${ctx.dnsServers.joinToString()}) – possible rogue gateway / Stingray!"
+                    ctx.hasCaptivePortal -> "Cellular interface flagged NET_CAPABILITY_CAPTIVE_PORTAL – anomalous for carrier data."
+                    ctx.isCellularDataSuspended -> "Telephony reports DATA_SUSPENDED despite active radio bearer."
+                    netSeverity == ThreatSeverity.WARNING -> "Strong cellular signal but unvalidated internet access (possible passive IMSI Catcher or data blackhole)."
+                    netSeverity == ThreatSeverity.INFO -> "Active VPN tunnel – Ping and NTP traffic are routed through VPN (elevated RTT)."
+                    else -> "Network connectivity and DNS routing validated cleanly."
                 },
                 measuredValue = buildString {
                     append(if (ctx.hasValidatedInternet) "Internet OK" else "Bez konektivity")
+                    if (ctx.dnsServers.isNotEmpty()) append(" • DNS:${ctx.dnsServers.first()}")
+                    if (ctx.hasPrivateCellularDns) append(" (PRIV!)")
+                    if (ctx.hasCaptivePortal) append(" • Captive")
+                    if (ctx.isCellularDataSuspended) append(" • DataSusp")
                     if (ctx.hasVpnActive) append(" • VPN")
                     if (ctx.devOptionsEnabled) append(" • DevOpts")
                 },
-                expectedRange = "Internet OK",
-                scoreImpact = if (netSeverity == ThreatSeverity.WARNING) 30 else 0
+                expectedRange = "Internet OK, veřejné DNS",
+                scoreImpact = when {
+                    ctx.hasPrivateCellularDns -> 65
+                    netSeverity == ThreatSeverity.WARNING -> 35
+                    else -> 0
+                }
             )
         )
 
@@ -485,7 +785,20 @@ object SecurityAnalyzer {
             gnssVsBaroAltJumpM = baroJump,
             gnssVsBtsDistanceM = maxBtsDist,
             gnssVsBtsMismatch = gnssVsBtsMismatch,
-            jumpEventsCount = gnss.jumpEventsCount
+            jumpEventsCount = gnss.jumpEventsCount,
+            nonGpsSatCount = nonGpsSatCount,
+            constellationDrop = constellationDrop,
+            nmeaVsLocationDistM = nmeaDistM,
+            adrValidRatioPct = adrRatioPct,
+            frozenConstellation = frozenSky,
+            dopplerElevMismatchCount = ctx.dopplerElevationMismatchCount,
+            cn0TakeoverJumpDb = ctx.cn0TakeoverJumpDb,
+            gnssBearingDeltaDeg = ctx.gnssBearingDelta4sDeg,
+            gyroYawDeltaDeg = ctx.gyroYawDelta4sDeg,
+            gyroTurnMismatch = ctx.gyroTurnMismatchDetected,
+            magneticFieldUt = ctx.magneticFieldUt,
+            stepsLast6s = ctx.stepsLast6s,
+            walkingVsGnssMismatch = walkingMismatch
         )
 
         return SecurityAnalysisState(
@@ -510,6 +823,8 @@ object SecurityAnalyzer {
         sim: SimCellInfo,
         tacChanges2Min: Int,
         pingLossOnData: Boolean,
+        stationaryTaDrop: Boolean,
+        stationaryTaDropDetail: String?,
         outChecks: MutableList<SecurityCheckResult>
     ): SimRfSecurityMetrics {
         val simTag = "sim${sim.slotIndex + 1}"
@@ -697,6 +1012,106 @@ object SecurityAnalyzer {
             )
         )
 
+        // Check E: FSPL Free-Space Ceiling, Test PLMN/TAC/eNB IDs, Narrow SDR BW & CQI vs Strong RF
+        val fsplDb = sim.btsMatch?.fsplDb
+        val fsplMaxExpectedDbm = fsplDb?.let { (40.0 - it).toInt().coerceIn(-125, -40) }
+        val fsplExcessDb = if (sim.rsrp != null && fsplMaxExpectedDbm != null) sim.rsrp - fsplMaxExpectedDbm else null
+        val fsplViolation = fsplExcessDb != null && fsplExcessDb > 12
+
+        val normalizedPlmn = sim.plmn.filter { it.isDigit() }
+        val testPlmn = normalizedPlmn == "00101" || normalizedPlmn == "001001" || normalizedPlmn.startsWith("999")
+        val testTac = sim.tac in setOf("0", "1", "65534", "65535")
+        val testEnb = sim.enbOrGnbId in setOf("0", "1")
+        val isLte = sim.networkGen.contains("4G", ignoreCase = true) || sim.networkGen.contains("LTE", ignoreCase = true)
+        val narrowBw = isLte && (sim.channelBandwidthKhz == 1400 || sim.channelBandwidthKhz == 3000)
+        val cqiPoorStrongRf = sim.cqi != null && sim.cqi in 1..3 && (sim.rsrp ?: -140) > -85 &&
+            ((sim.rsrq ?: 0) < -15 || pingLossOnData)
+
+        val suspiciousIssue: String? = when {
+            testPlmn -> "TEST_PLMN(${sim.plmn})"
+            testTac -> "TEST_TAC(${sim.tac})"
+            testEnb -> "TEST_ENB(${sim.enbOrGnbId})"
+            narrowBw -> "NARROW_BW(${sim.channelBandwidthKhz}kHz)"
+            else -> null
+        }
+
+        val fsplCqiSeverity = when {
+            testPlmn || testTac || testEnb || fsplViolation -> ThreatSeverity.CRITICAL
+            narrowBw || cqiPoorStrongRf -> ThreatSeverity.WARNING
+            else -> ThreatSeverity.OK
+        }
+        outChecks.add(
+            SecurityCheckResult(
+                id = "${simTag}_fspl_and_cqi",
+                category = ThreatCategory.CELLULAR_SPOOFING,
+                severity = fsplCqiSeverity,
+                titleCs = "$simTitlePrefix: Limit FSPL, CQI & Testovací ID",
+                titleEn = "$simTitlePrefix: FSPL Ceiling, CQI & Test IDs",
+                summaryCs = when {
+                    testPlmn || testTac || testEnb -> "KRITICKÉ: Síť vysílá testovací/rezervovaný identifikátor ($suspiciousIssue) – typické pro SDR / laboratorní IMSI Catcher!"
+                    fsplViolation -> "Přijatý výkon RSRP (${sim.rsrp} dBm) převyšuje teoretický limit volného prostoru FSPL (${fsplMaxExpectedDbm} dBm o +${fsplExcessDb} dB) – fyzicky nemožné bez nelegálního opakovače či falešné BTS!"
+                    narrowBw -> "Neobvykle úzký LTE kanál (${sim.channelBandwidthKhz?.div(1000.0)} MHz) – typické pro levné SDR IMSI Catchery!"
+                    cqiPoorStrongRf -> "Silný RSRP (${sim.rsrp} dBm), ale kriticky nízké CQI=${sim.cqi} a vysoká ztrátovost – rušení nebo falešná buňka bez datového uplinku."
+                    else -> "Výkon v mezích FSPL, platné síťové ID (PLMN/TAC/eNB), standardní šířka kanálu i CQI."
+                },
+                summaryEn = when {
+                    testPlmn || testTac || testEnb -> "CRITICAL: Serving cell broadcasts reserved/test identifier ($suspiciousIssue) – SDR Stingray indicator!"
+                    fsplViolation -> "Measured RSRP (${sim.rsrp} dBm) exceeds free-space FSPL ceiling (${fsplMaxExpectedDbm} dBm by +${fsplExcessDb} dB) – impossible without nearby repeater or rogue BTS!"
+                    narrowBw -> "Abnormally narrow LTE channel (${sim.channelBandwidthKhz?.div(1000.0)} MHz) – common signature of low-cost SDR catchers!"
+                    cqiPoorStrongRf -> "Strong RSRP (${sim.rsrp} dBm) paired with poor CQI=${sim.cqi} and link loss – co-channel interference or fake base station."
+                    else -> "Within FSPL limit, valid PLMN/TAC/eNB IDs, standard channel bandwidth, and nominal CQI."
+                },
+                measuredValue = buildString {
+                    append(fsplMaxExpectedDbm?.let { "FSPLmax:${it}dBm(Δ${fsplExcessDb?.let { d -> "${if (d >= 0) "+" else ""}$d" } ?: "—"})" } ?: "FSPL:—")
+                    append(" • BW:${sim.channelBandwidthKhz?.let { "${it / 1000.0}M" } ?: "—"}")
+                    append(" • CQI:${sim.cqi ?: "—"}")
+                    if (suspiciousIssue != null) append(" • $suspiciousIssue")
+                },
+                expectedRange = "ΔFSPL ≤ +12 dB, valid ID/BW",
+                scoreImpact = when {
+                    testPlmn || testTac || testEnb -> 75
+                    fsplViolation -> 65
+                    narrowBw || cqiPoorStrongRf -> 35
+                    else -> 0
+                }
+            )
+        )
+
+        // Check F: Stationary IMU vs Sudden Timing Advance Drop
+        if (sim.timingAdvance != null || stationaryTaDrop) {
+            val taDropSeverity = when {
+                stationaryTaDrop && (sim.timingAdvance ?: 99) <= 1 && isIsolated -> ThreatSeverity.CRITICAL
+                stationaryTaDrop -> ThreatSeverity.WARNING
+                else -> ThreatSeverity.OK
+            }
+            outChecks.add(
+                SecurityCheckResult(
+                    id = "${simTag}_imu_ta_drop",
+                    category = ThreatCategory.CELLULAR_SPOOFING,
+                    severity = taDropSeverity,
+                    titleCs = "$simTitlePrefix: Skokový pokles TA v klidu (IMU)",
+                    titleEn = "$simTitlePrefix: Stationary IMU TA Drop",
+                    summaryCs = when (taDropSeverity) {
+                        ThreatSeverity.CRITICAL -> "KRITICKÉ: Telefon leží v klidu (IMU), přesto TA náhle spadlo k nule na izolované buňce (${stationaryTaDropDetail ?: "TA=${sim.timingAdvance}"}) – přiblížení IMSI Catcheru!"
+                        ThreatSeverity.WARNING -> "Zařízení je dle IMU nehybné, přesto došlo ke skokovému poklesu Timing Advance (${stationaryTaDropDetail ?: "TA=${sim.timingAdvance}"})."
+                        else -> "Timing Advance je během klidového stavu stabilní bez podezřelých poklesů."
+                    },
+                    summaryEn = when (taDropSeverity) {
+                        ThreatSeverity.CRITICAL -> "CRITICAL: Device is IMU-stationary yet TA abruptly collapsed toward zero on an isolated cell (${stationaryTaDropDetail ?: "TA=${sim.timingAdvance}"})!"
+                        ThreatSeverity.WARNING -> "Abrupt Timing Advance drop while IMU reports stationary device (${stationaryTaDropDetail ?: "TA=${sim.timingAdvance}"})."
+                        else -> "Timing Advance remains stable while stationary."
+                    },
+                    measuredValue = stationaryTaDropDetail ?: "TA = ${sim.timingAdvance ?: "—"} (stabilní)",
+                    expectedRange = "Bez skoku TA v klidu",
+                    scoreImpact = when (taDropSeverity) {
+                        ThreatSeverity.CRITICAL -> 55
+                        ThreatSeverity.WARNING -> 35
+                        else -> 0
+                    }
+                )
+            )
+        }
+
         return SimRfSecurityMetrics(
             slotIndex = sim.slotIndex,
             operatorName = sim.operatorAlpha,
@@ -719,7 +1134,12 @@ object SecurityAnalyzer {
             is2gDowngrade = is2g,
             isIsolatedNoNeighbors = isIsolated,
             dbMismatch = dbMismatch,
-            pingLossWithStrongRf = pingLossWithStrongRf
+            pingLossWithStrongRf = pingLossWithStrongRf,
+            fsplMaxExpectedDbm = fsplMaxExpectedDbm,
+            fsplExcessDb = fsplExcessDb,
+            suspiciousCellOrBwIssue = suspiciousIssue,
+            cqiPoorWithStrongRf = cqiPoorStrongRf,
+            stationaryTaDrop = stationaryTaDrop
         )
     }
 
@@ -727,27 +1147,49 @@ object SecurityAnalyzer {
         gnss: GnssState,
         cellular: CellularState,
         timeDiag: TimeSyncDiagnostics,
+        ctx: SecurityContextSnapshot,
         attack: SimulatedAttackType
-    ): Triple<GnssState, CellularState, TimeSyncDiagnostics> {
+    ): SimulatedScenarioInput {
         return when (attack) {
-            SimulatedAttackType.NONE -> Triple(gnss, cellular, timeDiag)
+            SimulatedAttackType.NONE -> SimulatedScenarioInput(gnss, cellular, timeDiag, ctx)
             SimulatedAttackType.GNSS_SPOOFING -> {
-                val spoofedSats = gnss.satellites.map { s ->
-                    s.copy(
+                val gpsSats = (1..8).map { idx ->
+                    SatelliteInfo(
+                        svid = idx,
+                        constellationType = 1,
+                        constellationName = "GPS",
                         cn0DbHz = 47.2f,
-                        bandLabel = if (s.constellationType == 1) "L1 (1575.42 MHz)" else s.bandLabel
+                        elevationDegrees = (15f + idx * 7f).coerceAtMost(80f),
+                        azimuthDegrees = (idx * 42f) % 360f,
+                        hasCarrierFrequency = true,
+                        carrierFrequencyHz = 1575420000f,
+                        bandLabel = "L1 (1575.42 MHz)",
+                        usedInFix = true
                     )
                 }
                 val spoofGnss = gnss.copy(
-                    satellites = spoofedSats,
+                    satellites = gpsSats,
+                    satellitesInView = gpsSats.size,
+                    satellitesUsedInFix = gpsSats.size,
+                    l1Count = gpsSats.size,
                     l5InViewCount = 0,
                     l5Count = 0,
+                    adrValidCount = 0,
                     hasEverSeenDualFreq = true,
+                    hasEverSeenMultiConstellation = true,
+                    hasEverSeenValidAdr = true,
                     dopplerSpreadMps = 12.4f,
                     speedKmh = 64.0f,
-                    jumpEventsCount = 2
+                    jumpEventsCount = 2,
+                    nmeaVsLocationDistM = 420.0
                 )
-                Triple(spoofGnss, cellular, timeDiag)
+                val spoofCtx = ctx.copy(
+                    cn0TakeoverJumpDb = 11.2f,
+                    gyroTurnMismatchDetected = true,
+                    gnssBearingDelta4sDeg = 52f,
+                    gyroYawDelta4sDeg = 1.5f
+                )
+                SimulatedScenarioInput(spoofGnss, cellular, timeDiag, spoofCtx)
             }
             SimulatedAttackType.GNSS_JAMMING -> {
                 val jammedSats = gnss.satellites.map { it.copy(cn0DbHz = 16.5f) }
@@ -758,29 +1200,53 @@ object SecurityAnalyzer {
                     avgAgcDb = (gnss.agcBaselineDb ?: -10.0) - 18.0,
                     agcBaselineDb = gnss.agcBaselineDb ?: -10.0
                 )
-                Triple(jamGnss, cellular, timeDiag)
+                SimulatedScenarioInput(jamGnss, cellular, timeDiag, ctx)
             }
             SimulatedAttackType.IMSI_CATCHER_2G -> {
                 val rogueSim1 = cellular.sim1.copy(
                     networkGen = "2G GSM",
                     band = "GSM 900",
+                    tac = "1",
                     rsrp = -51,
                     sinr = 2.0f,
+                    cqi = 1,
                     neighbors = emptyList(),
                     timingAdvance = 0,
                     estimatedDistanceM = 0.0
                 )
-                Triple(gnss, cellular.copy(sim1 = rogueSim1, pingPacketLoss = true), timeDiag)
+                val rogueCtx = ctx.copy(
+                    stationaryTaDropDetectedSim1 = true,
+                    stationaryTaDropDetailSim1 = "TA 8 → 0 (PCI ${cellular.sim1.pci}→0)",
+                    dnsServers = listOf("192.168.42.1"),
+                    hasPrivateCellularDns = true
+                )
+                SimulatedScenarioInput(gnss, cellular.copy(sim1 = rogueSim1, pingPacketLoss = true), timeDiag, rogueCtx)
             }
             SimulatedAttackType.TA_POWER_SPOOF -> {
+                val existingBts = cellular.sim1.btsMatch ?: BtsMatchInfo(
+                    operatorPlmn = "23001",
+                    operatorName = cellular.sim1.operatorAlpha,
+                    cellId = 568853L,
+                    enodebId = 2222L,
+                    sectorId = 21,
+                    dbPci = cellular.sim1.pci,
+                    dbTac = 24656,
+                    dbBand = "2600",
+                    distanceMeters = 1500.0,
+                    fsplDb = 104.0
+                )
                 val spoofSim1 = cellular.sim1.copy(
                     timingAdvance = 18,
                     estimatedDistanceM = 2812.0,
-                    rsrp = -61,
-                    rssi = -18,
-                    sinr = -5.4f
+                    rsrp = -51,
+                    rsrq = -17,
+                    rssi = -12,
+                    sinr = -5.4f,
+                    cqi = 2,
+                    channelBandwidthKhz = 3000,
+                    btsMatch = existingBts.copy(fsplDb = existingBts.fsplDb ?: 104.0)
                 )
-                Triple(gnss, cellular.copy(sim1 = spoofSim1), timeDiag)
+                SimulatedScenarioInput(gnss, cellular.copy(sim1 = spoofSim1), timeDiag, ctx)
             }
             SimulatedAttackType.TIME_DRIFT_ATTACK -> {
                 val now = System.currentTimeMillis()
@@ -793,7 +1259,7 @@ object SecurityAnalyzer {
                     gnssHardwareUtcMs = now - 4820L,
                     systemTimeMs = now + 3500L
                 )
-                Triple(gnss, cellular, driftedTime)
+                SimulatedScenarioInput(gnss, cellular, driftedTime, ctx)
             }
         }
     }
