@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.example.bts.BtsGeoUtils
 import kotlinx.coroutines.flow.Flow
 
 data class OperatorBtsStats(
@@ -53,13 +54,25 @@ interface BtsDao {
             if (prev == null) {
                 item
             } else {
-                val useNewCoords = item.latitude != null && item.longitude != null
+                val itemHasCoords = BtsGeoUtils.isValidCzechCoord(item.latitude, item.longitude)
+                val prevHasCoords = BtsGeoUtils.isValidCzechCoord(prev.latitude, prev.longitude)
+                val useNewCoords = when {
+                    !itemHasCoords -> false
+                    !prevHasCoords -> true
+                    else -> BtsGeoUtils.coordSourcePriority(item.coordSource) >= BtsGeoUtils.coordSourcePriority(prev.coordSource)
+                }
                 val lat = if (useNewCoords) item.latitude else prev.latitude
                 val lon = if (useNewCoords) item.longitude else prev.longitude
                 val coordSrc = if (useNewCoords) item.coordSource else prev.coordSource
 
-                val isItemLocSynthetic = item.locationName.isBlank() || item.locationName.startsWith("OpenCelliD")
-                val isPrevLocRich = prev.locationName.isNotBlank() && !prev.locationName.startsWith("OpenCelliD")
+                val isItemLocSynthetic = item.locationName.isBlank() ||
+                    item.locationName.startsWith("OpenCelliD") ||
+                    item.locationName.startsWith("CellMapper") ||
+                    item.locationName.startsWith("BeaconDB")
+                val isPrevLocRich = prev.locationName.isNotBlank() &&
+                    !prev.locationName.startsWith("OpenCelliD") &&
+                    !prev.locationName.startsWith("CellMapper") &&
+                    !prev.locationName.startsWith("BeaconDB")
                 val mergedLocation = when {
                     isItemLocSynthetic && isPrevLocRich -> prev.locationName
                     item.locationName.isBlank() -> prev.locationName
@@ -89,6 +102,45 @@ interface BtsDao {
             }
         }
         upsertBatch(merged)
+    }
+
+    /**
+     * Applies eNodeB/gNodeB-level tower coordinates (e.g. from CellMapper eNB CSV exports).
+     * Updates existing co-located cells only if the incoming source has higher/equal precision,
+     * or inserts a site-anchor entry when no cells for that eNodeB exist yet.
+     */
+    @Transaction
+    suspend fun applyEnodebTowersPreservingPriority(plmn: String, anchors: List<BtsTowerEntity>) {
+        if (anchors.isEmpty()) return
+        val toInsert = mutableListOf<BtsTowerEntity>()
+        for (anchor in anchors) {
+            if (anchor.enodebId <= 0L) continue
+            val existing = findCoLocatedByEnodeb(plmn, anchor.enodebId)
+            if (existing.isEmpty()) {
+                toInsert.add(anchor)
+            } else {
+                val newPrio = BtsGeoUtils.coordSourcePriority(anchor.coordSource)
+                for (row in existing) {
+                    val prevHas = BtsGeoUtils.isValidCzechCoord(row.latitude, row.longitude)
+                    val prevPrio = BtsGeoUtils.coordSourcePriority(row.coordSource)
+                    if (!prevHas || newPrio >= prevPrio) {
+                        toInsert.add(
+                            row.copy(
+                                latitude = anchor.latitude,
+                                longitude = anchor.longitude,
+                                coordSource = anchor.coordSource,
+                                locationName = if (row.locationName.isBlank()) anchor.locationName else row.locationName,
+                                band = if (row.band.isBlank()) anchor.band else row.band,
+                                tac = if (row.tac <= 0 && anchor.tac > 0) anchor.tac else row.tac
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        if (toInsert.isNotEmpty()) {
+            upsertBatch(toInsert)
+        }
     }
 
     @Query("SELECT * FROM bts_towers WHERE operatorPlmn = :plmn AND cellId = :cellId LIMIT 1")
@@ -150,6 +202,7 @@ interface BtsDao {
             "WHERE (:plmn IS NULL OR operatorPlmn = :plmn) " +
             "AND (:query = '' OR locationName LIKE '%' || :query || '%' " +
             "OR districtCode LIKE '%' || :query || '%' " +
+            "OR coordSource LIKE '%' || :query || '%' " +
             "OR CAST(cellId AS TEXT) LIKE '%' || :query || '%' " +
             "OR CAST(enodebId AS TEXT) LIKE '%' || :query || '%' " +
             "OR CAST(pci AS TEXT) = :query) " +
@@ -163,14 +216,25 @@ interface BtsDao {
             "WHERE districtCode = :districtCode " +
             "AND (:plmn IS NULL OR operatorPlmn = :plmn) " +
             "AND (latitude IS NULL OR longitude IS NULL) " +
-            "AND locationName != '' " +
-            "GROUP BY operatorPlmn, locationName " +
+            "GROUP BY operatorPlmn, CASE WHEN enodebId > 0 THEN enodebId WHEN locationName != '' THEN locationName ELSE CAST(cellId AS TEXT) END " +
             "LIMIT :limit"
     )
     suspend fun getUnlocatedSitesInDistrict(
         districtCode: String,
         plmn: String?,
-        limit: Int = 40
+        limit: Int = 50
+    ): List<BtsTowerEntity>
+
+    @Query(
+        "SELECT * FROM bts_towers " +
+            "WHERE (:plmn IS NULL OR operatorPlmn = :plmn) " +
+            "AND (latitude IS NULL OR longitude IS NULL) " +
+            "GROUP BY operatorPlmn, CASE WHEN enodebId > 0 THEN enodebId WHEN locationName != '' THEN locationName ELSE CAST(cellId AS TEXT) END " +
+            "LIMIT :limit"
+    )
+    suspend fun getUnlocatedSitesAll(
+        plmn: String?,
+        limit: Int = 50
     ): List<BtsTowerEntity>
 
     @Query(

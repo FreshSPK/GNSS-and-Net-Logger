@@ -2,26 +2,32 @@ package com.example
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import com.example.ui.tabs.SecurityTab
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.bts.BtsCsvImporter
 import com.example.bts.BtsGeoUtils
+import com.example.bts.BtsGeocoder
 import com.example.bts.BtsRepository
 import com.example.data.db.AppDatabase
 import com.example.data.db.LogSession
 import com.example.data.db.TelemetryRecord
 import com.example.export.Exporter
+import com.example.ui.components.BtsDatabaseDialog
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.charset.Charset
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import com.example.model.AnomalyType
 import com.example.model.BatteryState
 import com.example.model.CellularState
@@ -464,13 +470,13 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun testAboutDialogShowsRelease17AndGithubRepoLink() {
+    fun testAboutDialogShowsRelease18AndGithubRepoLink() {
         composeTestRule.setContent {
             SignalLoggerTheme(darkTheme = true) {
                 AboutAndHelpDialog(lang = "CS", onDismiss = {})
             }
         }
-        composeTestRule.onNodeWithText("Release v1.7").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Release v1.8").assertIsDisplayed()
         composeTestRule.onNodeWithTag("author_github_link").assertIsDisplayed()
         composeTestRule.onNodeWithText("GitHub: https://github.com/FreshSPK/GNSS-and-Net-Logger").assertIsDisplayed()
     }
@@ -881,11 +887,11 @@ class ExampleRobolectricTest {
     @Test
     fun testAboutDialogShowsPdfManualButtonsAndLocalizedFilenames() {
         assertEquals(
-            "GNSS_Net_Logger_v1.7_Manual_CS.pdf",
+            "GNSS_Net_Logger_v1.8_Manual_CS.pdf",
             com.example.export.UserManualPdfGenerator.manualFilename(isCs = true)
         )
         assertEquals(
-            "GNSS_Net_Logger_v1.7_Manual_EN.pdf",
+            "GNSS_Net_Logger_v1.8_Manual_EN.pdf",
             com.example.export.UserManualPdfGenerator.manualFilename(isCs = false)
         )
 
@@ -897,5 +903,215 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("download_pdf_manual_button").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("open_pdf_manual_button").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Uživatelský & technický manuál (PDF)").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun testV18RuianAndBeaconDbParsersAndAddressCleaning() {
+        val queries = BtsGeoUtils.buildRuianAddressQueries(
+            "Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL"
+        )
+        assertTrue(queries.any { it == "Technická 3082/12, Brno" })
+        assertTrue(queries.any { it == "Brno - Královo Pole, Technická 3082/12" })
+        assertTrue(BtsGeoUtils.hasStreetOrNumberHint("Brno - Královo Pole, Technická 3082/12, indoor FEKT"))
+        assertFalse(BtsGeoUtils.hasStreetOrNumberHint("Mikulov, k.ú. Mušlov, příhradový stožár v lese"))
+
+        val ruianJson = """
+            {
+              "spatialReference": { "wkid": 4326 },
+              "candidates": [
+                { "address": "Technická 3082/12, Královo Pole, 616 00 Brno", "location": { "x": 16.57545, "y": 49.22695 }, "score": 100.0 },
+                { "address": "Technická, Brno", "location": { "x": 16.58000, "y": 49.22500 }, "score": 60.0 }
+              ]
+            }
+        """.trimIndent()
+        val ruian = BtsGeocoder.parseCuZkRuianResponse(ruianJson)
+        assertNotNull(ruian)
+        assertEquals("RUIAN", ruian!!.source)
+        assertEquals(49.22695, ruian.latitude, 0.0001)
+        assertEquals(16.57545, ruian.longitude, 0.0001)
+
+        val beaconJson = """{ "location": { "lat": 49.2268, "lng": 16.5752 }, "accuracy": 420.0 }"""
+        val beacon = BtsGeocoder.parseBeaconDbResponse(beaconJson)
+        assertNotNull(beacon)
+        assertEquals("BEACONDB", beacon!!.source)
+        assertEquals("±420m", beacon.detail)
+
+        // Coarse > 5km country-level accuracy must be rejected
+        val tooCoarse = """{ "location": { "lat": 49.8, "lng": 15.5 }, "accuracy": 25000.0 }"""
+        assertEquals(null, BtsGeocoder.parseBeaconDbResponse(tooCoarse))
+    }
+
+    @Test
+    fun testV18MultiFormatImportPriorityNtmClfCellMapperKmlZipAndEnodebMatch() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.btsDao()
+            val repo = BtsRepository(context, dao)
+
+            // 1. Multi-file ZIP archive: GSMweb CSV + CLF v3.0 with // comment header
+            val gsmCsv = """
+                CellID;PhysCID;TAC;Band;GSMCID;Datum;Okr;Umisteni
+                568853;21;24656;2600;3391;25.04.2019;BM;Brno - Královo Pole, Technická 3082/12
+            """.trimIndent()
+            val clfWithComment = """
+                //CLF v3.0 exported from GSMweb
+                23001;568853;24656;2222;49.22695;16.57545;0;Brno FEKT mast
+            """.trimIndent()
+
+            val zipOut = ByteArrayOutputStream()
+            ZipOutputStream(zipOut).use { zos ->
+                zos.putNextEntry(ZipEntry("tlte.csv"))
+                zos.write(gsmCsv.toByteArray())
+                zos.closeEntry()
+                zos.putNextEntry(ZipEntry("23001.clf"))
+                zos.write(clfWithComment.toByteArray())
+                zos.closeEntry()
+            }
+            val zipRes = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(zipOut.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "cz_bts_bundle.zip"
+            )
+            assertEquals(2, zipRes.importedCount)
+            assertTrue(zipRes.detectedFormat.startsWith("ZIP"))
+
+            val clfMerged = dao.findByPlmnAndCellId("23001", 568853L)!!
+            assertEquals("CLF", clfMerged.coordSource)
+            assertEquals(49.22695, clfMerged.latitude!!, 0.0001)
+            assertEquals(21, clfMerged.pci)
+
+            // 2. Coarse OpenCelliD centroid MUST NOT overwrite exact CLF mast coordinates!
+            val coarseOpenCell = """
+                LTE,230,1,24656,568853,0,16.59999,49.24999,1500,3,1,1600000000,1700000000,-92
+            """.trimIndent()
+            BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(coarseOpenCell.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "230.csv"
+            )
+            val afterOpenCell = dao.findByPlmnAndCellId("23001", 568853L)!!
+            assertEquals("CLF", afterOpenCell.coordSource)
+            assertEquals(49.22695, afterOpenCell.latitude!!, 0.0001)
+
+            // 3. NetMonster .ntm import (both 9-column and 10-column forms)
+            val ntmData = """
+                4G;230;02;990209;38002;115;49.22810;16.57120;Brno Kolejni O2
+                5G;230;03;827147;38003;3231;260;49.22450;16.57890;Brno Pod Palackeho vrchem
+            """.trimIndent()
+            val ntmRes = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(ntmData.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "export.ntm"
+            )
+            assertEquals(2, ntmRes.importedCount)
+            assertEquals(2, ntmRes.withCoordsCount)
+            val o2Ntm = dao.findByPlmnAndCellId("23002", 990209L)!!
+            assertEquals("NTM", o2Ntm.coordSource)
+            assertEquals(115, o2Ntm.pci)
+            val vfNtm = dao.findByPlmnAndCellId("23003", 827147L)!!
+            assertEquals("NTM", vfNtm.coordSource)
+            assertEquals(260, vfNtm.pci)
+
+            // 4. CellMapper eNodeB-only Tower CSV + sibling sector matching in BtsRepository
+            val cellMapperEnbCsv = """
+                eNB,Lat,Lon,MCC,MNC,TAC,System,Name
+                4444,49.21000,16.61000,230,03,38003,LTE,Brno Ponava CellMapper Pin
+            """.trimIndent()
+            val cmRes = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(cellMapperEnbCsv.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "cellmapper_towers.csv"
+            )
+            assertEquals(1, cmRes.importedCount)
+
+            // Connect to sector 12 of eNB 4444 (CI = 4444 * 256 + 12 = 1137676), which was NOT explicitly in CSV
+            val enbSiblingMatch = repo.matchSimCell(
+                sim = SimCellInfo(
+                    isServing = true,
+                    networkGen = "4G LTE",
+                    plmn = "23003",
+                    ci = ((4444L shl 8) + 12L).toString(),
+                    pci = 333,
+                    tac = "38003"
+                ),
+                ueLat = 49.212,
+                ueLon = 16.612,
+                hasGnssFix = true,
+                isDemoMode = false
+            )
+            assertNotNull(enbSiblingMatch)
+            assertEquals("eNB", enbSiblingMatch!!.matchType)
+            assertEquals("CELLMAPPER", enbSiblingMatch.coordSource)
+            assertEquals(49.21000, enbSiblingMatch.latitude!!, 0.0001)
+            assertFalse(enbSiblingMatch.pciMismatch)
+
+            // 5. KML Placemark import
+            val kml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <kml><Document>
+                  <Placemark>
+                    <name>O2 eNB 7777 CellID 1990913</name>
+                    <description>23002 Brno Kralovo Pole TAC 38010</description>
+                    <Point><coordinates>16.58888,49.23333,0</coordinates></Point>
+                  </Placemark>
+                </Document></kml>
+            """.trimIndent()
+            val kmlRes = BtsCsvImporter.importStream(
+                inputStream = ByteArrayInputStream(kml.toByteArray()),
+                btsDao = dao,
+                fileNameHint = "towers.kml"
+            )
+            assertEquals(1, kmlRes.importedCount)
+            val kmlTower = dao.findByPlmnAndCellId("23002", 1990913L)!!
+            assertEquals("KML", kmlTower.coordSource)
+            assertEquals(49.23333, kmlTower.latitude!!, 0.0001)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h915dp")
+    fun testBtsDatabaseDialogShowsMultiSourceImportAndRuianBeaconDbControls() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val repo = BtsRepository(context, db.btsDao())
+            runBlocking { repo.importBundledSamples() }
+
+            composeTestRule.setContent {
+                SignalLoggerTheme(darkTheme = true) {
+                    BtsDatabaseDialog(
+                        btsRepository = repo,
+                        lang = "CS",
+                        onDismiss = {}
+                    )
+                }
+            }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("bts_dialog_list")
+                .performScrollToNode(hasTestTag("open_gsmweb_portal_button"))
+            composeTestRule.onNodeWithTag("open_gsmweb_portal_button").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("open_opencellid_downloads_button").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("open_cellmapper_portal_button").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("bts_dialog_list")
+                .performScrollToNode(hasTestTag("bts_import_file_button"))
+            composeTestRule.onNodeWithTag("bts_import_file_button").assertIsDisplayed()
+            composeTestRule.waitUntil(timeoutMillis = 3000) {
+                runCatching {
+                    composeTestRule.onNodeWithTag("bts_dialog_list")
+                        .performScrollToNode(hasTestTag("bts_batch_geocode_button"))
+                    true
+                }.getOrDefault(false)
+            }
+            composeTestRule.onNodeWithTag("bts_batch_geocode_button").assertIsDisplayed()
+        } finally {
+            db.close()
+        }
     }
 }

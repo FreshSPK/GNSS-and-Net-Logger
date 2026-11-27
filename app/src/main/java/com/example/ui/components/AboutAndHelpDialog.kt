@@ -99,7 +99,7 @@ fun AboutAndHelpDialog(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "Release v1.7",
+                                    text = "Release v1.8",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = EmeraldSignal
@@ -355,7 +355,7 @@ fun AboutAndHelpDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Release v1.7 New Features Box
+                // Release v1.8 New Features Box
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -364,7 +364,7 @@ fun AboutAndHelpDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = if (isCs) "✨ Novinky verze 1.7 (Release v1.7)" else "✨ What's New in Release v1.7",
+                            text = if (isCs) "✨ Novinky verze 1.8 (Release v1.8)" else "✨ What's New in Release v1.8",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = CyanTertiary
@@ -372,15 +372,15 @@ fun AboutAndHelpDialog(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isCs) {
-                                "• Pokročilá fúze senzorů (Gyroskop + Magnetometr + Krokoměr + Barometr): srovnává projekci rotace gyroskopu (∫ω_vert dt) se zatáčením kurzu GNSS, hlídá odchylky magnetického pole |B| (µT), kadenci kroků vs. rychlost GNSS i náhlý pád TA při nehybném telefonu\n" +
-                                "• Hluboké detektory GNSS spoofingu: kontrola shody surových vět \$GNGGA/\$GNRMC vs. Location API (ΔNMEA), výpadek vícekonstelačního příjmu (GPS-only), zamrzlé nebe (60 s), opačné znaménko Dopplera vůči elevaci, ztráta nosné fáze ADR a skok C/N0 (≥ +9 dB v klidu)\n" +
-                                "• Fyzika RF, FSPL strop & Dual-SIM křížová kontrola: ověření maximálního výkonu podle FSPL k BTS, detekce testovacích PLMN/TAC/eNB, úzkých LTE kanálů (1,4/3 MHz), nízkého CQI při silném RSRP, privátního mobilního DNS a srovnání SIM 1 vs. SIM 2\n" +
-                                "• Kompletní bezpečnostní štít z v1.6: Threat Risk Index (0–100 %), srovnání 3 časů (GNSS/NITZ/NTP), detekce 2G IMSI Catcherů, rušení AGC / RSSI−RSRP, Demo Simulátor útoků a detailní pop-upy se vzorci"
+                                "• Přesná česká lokalizace BTS (ČÚZK RÚIAN + BeaconDB): adresy z GSMwebu (tlte/o2lte/vlte CSV) nyní překládá oficiální registr ČÚZK RÚIAN s přesností na budovu (~2–10 m); lesní a mimoměstské stožáry bez ulice či neznámé buňky automaticky dohledá BeaconDB (bez API klíče)\n" +
+                                "• Univerzální import BTS (.ntm / .clf / .kml / .zip / CellMapper): nově podporuje exporty NetMonster (.ntm, nm2300x), věžové i logovací CSV z CellMapperu (včetně párování přes eNodeB/gNodeB pro všechny sektory stožáru), soubory KML i vícenásobné .zip archivy\n" +
+                                "• Ochrana přesnosti souřadnic: hierarchie priorit (Ruční > CLF/NTM/KML > RÚIAN > CellMapper eNB > BeaconDB > OpenCelliD) zaručuje, že hrubší odhady nikdy nepřepíší přesné zaměření stožáru\n" +
+                                "• Základ z v1.7 & v1.6: komplexní štít Podvody (fúze gyro/mag/krokoměru, ΔNMEA, ADR, 3× čas UTC, FSPL strop, Dual-SIM, Simulator útoků) a vektorový PDF manuál"
                             } else {
-                                "• Advanced Sensor Fusion (Gyro + Magnetometer + Pedometer + Barometer): compares gravity-projected gyroscope yaw (∫ω_vert dt) against GNSS bearing turns, tracks magnetic flux |B| (µT), walking cadence vs. GNSS speed, and abrupt TA drops while IMU-stationary\n" +
-                                "• Deep GNSS Anti-Spoofing: audits raw \$GNGGA/\$GNRMC vs. Location API divergence (ΔNMEA), non-GPS constellation dropouts, 60s frozen constellations, opposite Doppler-vs-elevation slope, lost ADR carrier phase, and stationary C/N0 takeover jumps (≥ +9 dB)\n" +
-                                "• RF FSPL Ceiling, Network Stack & Dual-SIM Correlation: enforces FSPL power ceiling to serving BTS, catches test PLMN/TAC/eNB IDs, narrow SDR bandwidths (1.4/3 MHz), poor CQI with strong RSRP, private cellular DNS, and SIM 1 vs. SIM 2 divergence\n" +
-                                "• Full v1.6 Security Shield Foundation: Threat Risk Index (0–100%), 3-clock UTC audit (GNSS/NITZ/NTP), 2G Stingray & AGC/RSSI−RSRP jamming detection, Demo Attack Simulator, and detailed calculation popups"
+                                "• Precision BTS Geolocation (CUZK RUIAN + BeaconDB): resolves Czech GSMweb street addresses via the official CUZK RUIAN registry to ~2–10 m building accuracy, and resolves rural/streetless masts or unknown cells via BeaconDB without any API key\n" +
+                                "• Universal Multi-Format BTS Import (.ntm / .clf / .kml / .zip / CellMapper): adds NetMonster .ntm / nm2300x, CellMapper eNodeB tower CSVs & signal logs (with co-located eNB sibling sector matching), KML placemarks, and multi-file .zip archives\n" +
+                                "• Coordinate Precision Hierarchy: Manual > CLF/NTM/KML > RUIAN > CellMapper eNB > BeaconDB > OpenCelliD ensures coarse crowdsourced centroids never overwrite exact mast coordinates\n" +
+                                "• Full v1.7 / v1.6 Foundation: Spoofing & Jamming Shield (Gyro/Mag/Step sensor fusion, ΔNMEA, ADR phase, 3-clock UTC audit, FSPL ceiling, Dual-SIM check) and vector PDF manual"
                             },
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextPrimaryDark

@@ -78,11 +78,14 @@ object BtsGeoUtils {
         val low = fileName.lowercase(Locale.ROOT)
         return when {
             low.startsWith("tlte") || low.startsWith("t5g") || low.startsWith("tgsm") ||
-                low.contains("t-mobile") || low.contains("tmobile") -> "23001"
+                low.contains("t-mobile") || low.contains("tmobile") ||
+                low.contains("23001") || low.contains("230-01") || low.contains("paegas") -> "23001"
             low.startsWith("o2") || low.contains("_o2") || low.contains("o2lte") ||
-                low.contains("o25g") -> "23002"
+                low.contains("o25g") || low.contains("23002") || low.contains("230-02") ||
+                low.contains("eurotel") -> "23002"
             low.startsWith("vlte") || low.startsWith("v5g") || low.startsWith("vgsm") ||
-                low.contains("vodafone") -> "23003"
+                low.contains("vodafone") || low.contains("23003") || low.contains("230-03") ||
+                low.contains("oskar") -> "23003"
             else -> null
         }
     }
@@ -106,21 +109,107 @@ object BtsGeoUtils {
     }
 
     /**
+     * Precision ranking for coordinate sources so coarse UE centroids (OpenCelliD / UE logs)
+     * never overwrite exact tower pins or official Czech RUIAN cadastre coordinates.
+     */
+    fun coordSourcePriority(source: String): Int = when (source.uppercase(Locale.ROOT)) {
+        "MANUAL" -> 100
+        "CLF", "NTM", "KML", "IMPORT", "DEMO_FEKT" -> 85
+        "RUIAN" -> 80
+        "CELLMAPPER" -> 70
+        "GEOCODER", "NOMINATIM" -> 55
+        "BEACONDB" -> 45
+        "OPENCELLID" -> 40
+        "CELLMAPPER_LOG" -> 25
+        else -> 0
+    }
+
+    private val MAST_JARGON_KEYWORDS = listOf(
+        "stožár", "stozar", "stož.", "příhrad", "prihrad", "betonov", "kotven",
+        "komín", "komin", "kom.", "panelák", "panelak", "bytový", "bytovy",
+        "indoor", "poutač", "poutac", "vodojem", "vodárn", "vodarn", "silo",
+        "věž", "vez", "kostel", "střecha", "strecha", "hala", "haly", "areál",
+        "areal", "oc ", "lzs", "tunel", "budova", "hotel", "nemocnice",
+        "datacentrum", "škola", "skola", "úřad", "urad", "kancelář", "rozhledna",
+        "k.ú.", "k. u.", "p.č.", "parc.", "parcela", "č.p.", "č.ev.", "u nádraží"
+    )
+
+    private fun stripNotesAndPrefixes(part: String): String {
+        return part
+            .replace(Regex("\\([^)]*\\)"), " ")
+            .replace(Regex("\\b(ul\\.|ulice|tř\\.|třída|nám\\.|náměstí)\\s*", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\b(č\\.\\s*p\\.|č\\.\\s*o\\.|č\\.\\s*ev\\.)\\s*", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    /**
+     * Returns true if the GSMweb Umisteni string looks like it carries a street or house number
+     * (where RUIAN address matching achieves 2-10m accuracy), rather than only a forest/hill mast description.
+     */
+    fun hasStreetOrNumberHint(rawUmisteni: String): Boolean {
+        val parts = rawUmisteni.split(",").map { stripNotesAndPrefixes(it) }.filter { it.isNotBlank() }
+        if (parts.size < 2) return false
+        val secondLow = parts[1].lowercase(Locale.ROOT)
+        if (MAST_JARGON_KEYWORDS.any { secondLow.contains(it) }) return false
+        return parts[1].any { it.isDigit() } || parts[1].length >= 4
+    }
+
+    /**
+     * Generates ranked Czech address queries for CUZK RUIAN GeocodeSOE (without ", Czechia").
+     * Example: "Brno - Královo Pole, Technická 3082/12, indoor FEKT" ->
+     *   ["Brno - Královo Pole, Technická 3082/12", "Technická 3082/12, Brno", "Brno - Královo Pole"]
+     */
+    fun buildRuianAddressQueries(rawUmisteni: String): List<String> {
+        val rawParts = rawUmisteni.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        if (rawParts.isEmpty()) return emptyList()
+
+        val kept = mutableListOf<String>()
+        for ((idx, part) in rawParts.withIndex()) {
+            val cleaned = stripNotesAndPrefixes(part)
+            if (cleaned.isBlank()) continue
+            val low = cleaned.lowercase(Locale.ROOT)
+            if (idx == 0) {
+                kept.add(cleaned)
+                continue
+            }
+            if (MAST_JARGON_KEYWORDS.any { low.contains(it) }) break
+            kept.add(cleaned)
+            if (kept.size >= 3) break
+        }
+
+        if (kept.isEmpty()) return emptyList()
+        val results = linkedSetOf<String>()
+        val cityFull = kept[0]
+        val baseCity = cityFull.substringBefore(" - ").trim()
+
+        if (kept.size >= 2) {
+            val streetPart = kept[1]
+            // Full form: "Technická 3082/12, Brno" works especially well in RUIAN GeocodeSOE
+            results.add("$streetPart, $baseCity")
+            results.add("$cityFull, $streetPart")
+            // Also try without orientation number if slash notation (e.g., 3082/12 -> 3082)
+            val slashMatch = Regex("^(.+?\\s+\\d+)/\\d+$").find(streetPart)
+            if (slashMatch != null) {
+                results.add("${slashMatch.groupValues[1]}, $baseCity")
+            }
+        }
+        // Only add bare municipality when there is no mast-only hint ambiguity or as last candidate
+        if (kept.size == 1) {
+            results.add(baseCity)
+            if (cityFull != baseCity) results.add(cityFull)
+        }
+        return results.filter { it.length >= 2 }.toList()
+    }
+
+    /**
      * Strips GSMweb tower construction jargon from Umisteni so Geocoder/Nominatim resolves street & municipality cleanly.
      * Example: "Brno - Královo Pole, Technická 3082/12, indoor v laboratoři FEKT VUT UREL"
-     *   -> "Brno - Královo Pole, Technická 3082/12, Česko"
+     *   -> "Brno - Královo Pole, Technická 3082/12, Czechia"
      */
     fun cleanLocationForGeocoding(rawUmisteni: String): String {
-        val parts = rawUmisteni.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val parts = rawUmisteni.split(",").map { stripNotesAndPrefixes(it) }.filter { it.isNotBlank() }
         if (parts.isEmpty()) return rawUmisteni
-
-        val mastKeywords = listOf(
-            "stožár", "stozar", "příhrad", "prihrad", "betonov", "kotven", "komín", "komin",
-            "panelák", "panelak", "bytový", "bytovy", "indoor", "poutač", "poutac",
-            "vodojem", "vodárn", "vodarn", "silo", "věž", "vez", "kostel", "střecha", "strecha",
-            "hala", "haly", "areál", "areal", "oc ", "lzs", "tunel", "budova", "hotel",
-            "nemocnice", "datacentrum", "škola", "skola", "úřad", "urad", "kancelář"
-        )
 
         val kept = mutableListOf<String>()
         for ((idx, part) in parts.withIndex()) {
@@ -129,7 +218,7 @@ object BtsGeoUtils {
                 kept.add(part)
                 continue
             }
-            val looksLikeMast = mastKeywords.any { low.contains(it) }
+            val looksLikeMast = MAST_JARGON_KEYWORDS.any { low.contains(it) }
             if (!looksLikeMast) {
                 kept.add(part)
             } else {

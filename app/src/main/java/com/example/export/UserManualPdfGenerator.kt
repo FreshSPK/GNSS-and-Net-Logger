@@ -63,7 +63,7 @@ object UserManualPdfGenerator {
     private val COLOR_VUT_RED = Color.parseColor("#E4002B")
 
     fun manualFilename(isCs: Boolean): String =
-        if (isCs) "GNSS_Net_Logger_v1.7_Manual_CS.pdf" else "GNSS_Net_Logger_v1.7_Manual_EN.pdf"
+        if (isCs) "GNSS_Net_Logger_v1.8_Manual_CS.pdf" else "GNSS_Net_Logger_v1.8_Manual_EN.pdf"
 
     fun createShareableOrViewableManualFile(context: Context, lang: String): File {
         val isCs = lang != "EN"
@@ -178,7 +178,7 @@ object UserManualPdfGenerator {
 
         val textLeft = MARGIN + 82f
         val titlePaint = textPaint(19f, Color.WHITE, bold = true)
-        c.drawText("GNSS & Net Logger v1.7", textLeft, 44f, titlePaint)
+        c.drawText("GNSS & Net Logger v1.8", textLeft, 44f, titlePaint)
 
         val subtitlePaint = textPaint(11.5f, Color.parseColor("#38BDF8"), bold = true)
         c.drawText(
@@ -530,12 +530,12 @@ object UserManualPdfGenerator {
 
         y = drawCalloutCard(
             c, y,
-            if (isCs) "Databáze českých BTS (OpenCelliD + GSMweb + MOCN) a výpočet FSPL"
-            else "Czech 3-Operator BTS Registry (OpenCelliD + GSMweb + MOCN) & FSPL Model",
+            if (isCs) "Databáze českých BTS (RÚIAN + BeaconDB + NTM/CLF/CellMapper) a výpočet FSPL"
+            else "Czech 3-Operator BTS Registry (RUIAN + BeaconDB + NTM/CLF/CellMapper) & FSPL",
             if (isCs) {
-                "Lokální databáze Room páruje obslužné CellID / eNodeB ID operátorů T-Mobile (23001), O2 (23002) a Vodafone (23003) včetně sdílení CETIN MOCN. Streamovaný import umí načíst OpenCelliD (.csv / .csv.gz) s GPS i textové exporty GSMweb a obousměrně je sloučit. Z polohy GPS a BTS pak počítá reálnou Haversine vzdálenost, azimut, odchylku ΔTA a teoretický útlum volného prostoru: FSPL [dB] = 20·log10(d_km) + 20·log10(f_MHz) + 32,45."
+                "Lokální databáze Room páruje CellID i sdílené eNodeB operátorů 23001/23002/23003 (včetně MOCN). Podporuje import GSMweb CSV, CLF v3/v4, NetMonster .ntm, CellMapper eNB CSV, KML, OpenCelliD (.csv.gz) i .ZIP s prioritou přesnosti (Ruční > CLF/NTM/KML > ČÚZK RÚIAN > CellMapper > BeaconDB > OpenCelliD). Pro přesné GPS u adres z GSMwebu využívá ČÚZK RÚIAN (~2–10 m) a pro lesní či neznámé buňky BeaconDB. Počítá Haversine vzdálenost, azimut, ΔTA a útlum: FSPL = 20·log10(d_km) + 20·log10(f_MHz) + 32,45."
             } else {
-                "The local Room database matches serving CellID / eNodeB ID across T-Mobile (23001), O2 (23002), and Vodafone (23003) with CETIN MOCN fallback. Streaming import handles OpenCelliD (.csv / .csv.gz) GPS dumps and GSMweb metadata, smartly merging both in any order to compute Haversine distance, bearing, ΔTA, and Free-Space Path Loss: FSPL [dB] = 20·log10(d_km) + 20·log10(f_MHz) + 32.45."
+                "The local Room database matches CellID and sibling eNodeB towers across 23001/23002/23003 (including MOCN). Supports GSMweb CSV, CLF v3/v4, NetMonster .ntm, CellMapper eNB CSV, KML, OpenCelliD (.csv.gz), and .ZIP with precision ranking (Manual > CLF/NTM/KML > RUIAN > CellMapper > BeaconDB > OpenCelliD). Resolves GSMweb addresses via CUZK RUIAN (~2–10 m) and rural/unknown cells via BeaconDB to compute Haversine distance, bearing, ΔTA, and FSPL = 20·log10(d_km) + 20·log10(f_MHz) + 32.45."
             },
             COLOR_CYAN_BG, COLOR_CYAN
         )
@@ -986,7 +986,7 @@ object UserManualPdfGenerator {
         c.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 32f, fillPaint(COLOR_DARK_NAVY))
         c.drawRect(0f, 32f, PAGE_WIDTH.toFloat(), 34.5f, fillPaint(COLOR_CYAN))
         c.drawText(text, MARGIN, 21f, textPaint(8.8f, Color.WHITE, bold = true))
-        c.drawText("v1.7", PAGE_WIDTH - MARGIN - 20f, 21f, textPaint(8.8f, Color.parseColor("#38BDF8"), bold = true))
+        c.drawText("v1.8", PAGE_WIDTH - MARGIN - 20f, 21f, textPaint(8.8f, Color.parseColor("#38BDF8"), bold = true))
     }
 
     private fun drawPageFooter(c: Canvas, pageNum: Int, totalPages: Int, isCs: Boolean) {
@@ -994,7 +994,7 @@ object UserManualPdfGenerator {
         c.drawLine(MARGIN, y - 8f, PAGE_WIDTH - MARGIN, y - 8f, strokePaint(COLOR_CARD_BORDER, 0.8f))
         val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         c.drawText(
-            "GNSS & Net Logger v1.7 • Ing. Jan Kufa, Ph.D. (VUT FEKT UREL) • $dateStr",
+            "GNSS & Net Logger v1.8 • Ing. Jan Kufa, Ph.D. (VUT FEKT UREL) • $dateStr",
             MARGIN, y + 4f, textPaint(7.5f, COLOR_MUTED)
         )
         val pageLabel = if (isCs) "Strana $pageNum / $totalPages" else "Page $pageNum / $totalPages"

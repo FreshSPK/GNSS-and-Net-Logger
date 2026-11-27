@@ -128,15 +128,25 @@ class SignalLoggerApp : Application() {
             ueLon = gnss.longitude,
             hasGnssFix = gnss.hasFix,
             isDemoMode = isDemo
-        ) ?: return sim
+        )
+        if (match == null) {
+            if (_settings.value.autoGeocodeBts && !isDemo && sim.isServing) {
+                applicationScope.launch {
+                    btsRepository.resolveUnknownCellViaBeaconDb(sim)
+                }
+            }
+            return sim
+        }
 
-        if (_settings.value.autoGeocodeBts && !isDemo && match.latitude == null && match.locationName.isNotBlank()) {
+        if (_settings.value.autoGeocodeBts && !isDemo && match.latitude == null && (match.locationName.isNotBlank() || match.cellId > 0L)) {
             applicationScope.launch {
                 btsRepository.geocodeSiteIfNotAttempted(
                     plmn = match.operatorPlmn,
                     cellId = match.cellId,
                     enodebId = match.enodebId,
-                    locationName = match.locationName
+                    locationName = match.locationName,
+                    tac = match.dbTac,
+                    band = match.dbBand
                 )
             }
         }

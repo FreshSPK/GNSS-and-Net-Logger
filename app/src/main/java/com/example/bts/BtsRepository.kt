@@ -25,6 +25,14 @@ data class BtsImportProgress(
     val importedCount: Int = 0
 )
 
+data class BatchGeocodeSummary(
+    val attempted: Int = 0,
+    val resolved: Int = 0,
+    val ruianCount: Int = 0,
+    val beaconDbCount: Int = 0,
+    val fallbackCount: Int = 0
+)
+
 class BtsRepository(
     private val context: Context,
     private val btsDao: BtsDao
@@ -169,6 +177,27 @@ class BtsRepository(
                     }
                 }
             }
+            // Fallback: match co-located eNodeB/gNodeB tower (supports CellMapper eNB exports & new sectors on known masts)
+            if (matched == null && ciLong > 256L) {
+                val enb = ciLong ushr 8
+                val sameOpSiblings = btsDao.findCoLocatedByEnodeb(plmn, enb)
+                if (sameOpSiblings.isNotEmpty()) {
+                    matched = sameOpSiblings.firstOrNull { BtsGeoUtils.isValidCzechCoord(it.latitude, it.longitude) }
+                        ?: sameOpSiblings.first()
+                    matchType = "eNB"
+                } else {
+                    val partner = BtsGeoUtils.mocnPartnerPlmn(plmn)
+                    if (partner != null) {
+                        val mocnSiblings = btsDao.findCoLocatedByEnodeb(partner, enb)
+                        if (mocnSiblings.isNotEmpty()) {
+                            matched = mocnSiblings.firstOrNull { BtsGeoUtils.isValidCzechCoord(it.latitude, it.longitude) }
+                                ?: mocnSiblings.first()
+                            matchType = "MOCN eNB"
+                            isMocn = true
+                        }
+                    }
+                }
+            }
         } else if (sim.pci > 0) {
             val tacInt = sim.tac.toIntOrNull()?.takeIf { it > 0 }
             if (tacInt != null) {
@@ -182,7 +211,6 @@ class BtsRepository(
 
         val tower = matched ?: return@withContext null
 
-        // Lookup co-located bands/sectors on the same mast (same eNodeB ID or same locationName)
         val siteTowers = when {
             tower.enodebId > 0L -> btsDao.findCoLocatedByEnodeb(tower.operatorPlmn, tower.enodebId)
             tower.locationName.isNotBlank() -> btsDao.findCoLocatedByLocation(tower.operatorPlmn, tower.locationName)
@@ -233,17 +261,18 @@ class BtsRepository(
         val freqMhz = sim.dlFreqMhz?.takeIf { it > 0.0 } ?: BtsGeoUtils.bandToApproxFreqMhz(tower.band)
         val fsplDb = BtsGeoUtils.calculateFsplDb(freqMhz, distanceMeters)
 
-        val pciMismatch = sim.pci > 0 && tower.pci > 0 && sim.pci != tower.pci
+        val isExactSectorMatch = matchType == "CI" || matchType == "MOCN" || matchType == "PCI+TAC"
+        val pciMismatch = isExactSectorMatch && sim.pci > 0 && tower.pci > 0 && sim.pci != tower.pci
         val simTacInt = sim.tac.toIntOrNull()
         val tacMismatch = simTacInt != null && simTacInt > 0 && tower.tac > 0 && simTacInt != tower.tac
 
         BtsMatchInfo(
             operatorPlmn = tower.operatorPlmn,
             operatorName = BtsGeoUtils.operatorDisplayName(tower.operatorPlmn),
-            cellId = tower.cellId,
+            cellId = if (isExactSectorMatch) tower.cellId else (ciLong ?: tower.cellId),
             enodebId = tower.enodebId,
-            sectorId = tower.sectorId,
-            dbPci = tower.pci,
+            sectorId = if (isExactSectorMatch || ciLong == null) tower.sectorId else (ciLong and 0xFF).toInt(),
+            dbPci = if (isExactSectorMatch) tower.pci else -1,
             dbTac = tower.tac,
             dbBand = tower.band,
             gsmCid = tower.gsmCid,
@@ -266,72 +295,161 @@ class BtsRepository(
         )
     }
 
+    /**
+     * Resolves an unmapped serving cell via BeaconDB Wireless Geolocate API and caches it in Room DB.
+     */
+    suspend fun resolveUnknownCellViaBeaconDb(sim: SimCellInfo): BtsGeocodeResult? = withContext(Dispatchers.IO) {
+        if (!sim.isServing || sim.networkGen == "Searching") return@withContext null
+        val plmn = BtsGeoUtils.normalizeCzechOperatorPlmn(sim.plmn)
+            ?: BtsGeoUtils.normalizeCzechOperatorPlmn(sim.operatorAlpha)
+            ?: return@withContext null
+        val cellId = sim.ci.toLongOrNull()?.takeIf { it > 0L } ?: return@withContext null
+        val key = "beacondb:$plmn:$cellId"
+        val now = System.currentTimeMillis()
+        val last = attemptedGeocodeMs[key]
+        if (last != null && now - last < geocodeRetryCooldownMs) return@withContext null
+        attemptedGeocodeMs[key] = now
+
+        val tac = sim.tac.toIntOrNull() ?: 0
+        val res = BtsGeocoder.tryBeaconDbGeolocate(plmn, cellId, tac, sim.band) ?: return@withContext null
+        val entity = BtsTowerEntity(
+            operatorPlmn = plmn,
+            cellId = cellId,
+            enodebId = if (cellId > 256L) cellId ushr 8 else 0L,
+            sectorId = (cellId and 0xFF).toInt(),
+            pci = sim.pci,
+            tac = tac,
+            band = sim.band,
+            locationName = "BeaconDB (${sim.networkGen} ${res.detail})".trim(),
+            latitude = res.latitude,
+            longitude = res.longitude,
+            coordSource = res.source
+        )
+        btsDao.upsertPreservingCoords(plmn, listOf(entity))
+        res
+    }
+
     suspend fun geocodeSiteIfNotAttempted(
         plmn: String,
         cellId: Long,
         enodebId: Long,
-        locationName: String
+        locationName: String,
+        tac: Int = 0,
+        band: String = ""
     ): Pair<Double, Double>? {
-        if (locationName.isBlank()) return null
-        val key = if (enodebId > 0L) "$plmn:enb:$enodebId" else "$plmn:loc:$locationName"
+        if (locationName.isBlank() && cellId <= 0L) return null
+        val key = if (enodebId > 0L) "$plmn:enb:$enodebId" else "$plmn:ci:$cellId:$locationName"
         val now = System.currentTimeMillis()
         val lastAttempt = attemptedGeocodeMs[key]
         if (lastAttempt != null && now - lastAttempt < geocodeRetryCooldownMs) {
             return null
         }
         attemptedGeocodeMs[key] = now
-        return geocodeAndSaveSite(plmn, cellId, enodebId, locationName)
+        return geocodeAndSaveSite(plmn, cellId, enodebId, locationName, tac, band)
     }
 
     suspend fun geocodeAndSaveSite(
         plmn: String,
         cellId: Long,
         enodebId: Long,
-        locationName: String
-    ): Pair<Double, Double>? = withContext(Dispatchers.IO) {
-        if (locationName.isBlank()) return@withContext null
-        val coords = BtsGeocoder.geocodeCzechLocation(context, locationName) ?: return@withContext null
+        locationName: String,
+        tac: Int = 0,
+        band: String = ""
+    ): Pair<Double, Double>? = geocodeAndSaveSiteDetailed(plmn, cellId, enodebId, locationName, tac, band)
+        ?.let { it.latitude to it.longitude }
+
+    suspend fun geocodeAndSaveSiteDetailed(
+        plmn: String,
+        cellId: Long,
+        enodebId: Long,
+        locationName: String,
+        tac: Int = 0,
+        band: String = ""
+    ): BtsGeocodeResult? = withContext(Dispatchers.IO) {
+        if (locationName.isBlank() && cellId <= 0L) return@withContext null
+        val res = BtsGeocoder.resolveTowerCoordinates(
+            context = context,
+            plmn = plmn,
+            cellId = cellId,
+            tac = tac,
+            band = band,
+            rawUmisteni = locationName
+        ) ?: return@withContext null
+
         saveSiteCoordinates(
             plmn = plmn,
             cellId = cellId,
             enodebId = enodebId,
             locationName = locationName,
-            lat = coords.first,
-            lon = coords.second,
-            source = "GEOCODER"
+            lat = res.latitude,
+            lon = res.longitude,
+            source = res.source
         )
-        coords
+        res
     }
 
     suspend fun batchGeocodeDistrict(
         districtCode: String,
         plmnFilter: String? = null,
-        limit: Int = 25
-    ): Int = withContext(Dispatchers.IO) {
-        if (_isGeocoding.value) return@withContext 0
+        limit: Int = 40
+    ): Int = batchGeocodeSites(districtCode = districtCode, plmnFilter = plmnFilter, limit = limit).resolved
+
+    suspend fun batchGeocodeSites(
+        districtCode: String?,
+        plmnFilter: String? = null,
+        limit: Int = 50
+    ): BatchGeocodeSummary = withContext(Dispatchers.IO) {
+        if (_isGeocoding.value) return@withContext BatchGeocodeSummary()
         _isGeocoding.value = true
         var resolved = 0
+        var ruianCount = 0
+        var beaconDbCount = 0
+        var fallbackCount = 0
+        var attempted = 0
         try {
-            val pending = btsDao.getUnlocatedSitesInDistrict(districtCode, plmnFilter, limit)
+            val pending = if (districtCode.isNullOrBlank()) {
+                btsDao.getUnlocatedSitesAll(plmnFilter, limit)
+            } else {
+                btsDao.getUnlocatedSitesInDistrict(districtCode, plmnFilter, limit)
+            }
+            attempted = pending.size
             _geocodeProgress.value = 0 to pending.size
             pending.forEachIndexed { idx, tower ->
-                val coords = BtsGeocoder.geocodeCzechLocation(context, tower.locationName)
-                if (coords != null) {
+                val res = BtsGeocoder.resolveTowerCoordinates(
+                    context = context,
+                    plmn = tower.operatorPlmn,
+                    cellId = tower.cellId,
+                    tac = tower.tac,
+                    band = tower.band,
+                    rawUmisteni = tower.locationName
+                )
+                if (res != null) {
                     saveSiteCoordinates(
                         plmn = tower.operatorPlmn,
                         cellId = tower.cellId,
                         enodebId = tower.enodebId,
                         locationName = tower.locationName,
-                        lat = coords.first,
-                        lon = coords.second,
-                        source = "GEOCODER"
+                        lat = res.latitude,
+                        lon = res.longitude,
+                        source = res.source
                     )
                     resolved++
+                    when (res.source) {
+                        "RUIAN" -> ruianCount++
+                        "BEACONDB" -> beaconDbCount++
+                        else -> fallbackCount++
+                    }
                 }
                 _geocodeProgress.value = (idx + 1) to pending.size
-                delay(200L)
+                delay(150L)
             }
-            resolved
+            BatchGeocodeSummary(
+                attempted = attempted,
+                resolved = resolved,
+                ruianCount = ruianCount,
+                beaconDbCount = beaconDbCount,
+                fallbackCount = fallbackCount
+            )
         } finally {
             _isGeocoding.value = false
             _geocodeProgress.value = 0 to 0

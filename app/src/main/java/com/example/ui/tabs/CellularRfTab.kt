@@ -1173,9 +1173,9 @@ fun DetailedSimCard(
                     ) {
                         Text(
                             text = if (isCs) {
-                                "Záznam z GSMweb neobsahuje GPS souřadnice (vzdálenost k BTS vyžaduje GPS). Naimportujte OpenCelliD (230.csv / .csv.gz) v DB BTS, nebo zkuste dohledat z adresy."
+                                "Záznam BTS zatím nemá GPS souřadnice. Klepněte na „Dohledat GPS“ níže (využije ČÚZK RÚIAN + BeaconDB), nebo v DB BTS naimportujte CLF/NTM/CellMapper/OpenCelliD."
                             } else {
-                                "GSMweb record has no GPS coordinates (needed for BTS distance). Import OpenCelliD (230.csv / .csv.gz) in BTS DB, or try address geocoding below."
+                                "This BTS record has no GPS coordinates yet. Tap 'Geocode GPS' below (uses CUZK RUIAN + BeaconDB) or import CLF/NTM/CellMapper/OpenCelliD in BTS DB."
                             },
                             modifier = Modifier.padding(8.dp),
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),

@@ -64,7 +64,8 @@ fun BtsDatabaseDialog(
     var searchQuery by remember { mutableStateOf(initialQuery) }
     var filterOperatorPlmn by remember { mutableStateOf<String?>(null) }
     var searchResults by remember { mutableStateOf<List<BtsTowerEntity>>(emptyList()) }
-    var selectedDistrict by remember(districts) { mutableStateOf(districts.firstOrNull() ?: "") }
+    var selectedDistrict by remember { mutableStateOf<String?>(null) } // null = All districts
+    var lastBatchGeocodeSummary by remember { mutableStateOf<String?>(null) }
 
     var editingTower by remember { mutableStateOf<BtsTowerEntity?>(null) }
     var showClearConfirm by remember { mutableStateOf(false) }
@@ -189,7 +190,8 @@ fun BtsDatabaseDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 12.dp)
+                        .testTag("bts_dialog_list"),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(vertical = 12.dp)
                 ) {
@@ -244,7 +246,7 @@ fun BtsDatabaseDialog(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = if (isCs) "IMPORT OPENCELLID (.CSV / .CSV.GZ) & GSMWEB / CLF" else "IMPORT OPENCELLID (.CSV / .CSV.GZ) & GSMWEB / CLF",
+                                    text = if (isCs) "IMPORT BTS (.CSV / .CLF / .NTM / .KML / .GZ / .ZIP)" else "IMPORT BTS (.CSV / .CLF / .NTM / .KML / .GZ / .ZIP)",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = CyanTertiary
@@ -252,43 +254,106 @@ fun BtsDatabaseDialog(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = if (isCs) {
-                                        "Doporučeno pro GPS polohu a vzdálenost: OpenCelliD.org (soubor ČR 230.csv nebo přímo 230.csv.gz – automaticky vyfiltruje T-Mobile, O2 a Vodafone).\nExporty z GSMweb.cz (tlte/o2lte/vlte CSV) obsahují české adresy, okresy a pásma bez GPS souřadnic – při kombinaci obou zdrojů se adresa a GPS automaticky sloučí."
+                                        "Podporované formáty: GSMweb.cz (tlte/o2lte/vlte CSV), CLF v3/v4, NetMonster (.ntm / nm2300x), CellMapper (eNB CSV i signal log), KML, OpenCelliD (230.csv.gz) a .ZIP.\nPriorita přesnosti GPS: Ruční > CLF/NTM/KML > ČÚZK RÚIAN > CellMapper eNB > BeaconDB > OpenCelliD (méně přesné zdroje nikdy nepřepíší přesnější polohu stožáru)."
                                     } else {
-                                        "Recommended for GPS & live BTS distance: OpenCelliD.org (Czechia 230.csv or 230.csv.gz directly – auto-filters T-Mobile, O2 & Vodafone).\nGSMweb.cz exports (tlte/o2lte/vlte CSV) contain Czech addresses, districts, bands & PCI without GPS – importing both automatically merges address + GPS per CellID."
+                                        "Supported formats: GSMweb.cz CSV, CLF v3/v4, NetMonster (.ntm / nm2300x), CellMapper (eNB Tower CSV & logs), KML, OpenCelliD (230.csv.gz) & .ZIP archives.\nGPS priority: Manual > CLF/NTM/KML > CUZK RUIAN > CellMapper eNB > BeaconDB > OpenCelliD (coarse centroids never overwrite exact mast coordinates)."
                                     },
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                     color = TextSecondaryDark
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                OutlinedButton(
-                                    onClick = {
-                                        runCatching {
-                                            context.startActivity(
-                                                Intent(Intent.ACTION_VIEW, Uri.parse("https://opencellid.org/downloads.php"))
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 48.dp)
-                                        .testTag("open_opencellid_downloads_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = BorderStroke(1.dp, EmeraldSignal.copy(alpha = 0.55f))
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInBrowser,
-                                        contentDescription = null,
-                                        tint = EmeraldSignal,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (isCs) "Otevřít OpenCelliD.org (stáhnout ČR 230.csv.gz)" else "Open OpenCelliD.org Downloads (CZ MCC 230)",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = EmeraldSignal
-                                    )
+                                    OutlinedButton(
+                                        onClick = {
+                                            runCatching {
+                                                context.startActivity(
+                                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://www.gsmweb.cz/"))
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .testTag("open_gsmweb_portal_button"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, CyanTertiary.copy(alpha = 0.55f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInBrowser,
+                                            contentDescription = null,
+                                            tint = CyanTertiary,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = "GSMweb.cz (CSV/CLF)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = CyanTertiary
+                                        )
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            runCatching {
+                                                context.startActivity(
+                                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://opencellid.org/downloads.php"))
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .testTag("open_opencellid_downloads_button"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, EmeraldSignal.copy(alpha = 0.55f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInBrowser,
+                                            contentDescription = null,
+                                            tint = EmeraldSignal,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = if (isCs) "OpenCelliD (230.csv.gz)" else "OpenCelliD (CZ 230)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = EmeraldSignal
+                                        )
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = {
+                                            runCatching {
+                                                context.startActivity(
+                                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://www.cellmapper.net/"))
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .testTag("open_cellmapper_portal_button"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = BorderStroke(1.dp, AmberWarning.copy(alpha = 0.55f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInBrowser,
+                                            contentDescription = null,
+                                            tint = AmberWarning,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(5.dp))
+                                        Text(
+                                            text = "CellMapper (eNB)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = AmberWarning
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -401,10 +466,10 @@ fun BtsDatabaseDialog(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = if (isCs) "Vybrat CSV/CLF" else "Import CSV/CLF",
+                                            text = if (isCs) "Vybrat CSV / CLF / NTM / KML" else "Import CSV / CLF / NTM / KML",
                                             fontWeight = FontWeight.Bold,
                                             color = DarkSlate900,
-                                            fontSize = 12.sp
+                                            fontSize = 11.sp
                                         )
                                     }
 
@@ -434,8 +499,8 @@ fun BtsDatabaseDialog(
                         }
                     }
 
-                    // Geocoding by District (GSMweb Umisteni -> GPS)
-                    if (districts.isNotEmpty()) {
+                    // Precision Geolocation Card (CUZK RUIAN + BeaconDB + Fallback)
+                    if (totalTowers > 0) {
                         item {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -444,16 +509,17 @@ fun BtsDatabaseDialog(
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        text = if (isCs) "DOPLNĚNÍ GPS SOUŘADNIC Z NÁZVŮ LOKALIT (OKRESY)" else "RESOLVE BTS GPS FROM ADDRESSES (DISTRICTS)",
+                                        text = if (isCs) "PŘESNÉ DOPLNĚNÍ GPS (ČÚZK RÚIAN + BEACONDB)" else "PRECISION TOWER GPS (CUZK RUIAN + BEACONDB)",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = AmberWarning
                                     )
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = if (isCs) {
-                                            "Exporty z GSMweb.cz jsou bez GPS souřadnic (mají jen textové umístění). Pro přesnou polohu naimportujte OpenCelliD (230.csv/.gz) výše, nebo zde volitelně dohledejte přibližnou GPS z adresy."
+                                            "1) Adresy z GSMwebu (ulice + č.p.) lokalizuje na budovu s přesností ~2–10 m přes oficiální registr ČÚZK RÚIAN.\n2) Stožáry v lese / bez ulice dohledá bez API klíče přes BeaconDB (api.beacondb.net).\nPozn.: Přímo na gsmweb.cz/celltrack/clf/ je zakázán výpis složky (403) – na GSMwebu stahujte přes hlavní menu, nebo využijte automatické zaměření zde."
                                         } else {
-                                            "GSMweb.cz exports contain street descriptions without GPS. Import OpenCelliD (230.csv/.gz) above for tower GPS, or optionally batch-geocode site names here."
+                                            "1) Resolves GSMweb street addresses to ~2–10m building accuracy via official Czech CUZK RUIAN.\n2) Resolves rural/streetless masts via BeaconDB cell lookup (no API key required)."
                                         },
                                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                         color = TextSecondaryDark
@@ -461,6 +527,13 @@ fun BtsDatabaseDialog(
                                     Spacer(modifier = Modifier.height(6.dp))
 
                                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        item {
+                                            FilterChip(
+                                                selected = selectedDistrict == null,
+                                                onClick = { selectedDistrict = null },
+                                                label = { Text(if (isCs) "Všechny" else "All Sites", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                                            )
+                                        }
                                         items(districts) { code ->
                                             FilterChip(
                                                 selected = selectedDistrict == code,
@@ -472,6 +545,22 @@ fun BtsDatabaseDialog(
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
+                                    lastBatchGeocodeSummary?.let { summaryText ->
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = EmeraldSignal.copy(alpha = 0.14f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = summaryText,
+                                                modifier = Modifier.padding(8.dp),
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                                color = EmeraldSignal
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+
                                     if (isGeocoding) {
                                         val (done, tot) = geocodeProgress
                                         LinearProgressIndicator(
@@ -481,33 +570,33 @@ fun BtsDatabaseDialog(
                                             trackColor = DarkSlate700
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
+                                        val scopeLabel = selectedDistrict ?: if (isCs) "Vše" else "All"
                                         Text(
-                                            text = if (isCs) "Geokóduji okres $selectedDistrict: $done / $tot lokalit..." else "Geocoding district $selectedDistrict: $done / $tot sites...",
+                                            text = if (isCs) "Lokalizuji ($scopeLabel): $done / $tot stožárů..." else "Resolving ($scopeLabel): $done / $tot masts...",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontFamily = FontFamily.Monospace,
                                             color = AmberWarning
                                         )
                                     } else {
+                                        val districtBtnLabel = selectedDistrict ?: if (isCs) "všechny okresy" else "All Sites"
                                         Button(
                                             onClick = {
-                                                if (selectedDistrict.isNotBlank()) {
-                                                    scope.launch {
-                                                        val found = btsRepository.batchGeocodeDistrict(
-                                                            districtCode = selectedDistrict,
-                                                            plmnFilter = filterOperatorPlmn,
-                                                            limit = 25
-                                                        )
-                                                        Toast.makeText(
-                                                            context,
-                                                            if (isCs) "Nalezeny GPS souřadnice pro $found lokalit v okrese $selectedDistrict"
-                                                            else "Resolved GPS for $found sites in district $selectedDistrict",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        refreshSearch()
+                                                scope.launch {
+                                                    val summary = btsRepository.batchGeocodeSites(
+                                                        districtCode = selectedDistrict,
+                                                        plmnFilter = filterOperatorPlmn,
+                                                        limit = 50
+                                                    )
+                                                    val msg = if (isCs) {
+                                                        "Nalezeno ${summary.resolved}/${summary.attempted} stožárů • RÚIAN: ${summary.ruianCount} • BeaconDB: ${summary.beaconDbCount} • Ostatní: ${summary.fallbackCount}"
+                                                    } else {
+                                                        "Resolved ${summary.resolved}/${summary.attempted} masts • RUIAN: ${summary.ruianCount} • BeaconDB: ${summary.beaconDbCount} • Other: ${summary.fallbackCount}"
                                                     }
+                                                    lastBatchGeocodeSummary = msg
+                                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                                    refreshSearch()
                                                 }
                                             },
-                                            enabled = selectedDistrict.isNotBlank(),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .heightIn(min = 48.dp)
@@ -518,7 +607,7 @@ fun BtsDatabaseDialog(
                                             Icon(imageVector = Icons.Default.TravelExplore, contentDescription = null, tint = DarkSlate900, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = if (isCs) "Dohledat GPS pro okres $selectedDistrict (max 25 lokalit)" else "Geocode District $selectedDistrict (up to 25 sites)",
+                                                text = if (isCs) "Dohledat GPS ($districtBtnLabel • max 50)" else "Resolve GPS ($districtBtnLabel • up to 50)",
                                                 fontWeight = FontWeight.Bold,
                                                 color = DarkSlate900,
                                                 fontSize = 12.sp
@@ -607,16 +696,25 @@ fun BtsDatabaseDialog(
                                 isCs = isCs,
                                 onGeocode = {
                                     scope.launch {
-                                        val res = btsRepository.geocodeAndSaveSite(
+                                        val res = btsRepository.geocodeAndSaveSiteDetailed(
                                             plmn = tower.operatorPlmn,
                                             cellId = tower.cellId,
                                             enodebId = tower.enodebId,
-                                            locationName = tower.locationName
+                                            locationName = tower.locationName,
+                                            tac = tower.tac,
+                                            band = tower.band
                                         )
-                                        if (res == null) {
+                                        if (res != null) {
                                             Toast.makeText(
                                                 context,
-                                                if (isCs) "GPS adresu se nepodařilo dohledat (zkuste zadat ručně)" else "Could not geocode address (try manual entry)",
+                                                if (isCs) "GPS nalezena (${res.source}): ${String.format(Locale.US, "%.5f, %.5f", res.latitude, res.longitude)}"
+                                                else "GPS resolved (${res.source}): ${String.format(Locale.US, "%.5f, %.5f", res.latitude, res.longitude)}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                if (isCs) "GPS se nepodařilo dohledat ani přes RÚIAN/BeaconDB (zkuste zadat ručně)" else "Could not resolve GPS via RUIAN/BeaconDB (try manual entry)",
                                                 Toast.LENGTH_SHORT
                                             ).show()
                                         }
@@ -945,6 +1043,11 @@ private fun BtsTowerRowCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (hasCoords) {
+                    val srcColor = when (tower.coordSource.uppercase(Locale.ROOT)) {
+                        "MANUAL", "CLF", "NTM", "KML", "RUIAN", "IMPORT" -> EmeraldSignal
+                        "CELLMAPPER", "BEACONDB" -> CyanTertiary
+                        else -> AmberWarning
+                    }
                     Text(
                         text = String.format(
                             Locale.US,
@@ -955,7 +1058,7 @@ private fun BtsTowerRowCard(
                         ),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         fontFamily = FontFamily.Monospace,
-                        color = EmeraldSignal,
+                        color = srcColor,
                         modifier = Modifier.weight(1f)
                     )
                 } else {
@@ -978,7 +1081,7 @@ private fun BtsTowerRowCard(
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(if (isCs) "Mapa" else "Map", fontSize = 10.sp)
                         }
-                    } else if (tower.locationName.isNotBlank()) {
+                    } else if (tower.locationName.isNotBlank() || tower.cellId > 0L) {
                         OutlinedButton(
                             onClick = onGeocode,
                             shape = RoundedCornerShape(8.dp),

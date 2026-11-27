@@ -454,19 +454,21 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onGeocodeBts = { match ->
                                         coroutineScope.launch {
-                                            val coords = app.btsRepository.geocodeAndSaveSite(
+                                            val res = app.btsRepository.geocodeAndSaveSiteDetailed(
                                                 plmn = match.operatorPlmn,
                                                 cellId = match.cellId,
                                                 enodebId = match.enodebId,
-                                                locationName = match.locationName
+                                                locationName = match.locationName,
+                                                tac = match.dbTac,
+                                                band = match.dbBand
                                             )
-                                            if (coords != null) {
+                                            if (res != null) {
                                                 Toast.makeText(
                                                     this@MainActivity,
                                                     if (isCs) {
-                                                        "GPS BTS uložena: ${String.format(Locale.US, "%.5f, %.5f", coords.first, coords.second)}"
+                                                        "GPS BTS (${res.source}): ${String.format(Locale.US, "%.5f, %.5f", res.latitude, res.longitude)}"
                                                     } else {
-                                                        "BTS GPS saved: ${String.format(Locale.US, "%.5f, %.5f", coords.first, coords.second)}"
+                                                        "BTS GPS (${res.source}): ${String.format(Locale.US, "%.5f, %.5f", res.latitude, res.longitude)}"
                                                     },
                                                     Toast.LENGTH_SHORT
                                                 ).show()

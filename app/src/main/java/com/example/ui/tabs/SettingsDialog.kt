@@ -254,9 +254,9 @@ fun SettingsDialog(
                         )
                         Text(
                             text = if (effectiveIsCs) {
-                                "Dohledá přibližnou GPS z adresy GSMweb, pokud vysílač nemá GPS z OpenCelliD"
+                                "Dohledá přesné GPS přes ČÚZK RÚIAN (adresy GSMweb) a BeaconDB (lesní/neznámé buňky)"
                             } else {
-                                "Resolves approximate GPS from GSMweb street names when OpenCelliD coords are missing"
+                                "Resolves precise GPS via CUZK RUIAN (GSMweb addresses) and BeaconDB (rural/unknown cells)"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
