@@ -134,21 +134,21 @@ private fun computeSegmentColor(
         }
         MapVisualizationMode.SATELLITES -> {
             when {
-                satellitesUsed < 5 -> AndroidColor.parseColor("#F43F5E")
-                satellitesUsed <= 20 -> AndroidColor.parseColor("#F59E0B")
-                satellitesUsed <= 30 -> AndroidColor.parseColor("#06B6D4")
-                satellitesUsed <= 50 -> AndroidColor.parseColor("#10B981")
-                else -> AndroidColor.parseColor("#3B82F6")
+                satellitesUsed < 5 -> AndroidColor.parseColor("#F43F5E")   // Red
+                satellitesUsed <= 20 -> AndroidColor.parseColor("#F97316") // Orange
+                satellitesUsed <= 30 -> AndroidColor.parseColor("#EAB308") // Yellow / Gold
+                satellitesUsed <= 50 -> AndroidColor.parseColor("#10B981") // Emerald Green
+                else -> AndroidColor.parseColor("#8B5CF6")                 // Distinct Violet
             }
         }
         MapVisualizationMode.PDOP -> {
             when {
                 satellitesUsed < 4 || pdop <= 0f || pdop >= 9.0f -> AndroidColor.parseColor("#64748B")
-                pdop < 0.7f -> AndroidColor.parseColor("#10B981")
-                pdop < 1.5f -> AndroidColor.parseColor("#06B6D4")
-                pdop < 2.5f -> AndroidColor.parseColor("#F59E0B")
-                pdop <= 3.5f -> AndroidColor.parseColor("#F97316")
-                else -> AndroidColor.parseColor("#F43F5E")
+                pdop < 0.7f -> AndroidColor.parseColor("#10B981")          // Emerald Green (Best)
+                pdop < 1.5f -> AndroidColor.parseColor("#EAB308")          // Yellow / Gold
+                pdop < 2.5f -> AndroidColor.parseColor("#F97316")          // Orange
+                pdop <= 3.5f -> AndroidColor.parseColor("#8B5CF6")         // Distinct Violet
+                else -> AndroidColor.parseColor("#F43F5E")                 // Red (Worst)
             }
         }
         MapVisualizationMode.BTS_ONLY -> AndroidColor.TRANSPARENT
@@ -996,18 +996,18 @@ fun MapTab(
                         Text(text = if (isCs) "LEGENDA SATELITY (POUŽITÉ)" else "SATELLITES LEGEND (USED)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
                         LegendRow(color = RoseCritical, text = if (isCs) "< 5 satelitů (Slabý fix)" else "< 5 sats (Poor fix)")
-                        LegendRow(color = AmberWarning, text = if (isCs) "5 až 20 satelitů" else "5 to 20 sats")
-                        LegendRow(color = CyanTertiary, text = if (isCs) "21 až 30 satelitů" else "21 to 30 sats")
+                        LegendRow(color = Color(0xFFF97316), text = if (isCs) "5 až 20 satelitů" else "5 to 20 sats")
+                        LegendRow(color = Color(0xFFEAB308), text = if (isCs) "21 až 30 satelitů" else "21 to 30 sats")
                         LegendRow(color = EmeraldSignal, text = if (isCs) "31 až 50 satelitů" else "31 to 50 sats")
-                        LegendRow(color = BlueSatellite, text = if (isCs) "> 50 satelitů (Nejlepší)" else "> 50 sats (Best)")
+                        LegendRow(color = Purple5G, text = if (isCs) "> 50 satelitů (Nejlepší)" else "> 50 sats (Best)")
                     }
                     MapVisualizationMode.PDOP -> {
                         Text(text = if (isCs) "LEGENDA PDOP" else "PDOP LEGEND", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = TextSecondaryDark)
                         Spacer(modifier = Modifier.height(6.dp))
                         LegendRow(color = EmeraldSignal, text = if (isCs) "< 0.7 (Nejlepší)" else "< 0.7 (Best)")
-                        LegendRow(color = CyanTertiary, text = if (isCs) "0.7 až 1.5 (Velmi dobrý)" else "0.7 to 1.5 (Very good)")
-                        LegendRow(color = AmberWarning, text = if (isCs) "1.5 až 2.5 (Střední)" else "1.5 to 2.5 (Moderate)")
-                        LegendRow(color = Color(0xFFF97316), text = if (isCs) "2.5 až 3.5 (Zhoršený)" else "2.5 to 3.5 (Fair)")
+                        LegendRow(color = Color(0xFFEAB308), text = if (isCs) "0.7 až 1.5 (Velmi dobrý)" else "0.7 to 1.5 (Very good)")
+                        LegendRow(color = Color(0xFFF97316), text = if (isCs) "1.5 až 2.5 (Střední)" else "1.5 to 2.5 (Moderate)")
+                        LegendRow(color = Purple5G, text = if (isCs) "2.5 až 3.5 (Zhoršený)" else "2.5 to 3.5 (Fair)")
                         LegendRow(color = RoseCritical, text = if (isCs) "> 3.5 (Nejhorší)" else "> 3.5 (Worst)")
                     }
                     MapVisualizationMode.BTS_ONLY -> {

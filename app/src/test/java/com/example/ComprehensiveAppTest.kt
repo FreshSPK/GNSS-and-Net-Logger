@@ -625,4 +625,99 @@ class ComprehensiveAppTest {
         composeTestRule.onNodeWithText("Max riziko: 85% (výstrah: 1)", substring = true).assertIsDisplayed()
         composeTestRule.onNodeWithText("Bezpečnost: 85% [CRITICAL] | ΔTA 2450m | NTP -4820ms", substring = true).assertIsDisplayed()
     }
+
+    @Test
+    fun testClockOffsetUpTo800MsStaysOkAndAbove800MsTriggersWarning() {
+        val now = 1700000000000L
+        val gnss = cleanGnss()
+        val cell = CellularState(sim1 = cleanSim1())
+
+        // -662 ms (exact screenshot scenario) and exactly -800 ms must stay OK (green)
+        for (offsetMs in listOf(-662L, -800L, 800L)) {
+            val diag = TimeSyncDiagnostics(
+                ntpTimeMs = now,
+                systemTimeMs = now + offsetMs,
+                gnssFixTimeMs = now + offsetMs,
+                gnssHardwareUtcMs = now + offsetMs
+            )
+            val res = SecurityAnalyzer.evaluate(
+                gnssInput = gnss.copy(fixTimestampMs = now + offsetMs, gnssHardwareUtcMs = now + offsetMs),
+                cellularInput = cell,
+                timeDiagInput = diag,
+                ctx = SecurityContextSnapshot()
+            )
+            val timeCheck = res.checks.first { it.id == "time_triple_sync" }
+            assertEquals("Offset $offsetMs ms should stay OK", ThreatSeverity.OK, timeCheck.severity)
+        }
+
+        // -850 ms should trigger WARNING, -2200 ms should trigger CRITICAL
+        val warnDiag = TimeSyncDiagnostics(
+            ntpTimeMs = now,
+            systemTimeMs = now - 730L,
+            gnssFixTimeMs = now - 850L,
+            gnssHardwareUtcMs = now - 850L
+        )
+        val warnRes = SecurityAnalyzer.evaluate(
+            gnssInput = gnss.copy(fixTimestampMs = now - 850L, gnssHardwareUtcMs = now - 850L),
+            cellularInput = cell,
+            timeDiagInput = warnDiag,
+            ctx = SecurityContextSnapshot()
+        )
+        assertEquals(ThreatSeverity.WARNING, warnRes.checks.first { it.id == "time_triple_sync" }.severity)
+
+        val critDiag = TimeSyncDiagnostics(
+            ntpTimeMs = now,
+            systemTimeMs = now - 730L,
+            gnssFixTimeMs = now - 2200L,
+            gnssHardwareUtcMs = now - 2200L
+        )
+        val critRes = SecurityAnalyzer.evaluate(
+            gnssInput = gnss.copy(fixTimestampMs = now - 2200L, gnssHardwareUtcMs = now - 2200L),
+            cellularInput = cell,
+            timeDiagInput = critDiag,
+            ctx = SecurityContextSnapshot()
+        )
+        assertEquals(ThreatSeverity.CRITICAL, critRes.checks.first { it.id == "time_triple_sync" }.severity)
+    }
+
+    @Test
+    fun testSecurityTabClickingCheckCardOpensFullDetailAndExplanationPopup() {
+        val now = 1700000000000L
+        val evaluated = SecurityAnalyzer.evaluate(
+            gnssInput = cleanGnss().copy(fixTimestampMs = now - 662L, gnssHardwareUtcMs = now - 662L),
+            cellularInput = CellularState(sim1 = cleanSim1()),
+            timeDiagInput = TimeSyncDiagnostics(
+                ntpTimeMs = now,
+                systemTimeMs = now - 734L,
+                gnssFixTimeMs = now - 662L,
+                gnssHardwareUtcMs = now - 662L
+            ),
+            ctx = SecurityContextSnapshot()
+        )
+
+        composeTestRule.setContent {
+            SignalLoggerTheme(darkTheme = true) {
+                SecurityTab(
+                    security = evaluated,
+                    isDemoMode = false,
+                    lang = "CS",
+                    onSyncNtpNow = {},
+                    onRunDeepScan = {},
+                    onClearIncidents = {},
+                    onSelectSimulatedAttack = {}
+                )
+            }
+        }
+
+        // Verify -662 ms GNSS-NTP stays OK & card can be clicked to open unclipped popup
+        composeTestRule.onNodeWithTag("security_check_card_time_triple_sync").performScrollTo().performClick()
+        composeTestRule.onNodeWithTag("security_check_detail_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithText("NAMĚŘENÉ HODNOTY (ÚPLNÝ VÝPIS)").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("security_check_detail_measured").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Co tento parametr znamená").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Jak se počítá").performScrollTo().assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("security_check_detail_close").performClick()
+        composeTestRule.onNodeWithTag("security_check_detail_dialog").assertDoesNotExist()
+    }
 }

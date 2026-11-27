@@ -57,7 +57,7 @@
 | **GNSS** | L1-Only Dual-Band Drop | `L5/E5a == 0` when L1 `≥ 8 sats` & `Ø > 32 dB-Hz` | Warning |
 | **GNSS** | IMU & Barometer Kinematics | Stationary IMU `≥ 4 s` & GNSS `> 12 km/h` / `Δh > 40 m` / jump `> 65 m/s` | Critical / Warning |
 | **GNSS + BTS** | Spatial Cross-Check | GNSS distance to known serving BTS `> 45 km` | Critical |
-| **Time / Čas** | 3-Clock Drift (`GNSS · NITZ · NTP`) | `\|GNSS − NTP\| > 450 ms` / `> 1 500 ms` or `\|GNSS − NITZ\| > 800 ms` | Warning / Critical |
+| **Time / Čas** | 3-Clock Drift (`GNSS · NITZ · NTP`) | `\|GNSS − NTP\| > 800 ms` / `> 2 000 ms` or `\|GNSS − NITZ\| > 800 ms` | Warning / Critical |
 | **Time / Čas** | Hardware Oscillator Stability | Clock discontinuity delta `> 0` or `\|drift\| > 50 000 ns/s` | Warning |
 | **Cell RF** | `ΔTA` vs. BTS Haversine | `\|TA_dist − BTS_dist\| > 1 500 m` / `> 3 500 m` | Warning / Critical |
 | **Cell RF** | `TA vs. RSRP` Path-Loss Physics | `TA ≤ 1 & RSRP > -55 dBm` (isolated) or `residual > +28 dB` | Critical / Warning |

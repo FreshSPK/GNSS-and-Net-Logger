@@ -6,12 +6,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,6 +58,7 @@ fun SecurityTab(
     var activeSubTab by remember { mutableStateOf(SecuritySubTab.CHECKS) }
     var checkFilter by remember { mutableStateOf("ALL") }
     var showMethodologyDialog by remember { mutableStateOf(false) }
+    var selectedCheckForDetail by remember { mutableStateOf<SecurityCheckResult?>(null) }
 
     val statusColor = when (security.overallStatus) {
         ThreatSeverity.CRITICAL -> RoseCritical
@@ -396,7 +399,11 @@ fun SecurityTab(
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         filtered.forEach { chk ->
-                            SecurityCheckCard(check = chk, isCs = isCs)
+                            SecurityCheckCard(
+                                check = chk,
+                                isCs = isCs,
+                                onClick = { selectedCheckForDetail = chk }
+                            )
                         }
                     }
                 }
@@ -449,6 +456,14 @@ fun SecurityTab(
         SecurityMethodologyDialog(
             isCs = isCs,
             onDismiss = { showMethodologyDialog = false }
+        )
+    }
+
+    selectedCheckForDetail?.let { detailCheck ->
+        SecurityCheckDetailDialog(
+            check = detailCheck,
+            isCs = isCs,
+            onDismiss = { selectedCheckForDetail = null }
         )
     }
 }
@@ -548,7 +563,8 @@ private fun DomainScoreChip(
 @Composable
 private fun SecurityCheckCard(
     check: SecurityCheckResult,
-    isCs: Boolean
+    isCs: Boolean,
+    onClick: () -> Unit
 ) {
     val color = when (check.severity) {
         ThreatSeverity.CRITICAL -> RoseCritical
@@ -564,7 +580,11 @@ private fun SecurityCheckCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .minimumInteractiveComponentSize()
+            .clickable(onClick = onClick)
+            .testTag("security_check_card_${check.id}"),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (check.severity == ThreatSeverity.CRITICAL || check.severity == ThreatSeverity.WARNING) {
@@ -651,6 +671,13 @@ private fun SecurityCheckCard(
                     fontFamily = FontFamily.Monospace,
                     color = TextSecondaryDark,
                     maxLines = 1
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = if (isCs) "Zobrazit detail a výpočet" else "Show detail & calculation",
+                    tint = CyanTertiary.copy(alpha = 0.8f),
+                    modifier = Modifier.size(13.dp)
                 )
             }
         }

@@ -74,14 +74,14 @@ Standalone native Android application for field RF drive-testing, multi-constell
 * **Color Layers (`S1` / `S2` toggle):**
   * **RSRP:** Green (`> -80 dBm`) to Red (`< -105 dBm`)
   * **Speed:** Blue (`< 10 km/h`) to Red (`> 90 km/h`)
-  * **Satellites:** Red (`< 5`), Orange (`5–20`), Cyan (`21–30`), Emerald (`31–50`), Blue (`> 50`)
-  * **PDOP:** Emerald (`< 0.7`), Cyan (`0.7–1.5`), Amber (`1.5–2.5`), Orange (`2.5–3.5`), Red (`> 3.5`)
+  * **Satellites:** Red (`< 5`), Orange (`5–20`), Yellow (`21–30`), Green (`31–50`), Violet (`> 50`)
+  * **PDOP:** Green (`< 0.7`), Yellow (`0.7–1.5`), Orange (`1.5–2.5`), Violet (`2.5–3.5`), Red (`> 3.5`)
 
 ### 5. Charts
 Interactive touch-scrubbing Canvas waveforms (live & historical): **Dual-SIM RSRP & SINR**, **Speed**, **Satellites** (**Used** vs. **Visible**), **PDOP**, **AGC Interference**, **Ping RTT**, **Accelerometer**, **Gyroscope**, **Compass**, and **Battery Temperature**.
 
 ### 6. Spoofing & Jamming Shield *(v1.6)*
-* **Threat Risk Index (`0–100%`) & Sub-Scores:** Fused risk score across **GNSS**, **Cell RF**, and **Clock**, with bottom-bar warning badge, **Deep Scan**, timestamped **Incident Log**, and **acoustic warning tone** on critical events during active recording.
+* **Threat Risk Index (`0–100%`) & Sub-Scores:** Fused risk score across **GNSS**, **Cell RF**, and **Clock**, with bottom-bar warning badge, **Deep Scan**, tap-to-inspect **Check Detail Popups** (unclipped values, meaning & calculation formula), timestamped **Incident Log**, and **acoustic warning tone** on critical events during active recording.
 * **Multi-Source UTC Time Audit (`GNSS · NITZ · NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) with RTT compensation compared against hardware `GnssClock` UTC (`timeNanos − fullBiasNanos`) and cellular NITZ time, plus hardware clock discontinuity & oscillator drift tracking.
 * **RF Propagation Physics (`TA vs. RSRP` & `BTS Distance`):** Validates Timing Advance against known BTS Haversine distance (`ΔTA`), checks measured RSRP against empirical path-loss (`-72 dBm @ 150 m / 1800 MHz`, `34 dB/dec`), flags wideband LTE jamming (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G GSM downgrades, isolated SIB cells, TAC oscillations, and strong-RF data blackholes.
 * **Deep GNSS Anti-Spoofing & Sensor Fusion:** Evaluates `Location.isMock`, AGC vs. C/N₀ compression, uniform C/N₀ (`Ø > 43.5 dB-Hz`, `σ < 2.3 dB-Hz`) & zenith-vs-horizon elevation inversion, orbital Doppler spread collapse (`σ_v < 45 m/s`), L1-only spoofing (vanishing L5/E5a), IMU stationary kinematics, barometer `Δh > 40 m`, teleport jumps (`> 65 m/s`), and GNSS-vs-BTS distance (`> 45 km`).
@@ -127,14 +127,14 @@ Interactive touch-scrubbing Canvas waveforms (live & historical): **Dual-SIM RSR
 * **Barevné vrstvy (přepínač `S1` / `S2`):**
   * **RSRP:** Zelená (`> -80 dBm`) až Červená (`< -105 dBm`)
   * **Rychlost:** Modrá (`< 10 km/h`) až Červená (`> 90 km/h`)
-  * **Satelity:** Červená (`< 5`), Oranžová (`5–20`), Azurová (`21–30`), Smaragdová (`31–50`), Modrá (`> 50`)
-  * **PDOP:** Smaragdová (`< 0,7`), Azurová (`0,7–1,5`), Oranžová (`1,5–2,5`), Oranžovočervená (`2,5–3,5`), Červená (`> 3,5`)
+  * **Satelity:** Červená (`< 5`), Oranžová (`5–20`), Žlutá (`21–30`), Zelená (`31–50`), Fialová (`> 50`)
+  * **PDOP:** Zelená (`< 0,7`), Žlutá (`0,7–1,5`), Oranžová (`1,5–2,5`), Fialová (`2,5–3,5`), Červená (`> 3,5`)
 
 ### 5. Grafy
 Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro historické relace): **Duální RSRP & SINR**, **Rychlost**, **Satelity** (**Ve fixu** i **Viditelné**), **PDOP**, **AGC rušení**, **Ping RTT**, **Akcelerometr**, **Gyroskop**, **Kompas** a **Teplota baterie**.
 
 ### 6. Podvody (Detekce spoofingu, rušení & přesného času) *(v1.6)*
-* **Threat Risk Index (`0–100 %`) & dílčí skóre:** Souhrnný ukazatel rizika pro **GNSS**, **RF sítě** a **Čas**, varovný štítek ve spodní liště, **Hloubkový sken**, **Deník incidentů** a **akustický tón** při kritickém incidentu během záznamu.
+* **Threat Risk Index (`0–100 %`) & dílčí skóre:** Souhrnný ukazatel rizika pro **GNSS**, **RF sítě** a **Čas**, varovný štítek ve spodní liště, **Hloubkový sken**, rozklikávací **detailní pop-up u každé kontroly** (úplné hodnoty, význam a vzorec výpočtu), **Deník incidentů** a **akustický tón** při kritickém incidentu během záznamu.
 * **Srovnání přesného času (`GNSS · NITZ · NTP`):** Vestavěný RFC 4330 SNTP UDP:123 klient (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) s kompenzací RTT oproti `GnssClock` UTC (`timeNanos − fullBiasNanos`) a síťovému času NITZ + sledování diskontinuit a driftu oscilátoru.
 * **RF Fyzika (`TA vs. RSRP` & `Poloha BTS`):** Ověřuje vzdálenost dle Timing Advance proti poloze BTS (ΔTA), kontroluje empirický útlum trasy (`-72 dBm @ 150 m / 1800 MHz`, `34 dB/dek`), detekuje širokopásmové rušení (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G GSM downgrade, izolovanou buňku, oscilaci TAC a výpadky dat při silném signálu.
 * **GNSS Anti-Spoofing & Fúze senzorů:** Kontroluje `Location.isMock`, pokles zisku AGC vs. C/N₀, jednotný výkon C/N₀ (`Ø > 43,5 dB-Hz`, `σ < 2,3 dB-Hz`) i inverzi elevace, kolaps Dopplerova rozptylu (`σ_v < 45 m/s`), zmizení pásma L5/E5a při silném L1, nesoulad s nehybným IMU a barometrem (`Δh > 40 m`), skoky polohy (`> 65 m/s`) i vzdálenost GNSS vs. BTS (`> 45 km`).

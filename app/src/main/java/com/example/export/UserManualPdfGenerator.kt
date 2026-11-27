@@ -789,12 +789,12 @@ object UserManualPdfGenerator {
             "1. Internetový NTP (RFC 4330 SNTP)" to "Přímý UDP paket na port 123 (time.google.com, tik.cesnet.cz, time.cloudflare.com) s výpočtem zpátečního zpoždění RTT/2 pro přesnost na jednotky milisekund.",
             "2. Čas mobilní sítě / OS (NITZ)" to "Čas poskytovaný základnovou stanicí operátora (Network Identity and Time Zone) a systémovými hodinami Androidu.",
             "3. Hardwarový čas GNSS (GnssClock)" to "Výpočet přímého satelitního času z nanosekundového čítače (timeNanos − fullBiasNanos − biasNanos) s odečtem přestupných sekund GPS–UTC, doplněný o sledování skokových diskontinuit a frekvenčního driftu oscilátoru (ns/s).",
-            "Jak odhaluje podvody" to "Replay útok (meaconing) přehrává starší záznam GNSS a způsobí odchylku Δ(GNSS − NTP) > 450 ms až několik sekund. Podvržená BTS vysílající falešný NITZ čas vytvoří odchylku Δ(Síť − NTP) při zachování platného NTP."
+            "Jak odhaluje podvody" to "Replay útok (meaconing) přehrává starší záznam GNSS a způsobí odchylku Δ(GNSS − NTP) > 800 ms (kriticky > 2 000 ms). Podvržená BTS vysílající falešný NITZ čas vytvoří odchylku Δ(Síť − NTP) při zachování platného NTP."
         ) else listOf(
             "1. Internet NTP (RFC 4330 SNTP)" to "Direct UDP:123 query (time.google.com, tik.cesnet.cz, time.cloudflare.com) with half-RTT compensation yielding millisecond-grade UTC reference.",
             "2. Mobile Network / OS Time (NITZ)" to "Carrier base-station NITZ broadcast and synchronized Android wall-clock time.",
             "3. Hardware GNSS UTC (GnssClock)" to "Computes exact satellite UTC directly from raw nanosecond counters (timeNanos − fullBiasNanos − biasNanos) minus GPS-UTC leap seconds, while monitoring oscillator drift (ns/s) and clock discontinuities.",
-            "What Skews Expose" to "GNSS replay (meaconing) injects delayed satellite signals causing Δ(GNSS − NTP) > 450 ms. A rogue BTS sending fake NITZ triggers Δ(Net − NTP) while internet NTP stays accurate."
+            "What Skews Expose" to "GNSS replay (meaconing) injects delayed satellite signals causing Δ(GNSS − NTP) > 800 ms (critical > 2,000 ms). A rogue BTS sending fake NITZ triggers Δ(Net − NTP) while internet NTP stays accurate."
         )
         for ((k, v) in clockRows) {
             y = drawKeyValueRowBox(c, y, k, v, COLOR_LIGHT_BG, COLOR_CYAN)
@@ -893,10 +893,10 @@ object UserManualPdfGenerator {
         )
 
         val mapItems = if (isCs) listOf(
-            "Vrstva Mapa (OpenStreetMap)" to "• RSRP (S1/S2): Zelená (> -80 dBm), Limetková (-80 až -92), Oranžová (-92 až -105), Červená (< -105 dBm).\n• Satelity: < 5 červená, 5–20 oranžová, 21–30 azurová, 31–50 smaragdová, > 50 modrá.\n• PDOP: < 0,7 smaragdová, 0,7–1,5 azurová, 1,5–2,5 žlutá, 2,5–3,5 oranžová, > 3,5 červená.",
+            "Vrstva Mapa (OpenStreetMap)" to "• RSRP (S1/S2): Zelená (> -80 dBm), Limetková (-80 až -90), Oranžová (-90 až -105), Červená (< -105 dBm).\n• Satelity: < 5 červená, 5–20 oranžová, 21–30 žlutá, 31–50 zelená, > 50 fialová.\n• PDOP: < 0,7 zelená, 0,7–1,5 žlutá, 1,5–2,5 oranžová, 2,5–3,5 fialová, > 3,5 červená.",
             "Exporty z Historie (Download/GNSS_Net_Logger/)" to "• CSV: Kompletní tabulka pro Excel/Python (včetně SIM1/SIM2 BTS vzdáleností, azimutů, CA, satelitů i skóre spoofingu, ΔTA a NTP).\n• 3D KML: Barevná trasa + špendlíky Waypointů pro Google Earth.\n• GPX 1.1 & GeoJSON: Otevřené standardy (vč. bezpečnostních rozšíření) pro QGIS, ArcGIS a GPS nástroje."
         ) else listOf(
-            "Map Layers (OpenStreetMap)" to "• RSRP (S1/S2): Green (> -80 dBm), Lime (-80..-92), Orange (-92..-105), Red (< -105 dBm).\n• Satellites: < 5 Red, 5–20 Orange, 21–30 Cyan, 31–50 Emerald, > 50 Blue.\n• PDOP: < 0.7 Emerald, 0.7–1.5 Cyan, 1.5–2.5 Amber, 2.5–3.5 Orange, > 3.5 Red.",
+            "Map Layers (OpenStreetMap)" to "• RSRP (S1/S2): Green (> -80 dBm), Lime (-80..-90), Orange (-90..-105), Red (< -105 dBm).\n• Satellites: < 5 Red, 5–20 Orange, 21–30 Yellow, 31–50 Green, > 50 Violet.\n• PDOP: < 0.7 Green, 0.7–1.5 Yellow, 1.5–2.5 Orange, 2.5–3.5 Violet, > 3.5 Red.",
             "History Exports (Download/GNSS_Net_Logger/)" to "• CSV: Full spreadsheet schema (including SIM 1 / SIM 2 BTS distances, bearings, CA, satellites, risk score, ΔTA & NTP).\n• 3D KML: Color-coded path + Waypoint pins for Google Earth.\n• GPX 1.1 & GeoJSON: Open GIS standards (with security extensions) ready for QGIS & ArcGIS."
         )
         for ((k, v) in mapItems) {

@@ -165,8 +165,8 @@ fun TimeForensicsSubView(
                     modifier = Modifier.weight(1f),
                     title = "GNSS − NTP",
                     deltaMs = timeDiag.gnssMinusNtpMs,
-                    warnThresholdMs = 450L,
-                    critThresholdMs = 1500L
+                    warnThresholdMs = 800L,
+                    critThresholdMs = 2000L
                 )
                 DeltaTile(
                     modifier = Modifier.weight(1f),
@@ -183,6 +183,16 @@ fun TimeForensicsSubView(
                     critThresholdMs = 2500L
                 )
             }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = if (isCs) {
+                    "Limity (zelená): GNSS−NTP ≤ 800 ms • Síť−NTP ≤ 1500 ms (krok NITZ) • GNSS−Síť ≤ 800 ms"
+                } else {
+                    "Green limits: GNSS−NTP ≤ 800 ms • Net−NTP ≤ 1500 ms (NITZ step) • GNSS−Net ≤ 800 ms"
+                },
+                fontSize = 9.sp,
+                color = TextSecondaryDark
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -289,8 +299,8 @@ private fun DeltaTile(
     val absDelta = deltaMs?.let { abs(it) }
     val color = when {
         absDelta == null -> TextSecondaryDark
-        absDelta >= critThresholdMs -> RoseCritical
-        absDelta >= warnThresholdMs -> AmberWarning
+        absDelta > critThresholdMs -> RoseCritical
+        absDelta > warnThresholdMs -> AmberWarning
         else -> EmeraldSignal
     }
     Surface(

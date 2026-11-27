@@ -325,9 +325,9 @@ object SecurityAnalyzer {
         val absGnssSys = gnssMinusSys?.let { abs(it) }
 
         val timeDriftSeverity = when {
-            absGnssNtp != null && absGnssNtp > 1500L -> ThreatSeverity.CRITICAL
+            absGnssNtp != null && absGnssNtp > 2000L -> ThreatSeverity.CRITICAL
             absGnssSys != null && absGnssSys > 2500L -> ThreatSeverity.CRITICAL
-            absGnssNtp != null && absGnssNtp > 450L -> ThreatSeverity.WARNING
+            absGnssNtp != null && absGnssNtp > 800L -> ThreatSeverity.WARNING
             absSysNtp != null && absSysNtp > 2500L -> ThreatSeverity.WARNING
             absGnssSys != null && absGnssSys > 800L -> ThreatSeverity.WARNING
             else -> ThreatSeverity.OK
@@ -358,7 +358,7 @@ object SecurityAnalyzer {
                     append(" | S-N: ${sysMinusNtp?.let { "${it}ms" } ?: "—"}")
                     append(" | G-S: ${gnssMinusSys?.let { "${it}ms" } ?: "—"}")
                 },
-                expectedRange = "|Δt| < 450 ms",
+                expectedRange = "|Δt| ≤ 800 ms",
                 scoreImpact = when (timeDriftSeverity) {
                     ThreatSeverity.CRITICAL -> 75
                     ThreatSeverity.WARNING -> 35
