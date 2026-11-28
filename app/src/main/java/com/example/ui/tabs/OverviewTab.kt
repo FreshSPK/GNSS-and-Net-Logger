@@ -44,6 +44,7 @@ fun OverviewTab(
     env: EnvironmentState,
     isLogging: Boolean,
     isPaused: Boolean,
+    isStationaryHold: Boolean = false,
     loggedPoints: Int,
     sessionStartTimeMs: Long? = null,
     sessionDistanceMeters: Double = 0.0,
@@ -147,6 +148,22 @@ fun OverviewTab(
                                 },
                                 fontSize = 14.sp
                             )
+                            if (isLogging && !isPaused && isStationaryHold) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = CyanTertiary.copy(alpha = 0.20f),
+                                    modifier = Modifier.testTag("stationary_hold_badge")
+                                ) {
+                                    Text(
+                                        text = if (isCs) "IMU KLID • Hold" else "IMU STILL • Hold",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CyanTertiary
+                                    )
+                                }
+                            }
                         }
                         if (isLogging) {
                             Spacer(modifier = Modifier.height(6.dp))

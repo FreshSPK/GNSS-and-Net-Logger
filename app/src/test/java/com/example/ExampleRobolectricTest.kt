@@ -18,6 +18,7 @@ import com.example.bts.BtsGeoUtils
 import com.example.bts.BtsGeocoder
 import com.example.bts.BtsRepository
 import com.example.data.db.AppDatabase
+import com.example.data.db.BtsTowerEntity
 import com.example.data.db.LogSession
 import com.example.data.db.TelemetryRecord
 import com.example.export.Exporter
@@ -1110,6 +1111,100 @@ class ExampleRobolectricTest {
                 }.getOrDefault(false)
             }
             composeTestRule.onNodeWithTag("bts_batch_geocode_button").assertIsDisplayed()
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun testMultiBandMastPropagationAndLocationDeduplication() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val dao = db.btsDao()
+            runBlocking {
+                // Multi-band physical mast: eNB 928461 (800M) has RUIAN GPS, co-located eNB 928462 (1800M) lacks GPS
+                // Plus two unlocated co-located eNBs sharing a separate address
+                dao.upsertBatch(
+                    listOf(
+                        BtsTowerEntity(
+                            operatorPlmn = "23001",
+                            cellId = 237686027L,
+                            enodebId = 928461L,
+                            sectorId = 11,
+                            band = "800",
+                            locationName = "Tišnov, Na Hrádku 20, gymnázium",
+                            latitude = 49.34929,
+                            longitude = 16.42580,
+                            coordSource = "RUIAN"
+                        ),
+                        BtsTowerEntity(
+                            operatorPlmn = "23001",
+                            cellId = 237686293L,
+                            enodebId = 928462L,
+                            sectorId = 21,
+                            band = "1800",
+                            locationName = "Tišnov, Na Hrádku 20, gymnázium",
+                            latitude = null,
+                            longitude = null,
+                            coordSource = ""
+                        ),
+                        BtsTowerEntity(
+                            operatorPlmn = "23001",
+                            cellId = 237686294L,
+                            enodebId = 928462L,
+                            sectorId = 22,
+                            band = "1800",
+                            locationName = "Tišnov, Na Hrádku 20, gymnázium",
+                            latitude = null,
+                            longitude = null,
+                            coordSource = ""
+                        ),
+                        BtsTowerEntity(
+                            operatorPlmn = "23001",
+                            cellId = 227356427L,
+                            enodebId = 888111L,
+                            sectorId = 11,
+                            band = "800",
+                            locationName = "Brno, Kolejní 4, VUT",
+                            latitude = null,
+                            longitude = null,
+                            coordSource = ""
+                        ),
+                        BtsTowerEntity(
+                            operatorPlmn = "23001",
+                            cellId = 227384853L,
+                            enodebId = 888222L,
+                            sectorId = 21,
+                            band = "1800",
+                            locationName = "Brno, Kolejní 4, VUT",
+                            latitude = null,
+                            longitude = null,
+                            coordSource = ""
+                        )
+                    )
+                )
+
+                // Before propagation: 4 unlocated cells across 2 physical addresses -> GROUP BY returns max 2 sites
+                val unlocatedBefore = dao.getUnlocatedSitesAll("23001", 50)
+                assertEquals(2, unlocatedBefore.size)
+
+                // SQL pre-pass copies GPS from eNB 928461 to both co-located 1800M sectors of eNB 928462 locally
+                val propagated = dao.propagateKnownSiteCoordinates()
+                assertEquals(2, propagated)
+
+                val sector21 = dao.findByPlmnAndCellId("23001", 237686293L)!!
+                assertEquals(49.34929, sector21.latitude!!, 0.0001)
+                assertEquals(16.42580, sector21.longitude!!, 0.0001)
+                assertEquals("RUIAN", sector21.coordSource)
+
+                // After propagation: only 1 unlocated physical mast remains for Brno, Kolejní 4, VUT
+                val unlocatedAfter = dao.getUnlocatedSitesAll("23001", 50)
+                assertEquals(1, unlocatedAfter.size)
+                assertEquals("Brno, Kolejní 4, VUT", unlocatedAfter.first().locationName)
+            }
         } finally {
             db.close()
         }

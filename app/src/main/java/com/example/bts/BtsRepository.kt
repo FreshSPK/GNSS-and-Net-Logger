@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.cos
 
@@ -28,6 +29,7 @@ data class BtsImportProgress(
 data class BatchGeocodeSummary(
     val attempted: Int = 0,
     val resolved: Int = 0,
+    val propagatedCount: Int = 0,
     val ruianCount: Int = 0,
     val beaconDbCount: Int = 0,
     val fallbackCount: Int = 0
@@ -98,6 +100,7 @@ class BtsRepository(
                     }
                 }
             }
+            btsDao.propagateKnownSiteCoordinates()
             attemptedGeocodeMs.clear()
             BtsImportResult(
                 totalLines = totalLines,
@@ -139,6 +142,7 @@ class BtsRepository(
                         importedCount = imported
                     )
                 }
+                btsDao.propagateKnownSiteCoordinates()
                 attemptedGeocodeMs.clear()
                 result
             }
@@ -338,13 +342,16 @@ class BtsRepository(
         band: String = ""
     ): Pair<Double, Double>? {
         if (locationName.isBlank() && cellId <= 0L) return null
-        val key = if (enodebId > 0L) "$plmn:enb:$enodebId" else "$plmn:ci:$cellId:$locationName"
+        val trimmedLoc = locationName.trim()
+        val locKey = if (trimmedLoc.isNotBlank()) "$plmn:loc:${trimmedLoc.lowercase(Locale.ROOT)}" else null
+        val enbKey = if (enodebId > 0L) "$plmn:enb:$enodebId" else "$plmn:ci:$cellId:$trimmedLoc"
         val now = System.currentTimeMillis()
-        val lastAttempt = attemptedGeocodeMs[key]
+        val lastAttempt = attemptedGeocodeMs[enbKey] ?: locKey?.let { attemptedGeocodeMs[it] }
         if (lastAttempt != null && now - lastAttempt < geocodeRetryCooldownMs) {
             return null
         }
-        attemptedGeocodeMs[key] = now
+        attemptedGeocodeMs[enbKey] = now
+        if (locKey != null) attemptedGeocodeMs[locKey] = now
         return geocodeAndSaveSite(plmn, cellId, enodebId, locationName, tac, band)
     }
 
@@ -402,11 +409,14 @@ class BtsRepository(
         if (_isGeocoding.value) return@withContext BatchGeocodeSummary()
         _isGeocoding.value = true
         var resolved = 0
+        var propagatedCount = 0
         var ruianCount = 0
         var beaconDbCount = 0
         var fallbackCount = 0
         var attempted = 0
+        val resolvedAddressCache = HashMap<String, BtsGeocodeResult>()
         try {
+            propagatedCount = btsDao.propagateKnownSiteCoordinates()
             val pending = if (districtCode.isNullOrBlank()) {
                 btsDao.getUnlocatedSitesAll(plmnFilter, limit)
             } else {
@@ -415,14 +425,39 @@ class BtsRepository(
             attempted = pending.size
             _geocodeProgress.value = 0 to pending.size
             pending.forEachIndexed { idx, tower ->
-                val res = BtsGeocoder.resolveTowerCoordinates(
-                    context = context,
-                    plmn = tower.operatorPlmn,
-                    cellId = tower.cellId,
-                    tac = tower.tac,
-                    band = tower.band,
-                    rawUmisteni = tower.locationName
-                )
+                val cleanAddrKey = tower.locationName.trim()
+                    .takeIf { it.isNotBlank() && !it.startsWith("OpenCelliD") && !it.startsWith("CellMapper") && !it.startsWith("BeaconDB") }
+                    ?.let { BtsGeoUtils.cleanLocationForGeocoding(it).lowercase(Locale.ROOT) }
+                var fromCache = false
+                var res = cleanAddrKey?.let { resolvedAddressCache[it] }
+                if (res != null) {
+                    fromCache = true
+                } else if (tower.locationName.isNotBlank() && BtsGeoUtils.hasStreetOrNumberHint(tower.locationName)) {
+                    val dbReuse = btsDao.findFirstLocatedByLocation(tower.locationName)
+                    if (dbReuse != null && BtsGeoUtils.isValidCzechCoord(dbReuse.latitude, dbReuse.longitude)) {
+                        res = BtsGeocodeResult(
+                            latitude = dbReuse.latitude!!,
+                            longitude = dbReuse.longitude!!,
+                            source = dbReuse.coordSource.ifBlank { "RUIAN" },
+                            detail = "Cached site"
+                        )
+                        if (cleanAddrKey != null) resolvedAddressCache[cleanAddrKey] = res
+                        fromCache = true
+                    }
+                }
+                if (res == null) {
+                    res = BtsGeocoder.resolveTowerCoordinates(
+                        context = context,
+                        plmn = tower.operatorPlmn,
+                        cellId = tower.cellId,
+                        tac = tower.tac,
+                        band = tower.band,
+                        rawUmisteni = tower.locationName
+                    )
+                    if (res != null && cleanAddrKey != null && BtsGeoUtils.hasStreetOrNumberHint(tower.locationName)) {
+                        resolvedAddressCache[cleanAddrKey] = res
+                    }
+                }
                 if (res != null) {
                     saveSiteCoordinates(
                         plmn = tower.operatorPlmn,
@@ -441,11 +476,12 @@ class BtsRepository(
                     }
                 }
                 _geocodeProgress.value = (idx + 1) to pending.size
-                delay(150L)
+                if (!fromCache) delay(150L)
             }
             BatchGeocodeSummary(
                 attempted = attempted,
                 resolved = resolved,
+                propagatedCount = propagatedCount,
                 ruianCount = ruianCount,
                 beaconDbCount = beaconDbCount,
                 fallbackCount = fallbackCount
@@ -468,11 +504,20 @@ class BtsRepository(
     ) = withContext(Dispatchers.IO) {
         btsDao.updateTowerCoordinates(plmn, cellId, lat, lon, source)
         if (applyToEntireSite) {
-            if (enodebId > 0L) {
-                btsDao.updateSiteCoordinatesByEnodeb(plmn, enodebId, lat, lon, source)
-            }
-            if (locationName.isNotBlank()) {
-                btsDao.updateSiteCoordinatesByLocation(plmn, locationName, lat, lon, source)
+            if (source == "MANUAL") {
+                if (enodebId > 0L) {
+                    btsDao.updateSiteCoordinatesByEnodeb(plmn, enodebId, lat, lon, source)
+                }
+                if (locationName.isNotBlank()) {
+                    btsDao.updateSiteCoordinatesByLocation(plmn, locationName, lat, lon, source)
+                }
+            } else {
+                if (enodebId > 0L) {
+                    btsDao.updateMissingSiteCoordinatesByEnodeb(plmn, enodebId, lat, lon, source)
+                }
+                if (locationName.isNotBlank()) {
+                    btsDao.updateMissingSiteCoordinatesByLocation(plmn, locationName, lat, lon, source)
+                }
             }
         }
     }

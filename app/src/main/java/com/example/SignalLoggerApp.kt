@@ -50,6 +50,7 @@ class SignalLoggerApp : Application() {
     @Volatile
     private var isUiInForeground: Boolean = false
     private var wasDemoMode: Boolean = false
+    private var wasLiveTelemetryRunning: Boolean = false
 
     private var demoLoopJob: Job? = null
     private var chartFeedJob: Job? = null
@@ -77,6 +78,7 @@ class SignalLoggerApp : Application() {
         val darkMap = sp.getBoolean("dark_map_mode", true)
         val audioAlerts = sp.getBoolean("audio_anomaly_alerts", false)
         val autoGeocode = sp.getBoolean("auto_geocode_bts", true)
+        val smartStationary = sp.getBoolean("smart_stationary_filter", true)
 
         val fields = LoggedFieldsSelection(
             logGnss = sp.getBoolean("field_gnss", true),
@@ -100,6 +102,7 @@ class SignalLoggerApp : Application() {
             darkMapMode = darkMap,
             audioAnomalyAlerts = audioAlerts,
             autoGeocodeBts = autoGeocode,
+            smartStationaryFilter = smartStationary,
             fieldsSelection = fields
         )
         _settings.value = loaded
@@ -194,8 +197,12 @@ class SignalLoggerApp : Application() {
 
         val loggingActive = TelemetryLoggingService.isLogging.value
         val needsTelemetry = isUiInForeground || loggingActive
+        val isLiveNow = needsTelemetry && !current.isDemoMode
 
-        if (needsTelemetry && !current.isDemoMode) {
+        if (isLiveNow) {
+            if (!wasLiveTelemetryRunning) {
+                securityEngine.resetSessionBaselines(preserveNtp = true)
+            }
             cellularEngine.setTaMultiplierMode(current.taMultiplierMode)
             cellularEngine.setPingEnabled(current.fieldsSelection.logPing)
             cellularEngine.start()
@@ -206,6 +213,7 @@ class SignalLoggerApp : Application() {
             gnssEngine.stop()
             environmentEngine.stop()
         }
+        wasLiveTelemetryRunning = isLiveNow
 
         if (needsTelemetry && current.isDemoMode) {
             startDemoLoop()
@@ -260,19 +268,36 @@ class SignalLoggerApp : Application() {
                 )
 
                 if (g.hasFix && (g.latitude != 0.0 || g.longitude != 0.0)) {
-                    TelemetryLoggingService.addMapTrailPoint(
-                        MapTrailPoint(
-                            latitude = g.latitude,
-                            longitude = g.longitude,
-                            sim1Rsrp = c.sim1.rsrp,
-                            sim2Rsrp = c.sim2.rsrp,
-                            speedKmh = g.speedKmh,
-                            satellitesUsed = g.satellitesUsedInFix,
-                            satellitesInView = g.satellitesInView,
-                            pdop = g.pdop,
-                            timestampMs = now
+                    val suppressStationaryTrail = !_settings.value.isDemoMode &&
+                        _settings.value.smartStationaryFilter &&
+                        e.motion.isStationary
+                    val lastTrail = TelemetryLoggingService.liveMapTrail.value.lastOrNull()
+                    val shouldAddTrail = if (!suppressStationaryTrail || lastTrail == null) {
+                        true
+                    } else {
+                        val distM = com.example.bts.BtsGeoUtils.haversineDistanceMeters(
+                            lastTrail.latitude,
+                            lastTrail.longitude,
+                            g.latitude,
+                            g.longitude
                         )
-                    )
+                        distM >= maxOf(6.0, g.horizontalAccuracyM * 1.8)
+                    }
+                    if (shouldAddTrail) {
+                        TelemetryLoggingService.addMapTrailPoint(
+                            MapTrailPoint(
+                                latitude = g.latitude,
+                                longitude = g.longitude,
+                                sim1Rsrp = c.sim1.rsrp,
+                                sim2Rsrp = c.sim2.rsrp,
+                                speedKmh = g.speedKmh,
+                                satellitesUsed = g.satellitesUsedInFix,
+                                satellitesInView = g.satellitesInView,
+                                pdop = g.pdop,
+                                timestampMs = now
+                            )
+                        )
+                    }
                 }
 
                 if (!TelemetryLoggingService.isLogging.value) {
@@ -341,6 +366,7 @@ class SignalLoggerApp : Application() {
             .putBoolean("dark_map_mode", newSettings.darkMapMode)
             .putBoolean("audio_anomaly_alerts", newSettings.audioAnomalyAlerts)
             .putBoolean("auto_geocode_bts", newSettings.autoGeocodeBts)
+            .putBoolean("smart_stationary_filter", newSettings.smartStationaryFilter)
             .putBoolean("field_gnss", newSettings.fieldsSelection.logGnss)
             .putBoolean("field_cellular_rf", newSettings.fieldsSelection.logCellularRf)
             .putBoolean("field_neighbors", newSettings.fieldsSelection.logNeighbors)
@@ -358,10 +384,16 @@ class SignalLoggerApp : Application() {
 
     fun shutdownApp() {
         isUiInForeground = false
+        wasLiveTelemetryRunning = false
         demoLoopJob?.cancel()
         chartFeedJob?.cancel()
         cellularEngine.stop()
         gnssEngine.stop()
         environmentEngine.stop()
+        gnssEngine.resetState()
+        cellularEngine.resetState()
+        environmentEngine.resetToLiveDefaults()
+        securityEngine.resetSessionBaselines(preserveNtp = false)
+        securityEngine.clearIncidents()
     }
 }

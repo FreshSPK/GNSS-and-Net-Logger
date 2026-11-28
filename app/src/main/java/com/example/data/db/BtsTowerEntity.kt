@@ -11,7 +11,9 @@ import androidx.room.Index
         Index("operatorPlmn", "enodebId"),
         Index("operatorPlmn", "pci", "tac"),
         Index("districtCode"),
-        Index("latitude", "longitude")
+        Index("latitude", "longitude"),
+        Index("operatorPlmn", "locationName"),
+        Index("locationName")
     ]
 )
 data class BtsTowerEntity(

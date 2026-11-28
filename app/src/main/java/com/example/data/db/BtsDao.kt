@@ -28,6 +28,22 @@ data class ExistingCoordRow(
     val coordSource: String
 )
 
+data class EnodebCoordCandidate(
+    val operatorPlmn: String,
+    val enodebId: Long,
+    val latitude: Double,
+    val longitude: Double,
+    val coordSource: String
+)
+
+data class LocationCoordCandidate(
+    val operatorPlmn: String,
+    val locationName: String,
+    val latitude: Double,
+    val longitude: Double,
+    val coordSource: String
+)
+
 @Dao
 interface BtsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -216,7 +232,11 @@ interface BtsDao {
             "WHERE districtCode = :districtCode " +
             "AND (:plmn IS NULL OR operatorPlmn = :plmn) " +
             "AND (latitude IS NULL OR longitude IS NULL) " +
-            "GROUP BY operatorPlmn, CASE WHEN enodebId > 0 THEN enodebId WHEN locationName != '' THEN locationName ELSE CAST(cellId AS TEXT) END " +
+            "GROUP BY CASE " +
+            "WHEN locationName != '' AND locationName NOT LIKE 'OpenCelliD%' AND locationName NOT LIKE 'CellMapper%' AND locationName NOT LIKE 'BeaconDB%' " +
+            "THEN 'LOC:' || operatorPlmn || '|' || locationName " +
+            "WHEN enodebId > 0 THEN 'ENB:' || operatorPlmn || '|' || CAST(enodebId AS TEXT) " +
+            "ELSE 'CI:' || operatorPlmn || '|' || CAST(cellId AS TEXT) END " +
             "LIMIT :limit"
     )
     suspend fun getUnlocatedSitesInDistrict(
@@ -229,13 +249,61 @@ interface BtsDao {
         "SELECT * FROM bts_towers " +
             "WHERE (:plmn IS NULL OR operatorPlmn = :plmn) " +
             "AND (latitude IS NULL OR longitude IS NULL) " +
-            "GROUP BY operatorPlmn, CASE WHEN enodebId > 0 THEN enodebId WHEN locationName != '' THEN locationName ELSE CAST(cellId AS TEXT) END " +
+            "GROUP BY CASE " +
+            "WHEN locationName != '' AND locationName NOT LIKE 'OpenCelliD%' AND locationName NOT LIKE 'CellMapper%' AND locationName NOT LIKE 'BeaconDB%' " +
+            "THEN 'LOC:' || operatorPlmn || '|' || locationName " +
+            "WHEN enodebId > 0 THEN 'ENB:' || operatorPlmn || '|' || CAST(enodebId AS TEXT) " +
+            "ELSE 'CI:' || operatorPlmn || '|' || CAST(cellId AS TEXT) END " +
             "LIMIT :limit"
     )
     suspend fun getUnlocatedSitesAll(
         plmn: String?,
         limit: Int = 50
     ): List<BtsTowerEntity>
+
+    @Query(
+        "SELECT * FROM bts_towers " +
+            "WHERE locationName = :locationName " +
+            "AND locationName != '' " +
+            "AND locationName NOT LIKE 'OpenCelliD%' " +
+            "AND locationName NOT LIKE 'CellMapper%' " +
+            "AND locationName NOT LIKE 'BeaconDB%' " +
+            "AND latitude IS NOT NULL AND longitude IS NOT NULL " +
+            "LIMIT 1"
+    )
+    suspend fun findFirstLocatedByLocation(locationName: String): BtsTowerEntity?
+
+    @Query(
+        "SELECT operatorPlmn, enodebId, latitude, longitude, coordSource " +
+            "FROM bts_towers " +
+            "WHERE enodebId > 0 AND latitude IS NOT NULL AND longitude IS NOT NULL " +
+            "AND EXISTS (" +
+            "SELECT 1 FROM bts_towers missing " +
+            "WHERE missing.operatorPlmn = bts_towers.operatorPlmn " +
+            "AND missing.enodebId = bts_towers.enodebId " +
+            "AND (missing.latitude IS NULL OR missing.longitude IS NULL)" +
+            ") " +
+            "GROUP BY operatorPlmn, enodebId"
+    )
+    suspend fun findEnodebPropagationCandidates(): List<EnodebCoordCandidate>
+
+    @Query(
+        "SELECT operatorPlmn, locationName, latitude, longitude, coordSource " +
+            "FROM bts_towers " +
+            "WHERE locationName != '' " +
+            "AND locationName NOT LIKE 'OpenCelliD%' " +
+            "AND locationName NOT LIKE 'CellMapper%' " +
+            "AND locationName NOT LIKE 'BeaconDB%' " +
+            "AND latitude IS NOT NULL AND longitude IS NOT NULL " +
+            "AND EXISTS (" +
+            "SELECT 1 FROM bts_towers missing " +
+            "WHERE missing.operatorPlmn = bts_towers.operatorPlmn " +
+            "AND missing.locationName = bts_towers.locationName " +
+            "AND (missing.latitude IS NULL OR missing.longitude IS NULL)" +
+            ") " +
+            "GROUP BY operatorPlmn, locationName"
+    )
+    suspend fun findLocationPropagationCandidates(): List<LocationCoordCandidate>
 
     @Query(
         "UPDATE bts_towers SET latitude = :lat, longitude = :lon, coordSource = :source " +
@@ -247,13 +315,51 @@ interface BtsDao {
         "UPDATE bts_towers SET latitude = :lat, longitude = :lon, coordSource = :source " +
             "WHERE operatorPlmn = :plmn AND enodebId = :enodebId AND enodebId > 0"
     )
-    suspend fun updateSiteCoordinatesByEnodeb(plmn: String, enodebId: Long, lat: Double, lon: Double, source: String)
+    suspend fun updateSiteCoordinatesByEnodeb(plmn: String, enodebId: Long, lat: Double, lon: Double, source: String): Int
+
+    @Query(
+        "UPDATE bts_towers SET latitude = :lat, longitude = :lon, coordSource = :source " +
+            "WHERE operatorPlmn = :plmn AND enodebId = :enodebId AND enodebId > 0 " +
+            "AND (latitude IS NULL OR longitude IS NULL)"
+    )
+    suspend fun updateMissingSiteCoordinatesByEnodeb(plmn: String, enodebId: Long, lat: Double, lon: Double, source: String): Int
 
     @Query(
         "UPDATE bts_towers SET latitude = :lat, longitude = :lon, coordSource = :source " +
             "WHERE operatorPlmn = :plmn AND locationName = :locationName AND locationName != ''"
     )
-    suspend fun updateSiteCoordinatesByLocation(plmn: String, locationName: String, lat: Double, lon: Double, source: String)
+    suspend fun updateSiteCoordinatesByLocation(plmn: String, locationName: String, lat: Double, lon: Double, source: String): Int
+
+    @Query(
+        "UPDATE bts_towers SET latitude = :lat, longitude = :lon, coordSource = :source " +
+            "WHERE operatorPlmn = :plmn AND locationName = :locationName AND locationName != '' " +
+            "AND (latitude IS NULL OR longitude IS NULL)"
+    )
+    suspend fun updateMissingSiteCoordinatesByLocation(plmn: String, locationName: String, lat: Double, lon: Double, source: String): Int
+
+    @Transaction
+    suspend fun propagateKnownSiteCoordinates(): Int {
+        var totalUpdated = 0
+        for (c in findEnodebPropagationCandidates()) {
+            totalUpdated += updateMissingSiteCoordinatesByEnodeb(
+                plmn = c.operatorPlmn,
+                enodebId = c.enodebId,
+                lat = c.latitude,
+                lon = c.longitude,
+                source = c.coordSource
+            )
+        }
+        for (c in findLocationPropagationCandidates()) {
+            totalUpdated += updateMissingSiteCoordinatesByLocation(
+                plmn = c.operatorPlmn,
+                locationName = c.locationName,
+                lat = c.latitude,
+                lon = c.longitude,
+                source = c.coordSource
+            )
+        }
+        return totalUpdated
+    }
 
     @Query("DELETE FROM bts_towers WHERE operatorPlmn = :plmn")
     suspend fun deleteByOperator(plmn: String)

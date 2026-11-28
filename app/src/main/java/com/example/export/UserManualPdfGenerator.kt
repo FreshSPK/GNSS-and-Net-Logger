@@ -786,13 +786,13 @@ object UserManualPdfGenerator {
         val clockRows = if (isCs) listOf(
             "1. Internetový NTP (RFC 4330 SNTP)" to "Přímý UDP paket na port 123 (time.google.com, tik.cesnet.cz, time.cloudflare.com) s výpočtem RTT/2. Aplikace dotaz opakuje každých 60 s (nebo ručně tlačítkem Sync NTP) a mezitím referenční čas počítá přes monotónní čítač elapsedRealtime(), aniž by měnila systémové hodiny OS.",
             "2. Čas mobilní sítě / OS (NITZ)" to "Čas základnové stanice operátora (NITZ) posílaný událostně při registraci Attach, změně Tracking Area či přechodu 4G↔5G s krokem 1 s a systémové hodiny Androidu.",
-            "3. Hardwarový čas GNSS (GnssClock)" to "Výpočet přímého satelitního času z nanosekundového čítače (timeNanos − fullBiasNanos − biasNanos) s odečtem přestupných sekund GPS–UTC, doplněný o sledování skokových diskontinuit a frekvenčního driftu oscilátoru (ns/s).",
-            "Jak odhaluje podvody" to "Replay útok (meaconing) přehrává starší záznam GNSS a způsobí odchylku Δ(GNSS − NTP) > 800 ms (kriticky > 2 000 ms). Podvržená BTS vysílající falešný NITZ čas vytvoří odchylku Δ(NITZ − NTP) při zachování platného NTP."
+            "3. Hardwarový čas GNSS (GnssClock)" to "Výpočet přímého satelitního času z nanosekundového čítače (timeNanos − fullBiasNanos − biasNanos) s odečtem přestupných sekund GPS–UTC, doplněný o sledování skokových diskontinuit během aktivního fixu a frekvenčního driftu oscilátoru (ns/s).",
+            "Jak odhaluje podvody" to "Replay útok (meaconing) přehrává starší záznam GNSS a způsobí odchylku Δ(GNSS − NTP) > 2 000 ms (kriticky > 5 000 ms). Podvržená BTS vysílající falešný NITZ čas vytvoří odchylku Δ(NITZ − NTP) > 3 500 ms při zachování platného NTP."
         ) else listOf(
             "1. Internet NTP (RFC 4330 SNTP)" to "Direct UDP:123 query (time.google.com, tik.cesnet.cz, time.cloudflare.com) with half-RTT compensation, refreshed every 60s (or on demand) and propagated locally via monotonic elapsedRealtime() without altering OS time.",
             "2. Mobile Network / OS Time (NITZ)" to "Carrier base-station NITZ broadcast (pushed event-driven on Attach, TA update, or RAT change at 1s steps) and Android wall-clock time.",
-            "3. Hardware GNSS UTC (GnssClock)" to "Computes exact satellite UTC directly from raw nanosecond counters (timeNanos − fullBiasNanos − biasNanos) minus GPS-UTC leap seconds, while monitoring oscillator drift (ns/s) and clock discontinuities.",
-            "What Skews Expose" to "GNSS replay (meaconing) injects delayed satellite signals causing Δ(GNSS − NTP) > 800 ms (critical > 2,000 ms). A rogue BTS sending fake NITZ triggers Δ(NITZ − NTP) while internet NTP stays accurate."
+            "3. Hardware GNSS UTC (GnssClock)" to "Computes exact satellite UTC directly from raw nanosecond counters (timeNanos − fullBiasNanos − biasNanos) minus GPS-UTC leap seconds, while monitoring oscillator drift (ns/s) and active-fix discontinuities.",
+            "What Skews Expose" to "GNSS replay (meaconing) injects delayed satellite signals causing Δ(GNSS − NTP) > 2,000 ms (critical > 5,000 ms). A rogue BTS sending fake NITZ triggers Δ(NITZ − NTP) > 3,500 ms while internet NTP stays accurate."
         )
         for ((k, v) in clockRows) {
             y = drawKeyValueRowBox(c, y, k, v, COLOR_LIGHT_BG, COLOR_CYAN)

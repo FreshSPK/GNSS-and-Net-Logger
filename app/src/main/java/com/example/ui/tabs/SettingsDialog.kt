@@ -41,6 +41,7 @@ fun SettingsDialog(
     var darkMap by remember { mutableStateOf(settings.darkMapMode) }
     var audioAlerts by remember { mutableStateOf(settings.audioAnomalyAlerts) }
     var autoGeocodeBts by remember { mutableStateOf(settings.autoGeocodeBts) }
+    var smartStationary by remember { mutableStateOf(settings.smartStationaryFilter) }
 
     val effectiveIsCs = remember(selectedLang, lang) {
         if (selectedLang == "SYSTEM") {
@@ -84,6 +85,7 @@ fun SettingsDialog(
                             triggerMode = LogTriggerMode.HYBRID
                             interval = 5
                             distThreshold = 10f
+                            smartStationary = true
                         },
                         label = {
                             Text(
@@ -99,6 +101,7 @@ fun SettingsDialog(
                             triggerMode = LogTriggerMode.HYBRID
                             interval = 10
                             distThreshold = 50f
+                            smartStationary = true
                         },
                         label = {
                             Text(
@@ -113,6 +116,7 @@ fun SettingsDialog(
                         onClick = {
                             triggerMode = LogTriggerMode.TIME
                             interval = 10
+                            smartStationary = false
                         },
                         label = {
                             Text(
@@ -263,6 +267,37 @@ fun SettingsDialog(
                         )
                     }
                     Switch(checked = autoGeocodeBts, onCheckedChange = { autoGeocodeBts = it })
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // IMU Smart Stationary Filter Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (effectiveIsCs) "Chytrý IMU filtr stání" else "Smart IMU Stationary Filter",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (effectiveIsCs) {
+                                "Akcelerometr, gyroskop a magnetometr potlačí opakované body i GPS drift při stání na místě"
+                            } else {
+                                "Uses accelerometer, gyroscope & magnetometer to suppress duplicate samples and GPS drift while stationary"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = smartStationary,
+                        onCheckedChange = { smartStationary = it },
+                        modifier = Modifier.testTag("smart_stationary_filter_switch")
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -483,7 +518,8 @@ fun SettingsDialog(
                             taMultiplierMode = taMultiplier,
                             darkMapMode = darkMap,
                             audioAnomalyAlerts = audioAlerts,
-                            autoGeocodeBts = autoGeocodeBts
+                            autoGeocodeBts = autoGeocodeBts,
+                            smartStationaryFilter = smartStationary
                         )
                     )
                     onDismiss()

@@ -177,30 +177,30 @@ fun TimeForensicsSubView(
                     modifier = Modifier.weight(1f),
                     title = "GNSS − NTP",
                     deltaMs = timeDiag.gnssMinusNtpMs,
-                    warnThresholdMs = 800L,
-                    critThresholdMs = 2000L
+                    warnThresholdMs = 2000L,
+                    critThresholdMs = 5000L
                 )
                 DeltaTile(
                     modifier = Modifier.weight(1f),
                     title = "NITZ − NTP",
                     deltaMs = timeDiag.systemMinusNtpMs,
-                    warnThresholdMs = 1500L,
-                    critThresholdMs = 3000L
+                    warnThresholdMs = 3500L,
+                    critThresholdMs = 8000L
                 )
                 DeltaTile(
                     modifier = Modifier.weight(1f),
                     title = "GNSS − NITZ",
                     deltaMs = timeDiag.gnssMinusSystemMs,
-                    warnThresholdMs = 800L,
-                    critThresholdMs = 2500L
+                    warnThresholdMs = 2500L,
+                    critThresholdMs = 6000L
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = if (isCs) {
-                    "Limity (zelená): GNSS−NTP ≤ 800 ms • NITZ−NTP ≤ 1500 ms (krok NITZ) • GNSS−NITZ ≤ 800 ms"
+                    "Limity (zelená): GNSS−NTP ≤ 2 000 ms • NITZ−NTP ≤ 3 500 ms (krok NITZ) • GNSS−NITZ ≤ 2 500 ms"
                 } else {
-                    "Green limits: GNSS−NTP ≤ 800 ms • NITZ−NTP ≤ 1500 ms (NITZ step) • GNSS−NITZ ≤ 800 ms"
+                    "Green limits: GNSS−NTP ≤ 2,000 ms • NITZ−NTP ≤ 3,500 ms (NITZ step) • GNSS−NITZ ≤ 2,500 ms"
                 },
                 fontSize = 9.sp,
                 color = TextSecondaryDark

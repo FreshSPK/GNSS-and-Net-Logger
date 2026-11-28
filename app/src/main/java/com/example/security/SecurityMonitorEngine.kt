@@ -62,6 +62,8 @@ class SecurityMonitorEngine(
     private var lastSim2Tac: String = ""
     private var sustainedPingLossCount: Int = 0
     private var initialClockDiscontinuity: Int? = null
+    private var prevClockDiscontinuity: Int? = null
+    private var inFixClockJumps: Int = 0
 
     // v1.7 rolling windows for gyro-bearing, stationary TA drop, sky freeze, Doppler-elev, C/N0 step & accuracy freeze
     private data class HeadingSample(val elapsedMs: Long, val bearingDeg: Float, val yawRateRadPerSec: Float)
@@ -97,7 +99,7 @@ class SecurityMonitorEngine(
         _securityState.value = _securityState.value.copy(recentIncidents = emptyList())
     }
 
-    fun resetSessionBaselines() {
+    fun resetSessionBaselines(preserveNtp: Boolean = false) {
         imuStationaryStreakSec = 0
         altWindow.clear()
         sim1TacHistory.clear()
@@ -106,6 +108,8 @@ class SecurityMonitorEngine(
         lastSim2Tac = ""
         sustainedPingLossCount = 0
         initialClockDiscontinuity = null
+        prevClockDiscontinuity = null
+        inFixClockJumps = 0
         headingWindow.clear()
         gyroMismatchStreak = 0
         satBaselineMap.clear()
@@ -118,6 +122,15 @@ class SecurityMonitorEngine(
         sim1TaDropDetail = null
         sim2TaDropDetail = null
         simulatedAttack = SimulatedAttackType.NONE
+        if (!preserveNtp) {
+            ntpOffsetFromElapsedMs = null
+            ntpServerName = "—"
+            ntpRttMs = null
+            ntpStratum = null
+            ntpError = null
+            lastNtpSyncEpochMs = null
+            lastNtpAttemptElapsedMs = 0L
+        }
     }
 
     fun setDeepScanActive(active: Boolean, completedEpochMs: Long? = null) {
@@ -226,8 +239,18 @@ class SecurityMonitorEngine(
             sustainedPingLossCount = 0
         }
 
-        if (initialClockDiscontinuity == null && gnss.clockDiscontinuityCount >= 0) {
-            initialClockDiscontinuity = gnss.clockDiscontinuityCount
+        if (gnss.hasGnssClockData && gnss.clockDiscontinuityCount >= 0) {
+            if (initialClockDiscontinuity == null) {
+                initialClockDiscontinuity = gnss.clockDiscontinuityCount
+                prevClockDiscontinuity = gnss.clockDiscontinuityCount
+            } else {
+                val prev = prevClockDiscontinuity ?: gnss.clockDiscontinuityCount
+                val step = (gnss.clockDiscontinuityCount - prev).coerceAtLeast(0)
+                if (step > 0 && gnss.hasFix && gnss.satellitesUsedInFix >= 4) {
+                    inFixClockJumps += step
+                }
+                prevClockDiscontinuity = gnss.clockDiscontinuityCount
+            }
         }
 
         // 5. v1.7 Heading Fusion (Gyroscope vs GNSS Bearing)
@@ -389,6 +412,27 @@ class SecurityMonitorEngine(
             ntpOffsetFromElapsedMs?.let { nowElapsed + it }
         }
 
+        val alignedFixTimeMs = if (isDemoMode) {
+            nowEpoch
+        } else {
+            val raw = gnss.fixTimestampMs
+            val capElapsed = gnss.fixElapsedMs
+            if (raw != null && capElapsed != null) {
+                val age = nowElapsed - capElapsed
+                if (age in 0L..8000L) raw + age else raw
+            } else raw
+        }
+        val alignedHwUtcMs = if (isDemoMode) {
+            nowEpoch
+        } else {
+            val raw = gnss.gnssHardwareUtcMs
+            val capElapsed = gnss.gnssHardwareUtcElapsedMs
+            if (raw != null && capElapsed != null) {
+                val age = nowElapsed - capElapsed
+                if (age in 0L..8000L) raw + age else raw
+            } else raw
+        }
+
         val timeDiag = TimeSyncDiagnostics(
             ntpTimeMs = effectiveNtpMs,
             ntpServer = if (isDemoMode) "demo.ntp.vut.cz" else ntpServerName,
@@ -398,8 +442,8 @@ class SecurityMonitorEngine(
             lastNtpSyncEpochMs = if (isDemoMode) nowEpoch else lastNtpSyncEpochMs,
             isNtpSyncing = !isDemoMode && isNtpSyncing,
             systemTimeMs = nowEpoch,
-            gnssFixTimeMs = if (isDemoMode) nowEpoch else gnss.fixTimestampMs,
-            gnssHardwareUtcMs = if (isDemoMode) nowEpoch else gnss.gnssHardwareUtcMs,
+            gnssFixTimeMs = alignedFixTimeMs,
+            gnssHardwareUtcMs = alignedHwUtcMs,
             clockDiscontinuityCount = gnss.clockDiscontinuityCount,
             clockDriftNanosPerSec = gnss.clockDriftNanosPerSec,
             clockBiasUncertaintyNanos = gnss.clockBiasUncertaintyNanos
@@ -418,6 +462,7 @@ class SecurityMonitorEngine(
             hasVpnActive = netFlags.hasVpn,
             hasValidatedInternet = netFlags.hasValidatedInternet,
             initialClockDiscontinuity = initialClockDiscontinuity,
+            inFixClockDiscontinuityJumps = inFixClockJumps,
             gnssBearingDelta4sDeg = gnssBearingDelta4s,
             gyroYawDelta4sDeg = gyroYawDelta4s,
             gyroTurnMismatchDetected = gyroMismatchNow,

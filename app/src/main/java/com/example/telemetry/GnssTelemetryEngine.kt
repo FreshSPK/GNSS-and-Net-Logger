@@ -142,6 +142,12 @@ class GnssTelemetryEngine(
         } catch (_: Exception) {}
         gnssThread = null
         gnssHandler = null
+        _gnssState.value = _gnssState.value.copy(
+            hasGnssClockData = false,
+            clockDiscontinuityCount = 0,
+            fixElapsedMs = null,
+            gnssHardwareUtcElapsedMs = null
+        )
     }
 
     fun resetState() {
@@ -298,6 +304,7 @@ class GnssTelemetryEngine(
             verticalAccuracyM = vAcc,
             isMockLocation = isMock,
             fixTimestampMs = loc.time.takeIf { it > 0L },
+            fixElapsedMs = if (loc.time > 0L) nowElapsed else null,
             jumpEventsCount = jumpEventsCount,
             lastJumpSpeedMs = lastJumpSpeedMs,
             nmeaLat = latestNmeaLat,
@@ -637,6 +644,7 @@ class GnssTelemetryEngine(
         } else null
 
         val avgDoppler = if (dopplerCount > 0) (sumDopplerHz / dopplerCount).toFloat() else null
+        val nowElapsed = android.os.SystemClock.elapsedRealtime()
         val current = _gnssState.value
         _gnssState.value = current.copy(
             rawDopplerHz = avgDoppler,
@@ -647,6 +655,8 @@ class GnssTelemetryEngine(
             clockDriftNanosPerSec = driftNps,
             clockBiasUncertaintyNanos = biasUncNanos,
             gnssHardwareUtcMs = gnssHardwareUtcMs ?: current.gnssHardwareUtcMs,
+            gnssHardwareUtcElapsedMs = if (gnssHardwareUtcMs != null) nowElapsed else current.gnssHardwareUtcElapsedMs,
+            hasGnssClockData = true,
             hasEverSeenValidAdr = hasEverSeenValidAdr
         )
     }

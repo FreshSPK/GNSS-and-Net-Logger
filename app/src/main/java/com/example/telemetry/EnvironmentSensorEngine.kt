@@ -23,6 +23,88 @@ import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+class ImuStationaryTracker(
+    private val requiredCalmMs: Long = 4000L,
+    private val magWindowMs: Long = 4500L
+) {
+    private data class MagSample(val elapsedMs: Long, val fieldUt: Float, val azimuthDeg: Float)
+
+    private val magHistory = ArrayDeque<MagSample>()
+    private var calmSinceElapsedMs: Long? = null
+
+    fun update(
+        accelMag: Float,
+        gx: Float,
+        gy: Float,
+        gz: Float,
+        magFieldUt: Float?,
+        azimuthDeg: Float,
+        stepsLast6s: Int,
+        nowElapsedMs: Long,
+        hasAccelSample: Boolean = true,
+        hasGyroSample: Boolean = true,
+        hasMagSample: Boolean = magFieldUt != null
+    ): Pair<Boolean, Int> {
+        if (!hasAccelSample) {
+            calmSinceElapsedMs = null
+            return false to 0
+        }
+
+        if (hasMagSample && magFieldUt != null) {
+            magHistory.addLast(MagSample(nowElapsedMs, magFieldUt, azimuthDeg))
+            while (magHistory.isNotEmpty() && nowElapsedMs - magHistory.first().elapsedMs > magWindowMs) {
+                magHistory.removeFirst()
+            }
+        }
+
+        var magSpan = 0f
+        var azSpan = 0f
+        if (magHistory.size >= 2) {
+            var minB = Float.MAX_VALUE
+            var maxB = -Float.MAX_VALUE
+            val baseAz = magHistory.first().azimuthDeg
+            var minSigned = 0f
+            var maxSigned = 0f
+            for (sample in magHistory) {
+                if (sample.fieldUt < minB) minB = sample.fieldUt
+                if (sample.fieldUt > maxB) maxB = sample.fieldUt
+                val diff = ((sample.azimuthDeg - baseAz + 540f) % 360f) - 180f
+                if (diff < minSigned) minSigned = diff
+                if (diff > maxSigned) maxSigned = diff
+            }
+            magSpan = maxB - minB
+            azSpan = maxSigned - minSigned
+        }
+
+        val accelDev = abs(accelMag - 9.81f)
+        val gyroMax = if (hasGyroSample) maxOf(abs(gx), abs(gy), abs(gz)) else 0f
+        val magCalm = !hasMagSample || magHistory.isEmpty() || (magSpan < 4.0f && azSpan < 15.0f)
+
+        val isCalmSample = stepsLast6s == 0 &&
+            accelDev < 0.75f &&
+            gyroMax < 0.25f &&
+            magCalm
+
+        if (!isCalmSample) {
+            calmSinceElapsedMs = null
+            return false to 0
+        }
+
+        if (calmSinceElapsedMs == null) {
+            calmSinceElapsedMs = nowElapsedMs
+        }
+        val calmMs = (nowElapsedMs - calmSinceElapsedMs!!).coerceAtLeast(0L)
+        val stationary = calmMs >= requiredCalmMs
+        val durationSec = if (stationary) (calmMs / 1000L).toInt().coerceAtMost(3600) else 0
+        return stationary to durationSec
+    }
+
+    fun reset() {
+        magHistory.clear()
+        calmSinceElapsedMs = null
+    }
+}
+
 class EnvironmentSensorEngine(private val context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
     private val pressureSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PRESSURE)
@@ -46,6 +128,10 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
     private var lastEmitMs = 0L
     private var sensorThread: android.os.HandlerThread? = null
     private var sensorHandler: android.os.Handler? = null
+    private val stationaryTracker = ImuStationaryTracker()
+    private var hasAccelSample = false
+    private var hasGyroSample = false
+    private var hasMagSample = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
@@ -113,6 +199,10 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         } catch (_: Exception) {}
         sensorThread = null
         sensorHandler = null
+        stationaryTracker.reset()
+        hasAccelSample = false
+        hasGyroSample = false
+        hasMagSample = false
         try {
             if (isBatteryRegistered) {
                 context.unregisterReceiver(batteryReceiver)
@@ -129,6 +219,14 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
 
     fun resetToLiveDefaults() {
         val qnh = _envState.value.baseQnhHpa
+        stationaryTracker.reset()
+        hasAccelSample = false
+        hasGyroSample = false
+        hasMagSample = false
+        hasGravity = false
+        hasGeomagnetic = false
+        stepPeakTimestampsMs.clear()
+        lastStepRecordedMs = 0L
         _envState.value = EnvironmentState(baseQnhHpa = qnh)
     }
 
@@ -159,7 +257,9 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
         azimuth: Float,
         verticalYawRadPerSec: Float = gz,
         magneticFieldUt: Float? = 48.5f,
-        stepsLast6s: Int = 0
+        stepsLast6s: Int = 0,
+        isStationary: Boolean = false,
+        stationaryDurationSec: Int = 0
     ) {
         val mag = sqrt(ax * ax + ay * ay + az * az)
         _envState.value = _envState.value.copy(
@@ -175,7 +275,9 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 verticalYawRadPerSec = verticalYawRadPerSec,
                 magneticFieldUt = magneticFieldUt,
                 stepsLast6s = stepsLast6s,
-                isWalkingDetected = stepsLast6s >= 4
+                isWalkingDetected = stepsLast6s >= 4,
+                isStationary = isStationary,
+                stationaryDurationSec = stationaryDurationSec
             )
         )
     }
@@ -211,6 +313,7 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 if (e.values.size < 3) return
                 System.arraycopy(e.values, 0, gravityValues, 0, 3)
                 hasGravity = true
+                hasAccelSample = true
                 latestAx = e.values[0]
                 latestAy = e.values[1]
                 latestAz = e.values[2]
@@ -221,6 +324,7 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
             }
             Sensor.TYPE_GYROSCOPE -> {
                 if (e.values.size < 3) return
+                hasGyroSample = true
                 latestGx = e.values[0]
                 latestGy = e.values[1]
                 latestGz = e.values[2]
@@ -240,6 +344,7 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 if (e.values.size < 3) return
                 System.arraycopy(e.values, 0, geomagneticValues, 0, 3)
                 hasGeomagnetic = true
+                hasMagSample = true
                 latestMagFieldUt = sqrt(
                     geomagneticValues[0] * geomagneticValues[0] +
                         geomagneticValues[1] * geomagneticValues[1] +
@@ -298,10 +403,27 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
 
     private fun maybeEmitMotionState() {
         val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastEmitMs < 100L) return // Max 10 Hz state emissions to reduce Compose recomposition overhead
-        lastEmitMs = now
         pruneOldSteps(now)
         val stepsCount = stepPeakTimestampsMs.size
+        val (isStationary, stationarySec) = stationaryTracker.update(
+            accelMag = latestMag,
+            gx = latestGx,
+            gy = latestGy,
+            gz = latestGz,
+            magFieldUt = latestMagFieldUt,
+            azimuthDeg = latestAzimuth,
+            stepsLast6s = stepsCount,
+            nowElapsedMs = now,
+            hasAccelSample = hasAccelSample,
+            hasGyroSample = hasGyroSample,
+            hasMagSample = hasMagSample
+        )
+
+        val wasStationary = _envState.value.motion.isStationary
+        if (now - lastEmitMs < 100L && !(wasStationary && !isStationary)) {
+            return // Max 10 Hz emissions, except immediate wake-up when motion starts
+        }
+        lastEmitMs = now
 
         val cur = _envState.value
         _envState.value = cur.copy(
@@ -317,7 +439,9 @@ class EnvironmentSensorEngine(private val context: Context) : SensorEventListene
                 verticalYawRadPerSec = latestVerticalYaw,
                 magneticFieldUt = latestMagFieldUt,
                 stepsLast6s = stepsCount,
-                isWalkingDetected = stepsCount >= 4
+                isWalkingDetected = stepsCount >= 4,
+                isStationary = isStationary,
+                stationaryDurationSec = stationarySec
             )
         )
     }

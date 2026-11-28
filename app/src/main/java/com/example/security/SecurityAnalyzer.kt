@@ -21,6 +21,7 @@ data class SecurityContextSnapshot(
     val hasVpnActive: Boolean = false,
     val hasValidatedInternet: Boolean = true,
     val initialClockDiscontinuity: Int? = null,
+    val inFixClockDiscontinuityJumps: Int? = null,
     // v1.7 extended sensor-fusion, GNSS & cellular/network context
     val gnssBearingDelta4sDeg: Float? = null,
     val gyroYawDelta4sDeg: Float? = null,
@@ -536,11 +537,12 @@ object SecurityAnalyzer {
         val absGnssSys = gnssMinusSys?.let { abs(it) }
 
         val timeDriftSeverity = when {
-            absGnssNtp != null && absGnssNtp > 2000L -> ThreatSeverity.CRITICAL
-            absGnssSys != null && absGnssSys > 2500L -> ThreatSeverity.CRITICAL
-            absGnssNtp != null && absGnssNtp > 800L -> ThreatSeverity.WARNING
-            absSysNtp != null && absSysNtp > 2500L -> ThreatSeverity.WARNING
-            absGnssSys != null && absGnssSys > 800L -> ThreatSeverity.WARNING
+            absGnssNtp != null && absGnssNtp > 5000L -> ThreatSeverity.CRITICAL
+            absGnssSys != null && absGnssSys > 6000L -> ThreatSeverity.CRITICAL
+            absSysNtp != null && absSysNtp > 8000L -> ThreatSeverity.CRITICAL
+            absGnssNtp != null && absGnssNtp > 2000L -> ThreatSeverity.WARNING
+            absGnssSys != null && absGnssSys > 2500L -> ThreatSeverity.WARNING
+            absSysNtp != null && absSysNtp > 3500L -> ThreatSeverity.WARNING
             else -> ThreatSeverity.OK
         }
         checks.add(
@@ -569,21 +571,26 @@ object SecurityAnalyzer {
                     append(" | NITZ-NTP: ${sysMinusNtp?.let { "${it}ms" } ?: "—"}")
                     append(" | GNSS-NITZ: ${gnssMinusSys?.let { "${it}ms" } ?: "—"}")
                 },
-                expectedRange = "|Δt| ≤ 800 ms",
+                expectedRange = "|Δt| ≤ 2 000 ms",
                 scoreImpact = when (timeDriftSeverity) {
-                    ThreatSeverity.CRITICAL -> 75
-                    ThreatSeverity.WARNING -> 35
+                    ThreatSeverity.CRITICAL -> 70
+                    ThreatSeverity.WARNING -> 20
                     else -> 0
                 }
             )
         )
 
-        val discDelta = if (ctx.initialClockDiscontinuity != null) {
+        val discDelta = ctx.inFixClockDiscontinuityJumps ?: if (
+            ctx.initialClockDiscontinuity != null &&
+            gnss.hasGnssClockData &&
+            gnss.hasFix &&
+            gnss.satellitesUsedInFix >= 4
+        ) {
             (gnss.clockDiscontinuityCount - ctx.initialClockDiscontinuity).coerceAtLeast(0)
         } else 0
         val clockDriftAnomaly = gnss.clockDriftNanosPerSec != null && abs(gnss.clockDriftNanosPerSec) > 50_000.0
         val hwClockSeverity = when {
-            discDelta > 0 || clockDriftAnomaly -> ThreatSeverity.WARNING
+            discDelta >= 2 || clockDriftAnomaly -> ThreatSeverity.WARNING
             else -> ThreatSeverity.OK
         }
         checks.add(
@@ -594,18 +601,18 @@ object SecurityAnalyzer {
                 titleCs = "Stabilita interních hodin GNSS (GnssClock)",
                 titleEn = "GNSS Hardware Clock Stability",
                 summaryCs = when {
-                    discDelta > 0 -> "Zaznamenány $discDelta skokové diskontinuity hardwarových hodin GNSS během relace."
+                    discDelta >= 2 -> "Zaznamenány $discDelta skokové diskontinuity hardwarových hodin GNSS během aktivního fixu."
                     clockDriftAnomaly -> "Neobvykle vysoký drift oscilátoru (${String.format(Locale.US, "%.0f", gnss.clockDriftNanosPerSec)} ns/s)."
                     else -> "Lokální oscilátor TCXO a časová základna GNSS běží plynule bez skoků."
                 },
                 summaryEn = when {
-                    discDelta > 0 -> "Observed $discDelta GNSS hardware clock discontinuities during this session."
+                    discDelta >= 2 -> "Observed $discDelta GNSS hardware clock discontinuities during active 3D fix."
                     clockDriftAnomaly -> "Abnormally high GNSS oscillator drift (${String.format(Locale.US, "%.0f", gnss.clockDriftNanosPerSec)} ns/s)."
                     else -> "GNSS TCXO oscillator drift and clock bias remain stable."
                 },
                 measuredValue = "Skoky: +$discDelta • Drift: ${gnss.clockDriftNanosPerSec?.let { String.format(Locale.US, "%.1f ns/s", it) } ?: "—"}",
-                expectedRange = "0 skoků, |drift| < 50k ns/s",
-                scoreImpact = if (hwClockSeverity == ThreatSeverity.WARNING) 30 else 0
+                expectedRange = "< 2 skoky (fix), |drift| < 50k ns/s",
+                scoreImpact = if (hwClockSeverity == ThreatSeverity.WARNING) 25 else 0
             )
         )
 
@@ -1255,9 +1262,9 @@ object SecurityAnalyzer {
                     ntpServer = "demo.ntp.local",
                     ntpRttMs = 14L,
                     ntpStratum = 2,
-                    gnssFixTimeMs = now - 4820L,
-                    gnssHardwareUtcMs = now - 4820L,
-                    systemTimeMs = now + 3500L
+                    gnssFixTimeMs = now - 6820L,
+                    gnssHardwareUtcMs = now - 6820L,
+                    systemTimeMs = now + 4500L
                 )
                 SimulatedScenarioInput(gnss, cellular, driftedTime, ctx)
             }

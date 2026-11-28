@@ -587,10 +587,12 @@ fun BtsDatabaseDialog(
                                                         plmnFilter = filterOperatorPlmn,
                                                         limit = 50
                                                     )
+                                                    val propSuffixCs = if (summary.propagatedCount > 0) " (+${summary.propagatedCount} dokopírováno lokálně)" else ""
+                                                    val propSuffixEn = if (summary.propagatedCount > 0) " (+${summary.propagatedCount} propagated locally)" else ""
                                                     val msg = if (isCs) {
-                                                        "Nalezeno ${summary.resolved}/${summary.attempted} stožárů • RÚIAN: ${summary.ruianCount} • BeaconDB: ${summary.beaconDbCount} • Ostatní: ${summary.fallbackCount}"
+                                                        "Nalezeno ${summary.resolved}/${summary.attempted} stožárů$propSuffixCs • RÚIAN: ${summary.ruianCount} • BeaconDB: ${summary.beaconDbCount} • Ostatní: ${summary.fallbackCount}"
                                                     } else {
-                                                        "Resolved ${summary.resolved}/${summary.attempted} masts • RUIAN: ${summary.ruianCount} • BeaconDB: ${summary.beaconDbCount} • Other: ${summary.fallbackCount}"
+                                                        "Resolved ${summary.resolved}/${summary.attempted} masts$propSuffixEn • RUIAN: ${summary.ruianCount} • BeaconDB: ${summary.beaconDbCount} • Other: ${summary.fallbackCount}"
                                                     }
                                                     lastBatchGeocodeSummary = msg
                                                     Toast.makeText(context, msg, Toast.LENGTH_LONG).show()

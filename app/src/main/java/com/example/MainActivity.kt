@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
             val handoverCount by TelemetryLoggingService.handoverCount.collectAsStateWithLifecycle()
             val handoverCountSim1 by TelemetryLoggingService.handoverCountSim1.collectAsStateWithLifecycle()
             val handoverCountSim2 by TelemetryLoggingService.handoverCountSim2.collectAsStateWithLifecycle()
+            val isStationaryHold by TelemetryLoggingService.isStationaryHold.collectAsStateWithLifecycle()
             val chartPoints by TelemetryLoggingService.recentChartPoints.collectAsStateWithLifecycle()
             val liveMapTrail by TelemetryLoggingService.liveMapTrail.collectAsStateWithLifecycle()
 
@@ -386,6 +387,7 @@ class MainActivity : ComponentActivity() {
                                     env = envState,
                                     isLogging = isLogging,
                                     isPaused = isPaused,
+                                    isStationaryHold = isStationaryHold,
                                     loggedPoints = loggedPoints,
                                     sessionStartTimeMs = sessionStartTimeMs,
                                     sessionDistanceMeters = sessionDistanceMeters,

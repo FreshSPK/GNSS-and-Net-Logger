@@ -4,7 +4,7 @@
 
 [![Android](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--36)-3DDC84.svg?style=flat&logo=android)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-Compose%20M3-7F52FF.svg?style=flat&logo=kotlin)](https://kotlinlang.org/)
-[![Room](https://img.shields.io/badge/Database-Room%20v6%20SQLite-FFA000.svg?style=flat)](https://developer.android.com/training/data-storage/room)
+[![Room](https://img.shields.io/badge/Database-Room%20v7%20SQLite-FFA000.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 [![OpenStreetMap](https://img.shields.io/badge/Map-OSMDroid-7EBC6F.svg?style=flat&logo=openstreetmap)](https://github.com/osmdroid/osmdroid)
 [![Release](https://img.shields.io/badge/Release-v1.8-10B981.svg?style=flat)](RELEASE_v1.8.md)
 [![VUT FEKT](https://img.shields.io/badge/VUT-FEKT%20Brno-E4002B.svg?style=flat)](https://www.fekt.vut.cz/)
@@ -24,7 +24,7 @@ Standalone native Android application for field RF drive-testing, multi-constell
 │                        GNSS & Net Logger (100% On-Device)                      │
 ├─────────────────────┬───────────────────────────┬──────────────────────────────┤
 │   Hardware & Radio  │     Analysis & Engine     │     Persistence & Output     │
-│  • LocationManager  │  • Dual-SIM Cell Engine   │  • Room SQLite (v6, MIG 5→6) │
+│  • LocationManager  │  • Dual-SIM Cell Engine   │  • Room SQLite (v7, MIG 6→7) │
 │  • GnssStatus / Raw │  • GNSS & SkyPlot Engine  │  • Foreground Service + Mark │
 │  • TelephonyManager │  • BtsRepository (v1.8)   │  • CSV / 3D KML / GPX / JSON │
 │  • IMU & Barometer  │  • ČÚZK RÚIAN + BeaconDB │  • OSMDroid Map + BTS Layer  │
@@ -57,7 +57,7 @@ Standalone native Android application for field RF drive-testing, multi-constell
 * **SIM Switcher (`SIM 1` | `SIM 2` | `Both SIMs`):** Strict per-subscription DSDS isolation showing `DATA ACTIVE (RRC Connected)` vs. `VOICE & SMS (DSDS Standby)` and live ΔRSRP operator delta.
 * **Czech 3-Operator BTS Database (`23001` T-Mobile CZ, `23002` O2 CZ, `23003` Vodafone CZ):**
   * **Universal 7-Format Streaming Importer (`.csv` / `.clf` / `.ntm` / `.kml` / `.csv.gz` / `.zip`):** Imports **GSMweb.cz** CSVs (`CP1250`/`UTF-8`), **NetMonster `.ntm` / `nm2300x`**, **CLF v3/v4** (hex/dec), **CellMapper** eNodeB tower CSVs & signal logs, Google Earth **KML `<Placemark>`**, **OpenCelliD `230.csv.gz`**, and multi-file **`.zip` archives** in 2,000-row batches.
-  * **ČÚZK RÚIAN (`~2–10 m`) & Keyless BeaconDB Localization *(v1.8)*:** Strips mast jargon from Czech GSMweb addresses to query official **ČÚZK RÚIAN `GeocodeSOE`** (`ags.cuzk.gov.cz`), and resolves rural/streetless masts or unknown serving cells via **BeaconDB** (`api.beacondb.net`, no API key required) — strictly enforcing a coordinate precision hierarchy (`MANUAL > CLF/NTM/KML > RUIAN > CELLMAPPER > GEOCODER > BEACONDB > OPENCELLID > CELLMAPPER_LOG`).
+  * **ČÚZK RÚIAN (`~2–10 m`), BeaconDB & Cross-Band Mast Propagation *(v1.8)*:** Strips mast jargon from Czech GSMweb addresses to query official **ČÚZK RÚIAN `GeocodeSOE`**, resolves streetless masts via **BeaconDB**, propagates known GPS across co-located `eNodeB`s sharing the same address via `BtsDao.propagateKnownSiteCoordinates`, and enforces `coordSourcePriority` (`MANUAL > CLF/NTM/KML > RUIAN > CELLMAPPER > GEOCODER > BEACONDB > OPENCELLID > CELLMAPPER_LOG`).
   * **Real BTS Distance, Azimuth & eNodeB Sibling Fallback:** Computes Haversine distance, cardinal bearing, ΔTA, `FSPL dB`, co-located mast bands, CETIN **MOCN** sharing, and **eNodeB anchor matching** across sibling sectors without false PCI mismatch warnings.
 * **5G NSA (EN-DC) vs. 5G SA Detection:** Per-SIM `TelephonyCallback` distinguishes `4G LTE`, `5G NSA` (`EN-DC LTE Anchor (Idle)` vs. `EN-DC NR Active`), and `5G SA`, including `SS-RSRP/RSRQ/SINR` and `CSI-RSRP/RSRQ/SINR`.
 * **Carrier Aggregation & Cell Decoding:** Exact DL/UL MHz frequencies, `Total CA` bandwidth, per-carrier `PCC/SCC/SCG` badges, PLMN, TAC, PCI, `eNodeB/gNodeB + Sector ID`, modem CQI, and Timing Advance BTS distance (`1×` / `2×`).
@@ -82,12 +82,12 @@ Interactive touch-scrubbing Canvas waveforms (live & historical): **Dual-SIM RSR
 
 ### 6. Spoofing & Jamming Shield *(v1.7)*
 * **Threat Risk Index (`0–100%`) & Sub-Scores:** Fused risk score across **GNSS**, **Cell RF**, and **Clock**, with bottom-bar warning badge, **Deep Scan**, tap-to-inspect **Check Detail Popups** (unclipped values, meaning & calculation formula), timestamped **Incident Log**, and **acoustic warning tone** on critical events during active recording.
-* **Multi-Source UTC Time Audit (`GNSS · NITZ · NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) with RTT compensation compared against hardware `GnssClock` UTC (`timeNanos − fullBiasNanos`) and cellular NITZ time, plus hardware clock discontinuity & oscillator drift tracking.
+* **Multi-Source UTC Time Audit (`GNSS · NITZ · NTP`):** Built-in RFC 4330 SNTP UDP:123 client (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) with RTT + callback-age alignment compared against hardware `GnssClock` UTC (`±2,000 ms` nominal) and cellular NITZ (`±2,500 / 3,500 ms`), plus active-3D-fix hardware discontinuity gating (`>= 2` jumps, session-reset on restart).
 * **RF Propagation Physics, Dual-SIM & Cellular DNS Audit:** Validates Timing Advance against known BTS Haversine distance (`ΔTA`), checks RSRP against path-loss and FSPL ceilings (`ΔFSPL > +12 dB`), flags wideband jamming (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G downgrades, reserved test IDs (`PLMN 00101`/`TAC 0/1`/`eNB 0/1`), narrow `1.4/3 MHz` LTE channels, poor `CQI` at strong RSRP, stationary IMU TA drops, Dual-SIM cross-correlation (`2G+TA=0` divergence, BTS `> 40 km`), and private cellular DNS / Captive Portal / `DATA_SUSPENDED` anomalies.
 * **Deep GNSS Anti-Spoofing & Multi-Sensor Fusion:** Evaluates `Location.isMock`, AGC compression, uniform C/N₀ & elevation inversion, orbital Doppler spread (`σ_v < 45 m/s`), L1-only & single-constellation GPS drops, raw `$GNGGA/$GNRMC` vs. Android Location (`> 35 m`), carrier-phase **ADR** collapse, opposite Doppler-vs-elevation trends, `≥ 60 s` sky freeze, `C/N₀` takeover steps, **Gyroscope `ΔYaw` vs. GNSS bearing**, magnetometer `|B|` (`18–95 µT`), zero-permission walking cadence (`imu_step_speed`), barometer `Δh > 40 m`, teleport jumps, and GNSS-vs-BTS distance (`> 45 km`).
 * **Demo Attack Simulator:** One-tap Demo Mode verification scenarios (*GNSS Spoof*, *GNSS Jamming*, *2G IMSI Catcher*, *TA + Power*, *Time Drift*).
 
-### 7. History & Exports (Room DB v6)
+### 7. History & Exports (Room DB v7)
 * **Session Management & Analytics:** Search, rename, view Dual-SIM analytics (`S1` + `S2` RSRP ranges, `5G/4G` share, avg PDOP, **Max Security Risk** & **Incident Count**), open waveforms in **Charts**, or inspect 1-based samples (`#1`, `#2`, …) with per-point **Security Status & Alert summary**, **jump-to-Map**, and single-point deletion.
 * **Streaming Exports (`Download/GNSS_Net_Logger/` & Share Sheet):**
   * **CSV** (complete SIM 1 + SIM 2 RF, `Sim1Bts*` / `Sim2Bts*`, `UniqueSats*`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA` / `Sim2CA`, `WaypointNote`, NMEA, Doppler, sensors, plus 10 v1.6 security columns: `SecurityRiskScore`, `SecurityStatus`, `GnssRiskScore`, `RfRiskScore`, `TimeRiskScore`, `GnssMinusNtpMs`, `Sim1TaVsBtsDelta_m`, `Sim1RsrpResidual_dB`, `Sim1RssiRsrpGap_dB`, `SecurityAlertsSummary`)
@@ -110,7 +110,7 @@ Interactive touch-scrubbing Canvas waveforms (live & historical): **Dual-SIM RSR
 * **Přepínač (`SIM 1` | `SIM 2` | `Obě SIM`):** Striktní DSDS oddělení karet s indikací `DATA AKTIVNÍ (RRC Connected)` vs. `HLAS & SMS (DSDS Standby)` a živým rozdílem signálu ΔRSRP.
 * **Databáze BTS 3 českých operátorů (`23001` T-Mobile CZ, `23002` O2 CZ, `23003` Vodafone CZ):**
   * **Univerzální import 7 formátů (`.csv` / `.clf` / `.ntm` / `.kml` / `.csv.gz` / `.zip`):** Streamovaně zpracuje **GSMweb.cz** (`CP1250`/`UTF-8`), **NetMonster `.ntm` / `nm2300x`**, **CLF v3/v4** (hex/dec), **CellMapper** eNodeB věžové CSV i logy, **KML `<Placemark>`**, **OpenCelliD `230.csv.gz`** a vícenásobné **`.zip` archivy** po dávkách 2 000 řádků.
-  * **ČÚZK RÚIAN (`~2–10 m`) & bezklíčové BeaconDB zaměření *(v1.8)*:** Očistí adresy z GSMwebu pro oficiální český registr **ČÚZK RÚIAN `GeocodeSOE`**, stožáry v lese a neznámé buňky dohledá přes **BeaconDB (`api.beacondb.net`)** bez API klíče a hlídá prioritu přesnosti (`Ruční > CLF/NTM/KML > RÚIAN > CellMapper eNB > Geocoder > BeaconDB > OpenCelliD`).
+  * **ČÚZK RÚIAN (`~2–10 m`), BeaconDB & propagace napříč pásmy stožáru *(v1.8)*:** Očistí adresy z GSMwebu pro oficiální český registr **ČÚZK RÚIAN `GeocodeSOE`**, lesní vysílače dohledá přes **BeaconDB**, lokálně zkopíruje vyřešenou polohu mezi různými pásmy (`eNodeB`) stejné adresy (`propagateKnownSiteCoordinates`) a hlídá prioritu přesnosti (`Ruční > CLF/NTM/KML > RÚIAN > CellMapper eNB > Geocoder > BeaconDB > OpenCelliD`).
   * **Skutečná vzdálenost k BTS, azimut & eNodeB kotvy:** Počítá Haversine vzdálenost, směr, ΔTA, útlum `FSPL dB`, souběžná pásma na stožáru, sdílení **MOCN** i párování sousedních sektorů podle `eNodeB` bez falešných varování PCI.
 * **Detekce 5G NSA (EN-DC) vs. 5G SA:** Per-SIM `TelephonyCallback` rozlišuje `4G LTE`, `5G NSA` (`EN-DC LTE Kotva (Idle)` vs. `EN-DC NR Aktivní`) a `5G SA`, včetně metrik `SS-RSRP/RSRQ/SINR` a `CSI-RSRP/RSRQ/SINR`.
 * **Carrier Aggregation & Dekódování buněk:** Přesné DL/UL frekvence v MHz, celková šířka pásma `Celkem CA`, štítky `PCC/SCC/SCG`, PLMN, TAC, PCI, `eNodeB/gNodeB + Sektor`, reálné CQI z modemu a vzdálenost BTS dle Timing Advance (`1×` / `2×`).
@@ -135,12 +135,12 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 
 ### 6. Podvody (Detekce spoofingu, rušení & přesného času) *(v1.7)*
 * **Threat Risk Index (`0–100 %`) & dílčí skóre:** Souhrnný ukazatel rizika pro **GNSS**, **RF sítě** a **Čas**, varovný štítek ve spodní liště, **Hloubkový sken**, rozklikávací **detailní pop-up u každé kontroly** (úplné hodnoty, význam a vzorec výpočtu), **Deník incidentů** a **akustický tón** při kritickém incidentu během záznamu.
-* **Srovnání přesného času (`GNSS · NITZ · NTP`):** Vestavěný RFC 4330 SNTP UDP:123 klient (`time.google.com`, `tik.cesnet.cz`, `pool.ntp.org`, `time.cloudflare.com`) s kompenzací RTT oproti `GnssClock` UTC (`timeNanos − fullBiasNanos`) a síťovému času NITZ + sledování diskontinuit a driftu oscilátoru.
+* **Srovnání přesného času (`GNSS · NITZ · NTP`):** Vestavěný RFC 4330 SNTP UDP:123 klient s kompenzací RTT i stáří měření oproti `GnssClock` UTC (`±2 000 ms` v normě) a síťovému času NITZ (`±2 500 / 3 500 ms`), plus sledování diskontinuit výhradně při platném 3D fixu (`>= 2` skoky, nulování při restartu).
 * **RF Fyzika, Dual-SIM korelace & audit DNS:** Ověřuje vzdálenost dle Timing Advance proti poloze BTS (ΔTA), kontroluje empirický útlum i teoretický strop `FSPL` (`ΔFSPL > +12 dB`), detekuje širokopásmové rušení (`RSSI − RSRP > 38 dB` + SINR/RSRQ), 2G downgrade, testovací ID (`PLMN 00101`/`TAC 0/1`/`eNB 0/1`), úzkou šířku kanálu (`1,4/3 MHz`), nízké `CQI` při silném RSRP, skokové poklesy TA při klidovém IMU, křížovou kontrolu **Dual-SIM** (`2G+TA=0`, rozestup BTS `> 40 km`) i privátní DNS / Captive Portal na mobilních datech.
 * **GNSS Anti-Spoofing & fúze senzorů:** Kontroluje `Location.isMock`, kompresi AGC, jednotný `C/N₀` i inverzi elevace, kolaps Dopplerova rozptylu, vymizení L5/E5a i ostatních konstelací při silném GPS, nesoulad surových vět `$GNGGA/$GNRMC` s `Location API` (`> 35 m`), výpadek nosné fáze **ADR**, opačný Doppler vůči elevaci, zamrzlou oblohu (`≥ 60 s`), skok `C/N₀`, **fúzi gyroskopu (`ΔYaw` vs. kurz GNSS)**, magnetometr `|B|` (`18–95 µT`), detekci chůze (`imu_step_speed`), barometr (`Δh > 40 m`), skoky polohy a vzdálenost GNSS vs. BTS (`> 45 km`).
 * **Demo Simulátor útoků:** V Demo režimu testuje scénáře *GNSS Spoof*, *GNSS Jamming*, *2G IMSI Catcher*, *TA + Výkon* a *Časový útok*.
 
-### 7. Historie & Exporty (Room DB v6)
+### 7. Historie & Exporty (Room DB v7)
 * **Správa relací & statistiky:** Vyhledávání, přejmenování, Dual-SIM přehled (`S1` + `S2` RSRP rozsahy, podíl `5G/4G`, průměrný PDOP, **Max. riziko** a **Počet incidentů**), otevření průběhů v **Grafech** a bodový inspektor číslovaný od **`#1`** se stavem zabezpečení, **skokem na Mapu** a mazáním bodů.
 * **Streamované exporty (`Download/GNSS_Net_Logger/` & Sdílení):**
   * **CSV** (kompletní sloupce SIM 1 + SIM 2, `Sim1Bts*` / `Sim2Bts*`, `UniqueSats*`, `UsedSatellites`, `VisibleSatellites`, `Sim1CA` / `Sim2CA`, `WaypointNote`, NMEA, Doppler, senzory + 10 bezpečnostních sloupců v1.6: `SecurityRiskScore`, `SecurityStatus`, `GnssRiskScore`, `RfRiskScore`, `TimeRiskScore`, `GnssMinusNtpMs`, `Sim1TaVsBtsDelta_m`, `Sim1RsrpResidual_dB`, `Sim1RssiRsrpGap_dB`, `SecurityAlertsSummary`)
@@ -155,7 +155,7 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 ### Settings & Illustrated PDF Manual / Nastavení a PDF manuál
 * **Language / Jazyk:** Czech, English, or System default / Čeština, Angličtina nebo dle systému.
 * **Demo Mode / Demo režim:** Synthetic drive-test around FEKT VUT Brno with `DEMO` badge & attack simulator; cleanly resets on exit.
-* **Sampling & Calibration / Vzorkování & Kalibrace:** **Walking (`5s / 10m`)**, **Driving (`10s / 50m`)**, **Static (`10s`)** + continuous sliders (`1–60 s`, `5–200 m`), TA multiplier (`1× 78.12 m` / `2× 156.24 m`), QNH pressure (`1013.25 hPa`), and optional BTS geocoding toggle.
+* **Sampling & Calibration / Vzorkování & Kalibrace:** **Walking (`5s / 10m`)**, **Driving (`10s / 50m`)**, **Static (`10s`)** + continuous sliders (`1–60 s`, `5–200 m`), **IMU Stationary Filter (`IMU KLID • Hold`)** suppressing ~10 m indoor/weak-signal drift when still, TA multiplier (`1× 78.12 m` / `2× 156.24 m`), QNH pressure (`1013.25 hPa`), and optional BTS geocoding toggle.
 * **6-Page Vector PDF Manual / 6stránkový ilustrovaný PDF manuál:** Tap the top-right **Info (`ⓘ`)** icon to download into `Download/GNSS_Net_Logger/GNSS_Net_Logger_v1.8_Manual_*.pdf` or open/share a bilingual vector-illustrated handbook covering every GNSS, RF, BTS, TA, and anti-spoofing model.
 
 ### Permissions & Privacy / Oprávnění a soukromí
@@ -167,8 +167,8 @@ Interaktivní dotykové křivky s min/prům/max statistikou (živě i pro histor
 | `POST_NOTIFICATIONS` | Active recording notification | Zobrazení notifikace běžícího záznamu |
 | `INTERNET` / `ACCESS_NETWORK_STATE` | OpenStreetMap tiles, SNTP UDP:123 clock audit, ČÚZK RÚIAN / BeaconDB BTS lookup & `8.8.8.8:53` ping | Mapové dlaždice OSM, přesný čas SNTP UDP:123, dohledání BTS přes ČÚZK RÚIAN / BeaconDB a ping `8.8.8.8:53` |
 
-> All telemetry stays strictly on-device in Room/SQLite storage (`v6`). Zero cloud uploads or analytics SDKs are used.  
-> Veškerá data zůstávají výhradně v lokální databázi zařízení (`Room v6`) bez jakéhokoli cloudu či analytických SDK.
+> All telemetry stays strictly on-device in Room/SQLite storage (`v7`). Zero cloud uploads or analytics SDKs are used.  
+> Veškerá data zůstávají výhradně v lokální databázi zařízení (`Room v7`) bez jakéhokoli cloudu či analytických SDK.
 
 ### Releases / Vydání
 | Version | Release Notes | APK Package |

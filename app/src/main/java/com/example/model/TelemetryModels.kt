@@ -66,7 +66,11 @@ data class GnssState(
     val hasEverSeenValidAdr: Boolean = false,
     val nmeaLat: Double? = null,
     val nmeaLon: Double? = null,
-    val nmeaVsLocationDistM: Double? = null
+    val nmeaVsLocationDistM: Double? = null,
+    // v1.8 Clock latency alignment & HAL measurement presence
+    val fixElapsedMs: Long? = null,
+    val gnssHardwareUtcElapsedMs: Long? = null,
+    val hasGnssClockData: Boolean = false
 )
 
 data class CellNeighbor(
@@ -197,6 +201,8 @@ data class MotionSensorState(
     val magneticFieldUt: Float? = null,
     val stepsLast6s: Int = 0,
     val isWalkingDetected: Boolean = false,
+    val isStationary: Boolean = false,
+    val stationaryDurationSec: Int = 0,
     val hasSensors: Boolean = true
 )
 
@@ -277,5 +283,6 @@ data class LoggingSettings(
     val taMultiplierMode: Int = 2, // 1 = standard 78m, 2 = 156m (calibrated for user mobile)
     val darkMapMode: Boolean = true,
     val audioAnomalyAlerts: Boolean = false,
-    val autoGeocodeBts: Boolean = true
+    val autoGeocodeBts: Boolean = true,
+    val smartStationaryFilter: Boolean = true
 )

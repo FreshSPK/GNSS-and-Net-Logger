@@ -812,9 +812,9 @@ private fun SecurityMethodologyDialog(
                 MethodSection(
                     title = if (isCs) "2. Srovnání času (GNSS · Mobilní síť · NTP)" else "2. Multi-Clock Audit (GNSS · Network · NTP)",
                     body = if (isCs) {
-                        "Porovnává v reálném čase přesný UTC čas ze satelitů (GnssClock i Fix), síťový/systémový čas NITZ a internetový NTP dotaz (UDP:123 s kompenzací RTT, limit 800 ms). Odhaluje replay útoky (meaconing), manipulaci NITZ i skoky krystalu GnssClock."
+                        "Porovnává v reálném čase přesný UTC čas ze satelitů (GnssClock i Fix), síťový/systémový čas NITZ a internetový NTP dotaz (UDP:123 s kompenzací RTT, limit 2 000 ms). Odhaluje replay útoky (meaconing), manipulaci NITZ i skoky krystalu GnssClock během aktivního fixu."
                     } else {
-                        "Continuously compares GNSS UTC (GnssClock & Fix), carrier NITZ/System time, and live SNTP UTC (UDP:123 with RTT compensation, 800 ms green window) to catch GNSS replay, NITZ spoofing, and oscillator jumps."
+                        "Continuously compares GNSS UTC (GnssClock & Fix), carrier NITZ/System time, and live SNTP UTC (UDP:123 with RTT compensation, 2,000 ms green window) to catch GNSS replay, NITZ spoofing, and oscillator jumps during active fix."
                     }
                 )
                 MethodSection(

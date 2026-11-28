@@ -24,7 +24,9 @@ import com.example.model.*
 import com.example.security.SecurityAnalyzer
 import com.example.security.SecurityContextSnapshot
 import com.example.security.SecurityMonitorEngine
+import com.example.service.TelemetryLoggingService
 import com.example.telemetry.EnvironmentSensorEngine
+import com.example.telemetry.ImuStationaryTracker
 import com.example.ui.tabs.*
 import com.example.ui.theme.SignalLoggerTheme
 import com.example.util.BandMapper
@@ -351,9 +353,15 @@ class ComprehensiveAppTest {
         writable.close()
         legacyHelper.close()
 
-        // 2. Open with Room v6 and run MIGRATION_5_6 cleanly
+        // 2. Open with Room v7 and run MIGRATION_5_6 + MIGRATION_6_7 cleanly
         val roomDb = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
+            .addMigrations(
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
+                AppDatabase.MIGRATION_6_7
+            )
             .allowMainThreadQueries()
             .build()
         try {
@@ -628,13 +636,13 @@ class ComprehensiveAppTest {
     }
 
     @Test
-    fun testClockOffsetUpTo800MsStaysOkAndAbove800MsTriggersWarning() {
+    fun testClockOffsetUpTo2000MsStaysOkAndAbove2000MsTriggersWarning() {
         val now = 1700000000000L
         val gnss = cleanGnss()
         val cell = CellularState(sim1 = cleanSim1())
 
-        // -662 ms (exact screenshot scenario) and exactly -800 ms must stay OK (green)
-        for (offsetMs in listOf(-662L, -800L, 800L)) {
+        // -662 ms, -1500 ms, and +/-2000 ms must stay OK (green)
+        for (offsetMs in listOf(-662L, -1500L, -2000L, 2000L)) {
             val diag = TimeSyncDiagnostics(
                 ntpTimeMs = now,
                 systemTimeMs = now + offsetMs,
@@ -651,34 +659,38 @@ class ComprehensiveAppTest {
             assertEquals("Offset $offsetMs ms should stay OK", ThreatSeverity.OK, timeCheck.severity)
         }
 
-        // -850 ms should trigger WARNING, -2200 ms should trigger CRITICAL
+        // -2200 ms should trigger WARNING (+20 pts), -5500 ms should trigger CRITICAL (+70 pts)
         val warnDiag = TimeSyncDiagnostics(
-            ntpTimeMs = now,
-            systemTimeMs = now - 730L,
-            gnssFixTimeMs = now - 850L,
-            gnssHardwareUtcMs = now - 850L
-        )
-        val warnRes = SecurityAnalyzer.evaluate(
-            gnssInput = gnss.copy(fixTimestampMs = now - 850L, gnssHardwareUtcMs = now - 850L),
-            cellularInput = cell,
-            timeDiagInput = warnDiag,
-            ctx = SecurityContextSnapshot()
-        )
-        assertEquals(ThreatSeverity.WARNING, warnRes.checks.first { it.id == "time_triple_sync" }.severity)
-
-        val critDiag = TimeSyncDiagnostics(
             ntpTimeMs = now,
             systemTimeMs = now - 730L,
             gnssFixTimeMs = now - 2200L,
             gnssHardwareUtcMs = now - 2200L
         )
-        val critRes = SecurityAnalyzer.evaluate(
+        val warnRes = SecurityAnalyzer.evaluate(
             gnssInput = gnss.copy(fixTimestampMs = now - 2200L, gnssHardwareUtcMs = now - 2200L),
+            cellularInput = cell,
+            timeDiagInput = warnDiag,
+            ctx = SecurityContextSnapshot()
+        )
+        val warnCheck = warnRes.checks.first { it.id == "time_triple_sync" }
+        assertEquals(ThreatSeverity.WARNING, warnCheck.severity)
+        assertEquals(20, warnCheck.scoreImpact)
+
+        val critDiag = TimeSyncDiagnostics(
+            ntpTimeMs = now,
+            systemTimeMs = now - 730L,
+            gnssFixTimeMs = now - 5500L,
+            gnssHardwareUtcMs = now - 5500L
+        )
+        val critRes = SecurityAnalyzer.evaluate(
+            gnssInput = gnss.copy(fixTimestampMs = now - 5500L, gnssHardwareUtcMs = now - 5500L),
             cellularInput = cell,
             timeDiagInput = critDiag,
             ctx = SecurityContextSnapshot()
         )
-        assertEquals(ThreatSeverity.CRITICAL, critRes.checks.first { it.id == "time_triple_sync" }.severity)
+        val critCheck = critRes.checks.first { it.id == "time_triple_sync" }
+        assertEquals(ThreatSeverity.CRITICAL, critCheck.severity)
+        assertEquals(70, critCheck.scoreImpact)
     }
 
     @Test
@@ -820,5 +832,156 @@ class ComprehensiveAppTest {
         composeTestRule.onNodeWithText("Skok TA při klidu IMU").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Gyroskop ΔYaw vs. GNSS").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Magnetometr |B| / Kroky (6s)").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun testGnssClockDiscontinuityGatingNoFixIgnoreAndSessionReset() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val engine = SecurityMonitorEngine(context, scope)
+        val env = EnvironmentState()
+        val cell = CellularState(sim1 = cleanSim1())
+
+        // 1. Before any GnssMeasurementsEvent arrives (hasGnssClockData=false), engine must NOT latch 0
+        engine.evaluateNow(
+            gnss = cleanGnss().copy(hasGnssClockData = false, clockDiscontinuityCount = 0),
+            cellular = cell,
+            env = env,
+            isDemoMode = false
+        )
+        assertEquals(
+            ThreatSeverity.OK,
+            engine.securityState.value.checks.first { it.id == "gnss_hw_clock" }.severity
+        )
+
+        // 2. First real HAL callback reports pre-existing boot discontinuity count = 16 -> delta must be +0 (OK)
+        engine.evaluateNow(
+            gnss = cleanGnss().copy(
+                hasGnssClockData = true,
+                clockDiscontinuityCount = 16,
+                hasFix = true,
+                satellitesUsedInFix = 8
+            ),
+            cellular = cell,
+            env = env,
+            isDemoMode = false
+        )
+        val afterBoot = engine.securityState.value.checks.first { it.id == "gnss_hw_clock" }
+        assertEquals(ThreatSeverity.OK, afterBoot.severity)
+        assertTrue(afterBoot.measuredValue.contains("Skoky: +0"))
+
+        // 3. Indoor duty-cycling without 3D fix increments HAL counter to 20 -> ignored
+        engine.evaluateNow(
+            gnss = cleanGnss().copy(
+                hasGnssClockData = true,
+                clockDiscontinuityCount = 20,
+                hasFix = false,
+                satellitesUsedInFix = 2
+            ),
+            cellular = cell,
+            env = env,
+            isDemoMode = false
+        )
+        val afterIndoor = engine.securityState.value.checks.first { it.id == "gnss_hw_clock" }
+        assertEquals(ThreatSeverity.OK, afterIndoor.severity)
+        assertTrue(afterIndoor.measuredValue.contains("Skoky: +0"))
+
+        // 4. Two clock jumps during an active 3D fix (20 -> 22) -> triggers WARNING
+        engine.evaluateNow(
+            gnss = cleanGnss().copy(
+                hasGnssClockData = true,
+                clockDiscontinuityCount = 22,
+                hasFix = true,
+                satellitesUsedInFix = 8
+            ),
+            cellular = cell,
+            env = env,
+            isDemoMode = false
+        )
+        val afterActiveJumps = engine.securityState.value.checks.first { it.id == "gnss_hw_clock" }
+        assertEquals(ThreatSeverity.WARNING, afterActiveJumps.severity)
+        assertTrue(afterActiveJumps.measuredValue.contains("Skoky: +2"))
+
+        // 5. Resetting session baselines on app/session restart must clear counter back to +0
+        engine.resetSessionBaselines(preserveNtp = true)
+        engine.evaluateNow(
+            gnss = cleanGnss().copy(
+                hasGnssClockData = true,
+                clockDiscontinuityCount = 22,
+                hasFix = true,
+                satellitesUsedInFix = 8
+            ),
+            cellular = cell,
+            env = env,
+            isDemoMode = false
+        )
+        val afterReset = engine.securityState.value.checks.first { it.id == "gnss_hw_clock" }
+        assertEquals(ThreatSeverity.OK, afterReset.severity)
+        assertTrue(afterReset.measuredValue.contains("Skoky: +0"))
+    }
+
+    @Test
+    fun testImuStationaryTrackerAndLoggingTriggerFilter() {
+        val tracker = ImuStationaryTracker(requiredCalmMs = 4000L)
+        assertFalse(tracker.update(9.81f, 0.01f, -0.01f, 0.02f, 48.0f, 120f, 0, 1000L).first)
+        assertFalse(tracker.update(9.82f, 0.01f, 0.0f, 0.01f, 48.2f, 121f, 0, 3500L).first)
+        val (stationary, sec) = tracker.update(9.80f, 0.01f, 0.0f, 0.01f, 48.1f, 121f, 0, 5200L)
+        assertTrue(stationary)
+        assertTrue(sec >= 4)
+
+        // Sudden walking step or gyro motion breaks stationary lock immediately
+        val (afterStep, _) = tracker.update(9.81f, 0.01f, 0.0f, 0.01f, 48.1f, 121f, 1, 5500L)
+        assertFalse(afterStep)
+
+        val walkSettings = LoggingSettings(
+            triggerMode = LogTriggerMode.HYBRID,
+            timeIntervalSeconds = 5,
+            distanceThresholdMeters = 10f,
+            smartStationaryFilter = true,
+            isDemoMode = false
+        )
+        // First fix always logs
+        val firstDecision = TelemetryLoggingService.evaluateLogTrigger(
+            settings = walkSettings,
+            nowMs = 10_000L,
+            lastLogTimestampMs = 0L,
+            hasLastLoggedLocation = false,
+            distanceFromLastM = Float.MAX_VALUE,
+            hasGnssFix = true,
+            horizontalAccuracyM = 10f,
+            gnssSpeedMs = 0f,
+            isImuStationary = true
+        )
+        assertTrue(firstDecision.shouldLog)
+
+        // Standing still in poor 10m coverage with 6s elapsed and 12m GPS wander: suppressed!
+        val holdDecision = TelemetryLoggingService.evaluateLogTrigger(
+            settings = walkSettings,
+            nowMs = 16_000L,
+            lastLogTimestampMs = 10_000L,
+            hasLastLoggedLocation = true,
+            distanceFromLastM = 12f,
+            hasGnssFix = true,
+            horizontalAccuracyM = 10f,
+            gnssSpeedMs = 0.2f,
+            isImuStationary = true
+        )
+        assertFalse(holdDecision.shouldLog)
+        assertTrue(holdDecision.isStationaryHold)
+
+        // Once user starts walking (IMU no longer stationary), trigger fires cleanly
+        val movingDecision = TelemetryLoggingService.evaluateLogTrigger(
+            settings = walkSettings,
+            nowMs = 16_000L,
+            lastLogTimestampMs = 10_000L,
+            hasLastLoggedLocation = true,
+            distanceFromLastM = 12f,
+            hasGnssFix = true,
+            horizontalAccuracyM = 10f,
+            gnssSpeedMs = 1.4f,
+            isImuStationary = false
+        )
+        assertTrue(movingDecision.shouldLog)
+        assertFalse(movingDecision.isStationaryHold)
     }
 }

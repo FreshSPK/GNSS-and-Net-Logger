@@ -176,29 +176,29 @@ fun getSecurityCheckGuide(checkId: String, isCs: Boolean): SecurityCheckGuide {
                     "Note: Carrier NITZ updates have 1 s granularity (higher NITZ−NTP tolerance)."
             },
             thresholds = if (isCs) {
-                "OK: |GNSS−NTP| ≤ 800 ms, |GNSS−NITZ| ≤ 800 ms, |NITZ−NTP| ≤ 2500 ms · WARNING (+35 b.): |GNSS−NTP| > 800 ms nebo |GNSS−NITZ| > 800 ms · CRITICAL (+75 b.): |GNSS−NTP| > 2000 ms nebo |GNSS−NITZ| > 2500 ms."
+                "OK: |GNSS−NTP| ≤ 2 000 ms, |GNSS−NITZ| ≤ 2 500 ms, |NITZ−NTP| ≤ 3 500 ms · WARNING (+20 b.): GNSS−NTP > 2 000 ms, GNSS−NITZ > 2 500 ms nebo NITZ−NTP > 3 500 ms · CRITICAL (+70 b.): > 5 000 ms / 6 000 ms / 8 000 ms."
             } else {
-                "OK: |GNSS−NTP| ≤ 800 ms, |GNSS−NITZ| ≤ 800 ms, |NITZ−NTP| ≤ 2500 ms · WARNING (+35 pts): |GNSS−NTP| > 800 ms or |GNSS−NITZ| > 800 ms · CRITICAL (+75 pts): |GNSS−NTP| > 2000 ms or |GNSS−NITZ| > 2500 ms."
+                "OK: |GNSS−NTP| ≤ 2,000 ms, |GNSS−NITZ| ≤ 2,500 ms, |NITZ−NTP| ≤ 3,500 ms · WARNING (+20 pts): > 2,000 / 2,500 / 3,500 ms · CRITICAL (+70 pts): > 5,000 / 6,000 / 8,000 ms."
             }
         )
 
         checkId == "gnss_hw_clock" -> SecurityCheckGuide(
             whatItMeans = if (isCs) {
-                "Sleduje plynulost chodu vnitřního křemenného oscilátoru (TCXO) GNSS přijímače. Časté diskontinuity nebo extrémní frekvenční drift mohou značit násilné přesměrování hodin čipu při manipulaci se signálem (nebo agresivní úsporný režim GNSS čipu v interiéru)."
+                "Sleduje plynulost chodu vnitřního křemenného oscilátoru (TCXO) GNSS přijímače. Počítá pouze nové skoky vzniklé během aktivního 3D fixu (≥ 4 satelity) – běžné úsporné resetování čipu bez fixu v interiéru a počítadlo před startem relace jsou ignorovány a po restartu aplikace se nulují."
             } else {
-                "Monitors stability of the internal GNSS TCXO oscillator via clock discontinuity jumps and drift rate. Unexpected jumps can reflect forced GNSS clock re-locking or indoor GNSS power cycling."
+                "Monitors stability of the internal GNSS TCXO oscillator via clock discontinuity jumps and drift rate. Counts only new discontinuities occurring during active 3D fix (≥ 4 sats), ignoring boot HAL totals, indoor power cycling without fix, and resetting cleanly on restart."
             },
             howItIsCalculated = if (isCs) {
-                "Skoky = (aktuální hardwareClockDiscontinuityCount) − (hodnota při startu relace).\n" +
+                "Skoky = součet nových inkrementů hardwareClockDiscontinuityCount od prvního GnssMeasurementsEvent během aktivního fixu (při startu relace vždy 0).\n" +
                     "Drift = GnssClock.driftNanosPerSecond [ns/s]."
             } else {
-                "Jumps = current hardwareClockDiscontinuityCount minus baseline at session start.\n" +
+                "Jumps = cumulative increments of hardwareClockDiscontinuityCount during active 3D fix after initial GnssMeasurementsEvent (resets to 0 per session).\n" +
                     "Drift = GnssClock.driftNanosPerSecond [ns/s]."
             },
             thresholds = if (isCs) {
-                "OK: 0 nových skoků v relaci a |drift| ≤ 50 000 ns/s · WARNING (+30 b.): skoky > 0 nebo |drift| > 50 000 ns/s."
+                "OK: < 2 nové skoky za fixu a |drift| ≤ 50 000 ns/s · WARNING (+25 b.): skoky ≥ 2 nebo |drift| > 50 000 ns/s."
             } else {
-                "OK: 0 new discontinuities and |drift| ≤ 50,000 ns/s · WARNING (+30 pts): discontinuities > 0 or |drift| > 50,000 ns/s."
+                "OK: < 2 discontinuities in fix and |drift| ≤ 50,000 ns/s · WARNING (+25 pts): discontinuities ≥ 2 or |drift| > 50,000 ns/s."
             }
         )
 

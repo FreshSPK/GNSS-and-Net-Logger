@@ -18,6 +18,7 @@ import com.example.data.db.TelemetryRecord
 import com.example.model.AnomalySeverity
 import com.example.model.ChartPoint
 import com.example.model.LogTriggerMode
+import com.example.model.LoggingSettings
 import com.example.model.MapTrailPoint
 import com.example.model.ThreatSeverity
 import kotlinx.coroutines.*
@@ -26,6 +27,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.*
+
+data class LogTriggerDecision(
+    val shouldLog: Boolean,
+    val isStationaryHold: Boolean
+)
 
 class TelemetryLoggingService : Service() {
 
@@ -92,6 +98,75 @@ class TelemetryLoggingService : Service() {
         // Continuous live map trail buffer persisted across tab switches
         private val _liveMapTrail = MutableStateFlow<List<MapTrailPoint>>(emptyList())
         val liveMapTrail: StateFlow<List<MapTrailPoint>> = _liveMapTrail.asStateFlow()
+
+        private val _isStationaryHold = MutableStateFlow(false)
+        val isStationaryHold: StateFlow<Boolean> = _isStationaryHold.asStateFlow()
+
+        fun evaluateLogTrigger(
+            settings: LoggingSettings,
+            nowMs: Long,
+            lastLogTimestampMs: Long,
+            hasLastLoggedLocation: Boolean,
+            distanceFromLastM: Float,
+            hasGnssFix: Boolean,
+            horizontalAccuracyM: Float,
+            gnssSpeedMs: Float,
+            isImuStationary: Boolean
+        ): LogTriggerDecision {
+            if (!hasLastLoggedLocation || lastLogTimestampMs == 0L) {
+                return LogTriggerDecision(shouldLog = true, isStationaryHold = false)
+            }
+
+            val applyStationaryHold = !settings.isDemoMode && settings.smartStationaryFilter && isImuStationary
+            val speedKmh = gnssSpeedMs * 3.6f
+            val noiseFloorM = if (horizontalAccuracyM > 0f) horizontalAccuracyM * 2.2f else 20f
+
+            return when (settings.triggerMode) {
+                LogTriggerMode.TIME -> {
+                    if (applyStationaryHold) {
+                        val requiredDist = maxOf(18f, noiseFloorM)
+                        val realMove = hasGnssFix && distanceFromLastM >= requiredDist &&
+                            (speedKmh >= 4.0f || distanceFromLastM >= requiredDist * 1.25f)
+                        LogTriggerDecision(shouldLog = realMove, isStationaryHold = !realMove)
+                    } else {
+                        val intervalMs = settings.timeIntervalSeconds * 1000L
+                        LogTriggerDecision(shouldLog = nowMs - lastLogTimestampMs >= intervalMs, isStationaryHold = false)
+                    }
+                }
+                LogTriggerMode.DISTANCE -> {
+                    if (applyStationaryHold) {
+                        val requiredDist = maxOf(settings.distanceThresholdMeters * 2.0f, noiseFloorM)
+                        val realMove = hasGnssFix && distanceFromLastM >= requiredDist &&
+                            (speedKmh >= 4.0f || distanceFromLastM >= requiredDist * 1.25f)
+                        LogTriggerDecision(shouldLog = realMove, isStationaryHold = !realMove)
+                    } else {
+                        val requiredDist = if (gnssSpeedMs < 0.4f && horizontalAccuracyM > 5f) {
+                            maxOf(settings.distanceThresholdMeters, horizontalAccuracyM)
+                        } else {
+                            settings.distanceThresholdMeters
+                        }
+                        LogTriggerDecision(shouldLog = distanceFromLastM >= requiredDist, isStationaryHold = false)
+                    }
+                }
+                LogTriggerMode.HYBRID -> {
+                    if (applyStationaryHold) {
+                        val requiredDist = maxOf(settings.distanceThresholdMeters * 2.0f, noiseFloorM)
+                        val realMove = hasGnssFix && distanceFromLastM >= requiredDist &&
+                            (speedKmh >= 4.0f || distanceFromLastM >= requiredDist * 1.25f)
+                        LogTriggerDecision(shouldLog = realMove, isStationaryHold = !realMove)
+                    } else {
+                        val intervalMs = settings.timeIntervalSeconds * 1000L
+                        val requiredDist = if (gnssSpeedMs < 0.4f && horizontalAccuracyM > 5f) {
+                            maxOf(settings.distanceThresholdMeters, horizontalAccuracyM)
+                        } else {
+                            settings.distanceThresholdMeters
+                        }
+                        val trigger = (nowMs - lastLogTimestampMs >= intervalMs) || (distanceFromLastM >= requiredDist)
+                        LogTriggerDecision(shouldLog = trigger, isStationaryHold = false)
+                    }
+                }
+            }
+        }
 
         @Synchronized
         fun addChartPoint(point: ChartPoint) {
@@ -190,7 +265,9 @@ class TelemetryLoggingService : Service() {
         _handoverCountSim1.value = 0
         _handoverCountSim2.value = 0
         _handoverCount.value = 0
+        _isStationaryHold.value = false
 
+        app.securityEngine.resetSessionBaselines(preserveNtp = true)
         app.reconcileEngines()
 
         serviceScope.launch {
@@ -241,6 +318,7 @@ class TelemetryLoggingService : Service() {
                 if (!_isPaused.value) {
                     val currentSettings = app.settings.value
                     val gnss = app.gnssEngine.gnssState.value
+                    val motion = app.environmentEngine.envState.value.motion
                     val now = System.currentTimeMillis()
 
                     val loc = Location("current").apply {
@@ -249,46 +327,22 @@ class TelemetryLoggingService : Service() {
                         altitude = gnss.altitudeMsl
                     }
 
-                    var shouldLog = false
-                    when (currentSettings.triggerMode) {
-                        LogTriggerMode.TIME -> {
-                            val intervalMs = currentSettings.timeIntervalSeconds * 1000L
-                            if (now - lastLogTimestampMs >= intervalMs) {
-                                shouldLog = true
-                            }
-                        }
-                        LogTriggerMode.DISTANCE -> {
-                            if (lastLoggedLocation == null) {
-                                shouldLog = true
-                            } else {
-                                val dist = lastLoggedLocation!!.distanceTo(loc)
-                                // Static GPS drift guard
-                                val requiredDist = if (gnss.speedMs < 0.4f && gnss.horizontalAccuracyM > 5f) {
-                                    maxOf(currentSettings.distanceThresholdMeters, gnss.horizontalAccuracyM)
-                                } else {
-                                    currentSettings.distanceThresholdMeters
-                                }
-                                if (dist >= requiredDist) {
-                                    shouldLog = true
-                                }
-                            }
-                        }
-                        LogTriggerMode.HYBRID -> {
-                            val intervalMs = currentSettings.timeIntervalSeconds * 1000L
-                            val dist = lastLoggedLocation?.distanceTo(loc) ?: Float.MAX_VALUE
-                            val requiredDist = if (gnss.speedMs < 0.4f && gnss.horizontalAccuracyM > 5f) {
-                                maxOf(currentSettings.distanceThresholdMeters, gnss.horizontalAccuracyM)
-                            } else {
-                                currentSettings.distanceThresholdMeters
-                            }
-                            if (now - lastLogTimestampMs >= intervalMs || dist >= requiredDist) {
-                                shouldLog = true
-                            }
-                        }
-                    }
+                    val distFromLast = lastLoggedLocation?.distanceTo(loc) ?: Float.MAX_VALUE
+                    val decision = evaluateLogTrigger(
+                        settings = currentSettings,
+                        nowMs = now,
+                        lastLogTimestampMs = lastLogTimestampMs,
+                        hasLastLoggedLocation = lastLoggedLocation != null,
+                        distanceFromLastM = distFromLast,
+                        hasGnssFix = gnss.hasFix,
+                        horizontalAccuracyM = gnss.horizontalAccuracyM,
+                        gnssSpeedMs = gnss.speedMs,
+                        isImuStationary = motion.isStationary
+                    )
+                    _isStationaryHold.value = decision.isStationaryHold
 
                     val sId = currentSessionId
-                    if (shouldLog && sId != null) {
+                    if (decision.shouldLog && sId != null) {
                         recordSample(sId, waypointNote = null, forceNow = false)
                     }
                 }
@@ -592,6 +646,7 @@ class TelemetryLoggingService : Service() {
         logLoopJob?.cancel()
         _isLogging.value = false
         _isPaused.value = false
+        _isStationaryHold.value = false
 
         serviceScope.launch {
             val app = application as SignalLoggerApp
